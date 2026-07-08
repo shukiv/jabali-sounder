@@ -41,6 +41,8 @@ export function useUpdateServer() {
       base_url?: string;
       scopes?: string[];
       insecure_skip_verify?: boolean;
+      token_id?: string;
+      token_secret?: string;
     }) => {
       const { id, ...payload } = input;
       const resp = await apiClient.patch<Server>(`/admin/servers/${id}`, payload);

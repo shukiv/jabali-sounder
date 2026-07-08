@@ -170,6 +170,8 @@ type updateServerRequest struct {
 	BaseURL            *string   `json:"base_url"`
 	Scopes             *[]string `json:"scopes"`
 	InsecureSkipVerify *bool     `json:"insecure_skip_verify"`
+	TokenID            *string   `json:"token_id"`
+	TokenSecret        *string   `json:"token_secret"`
 }
 
 func (h *serverHandler) update(c *gin.Context) {
@@ -207,12 +209,44 @@ func (h *serverHandler) update(c *gin.Context) {
 	if req.InsecureSkipVerify != nil {
 		s.InsecureSkipVerify = *req.InsecureSkipVerify
 	}
+	// Token credential edits. Changing either invalidates the known-good
+	// credential status until the next health check re-validates it.
+	if req.TokenID != nil {
+		if tid := strings.TrimSpace(*req.TokenID); tid != "" {
+			s.TokenID = tid
+			s.CredentialStatus = models.CredentialUnknown
+		}
+	}
+	if req.TokenSecret != nil {
+		if ts := strings.TrimSpace(*req.TokenSecret); ts != "" {
+			enc, err := h.encryptSecret(ts)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "encrypt token secret: " + err.Error()})
+				return
+			}
+			s.TokenSecretEnc = enc
+			s.CredentialStatus = models.CredentialUnknown
+		}
+	}
 
 	if err := h.cfg.Repo.Update(c.Request.Context(), s); err != nil {
+		if strings.Contains(err.Error(), "Duplicate") || strings.Contains(err.Error(), "duplicate") {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "duplicate name or token_id"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "update: " + err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, s)
+}
+
+// encryptSecret seals a plaintext token secret with the manager key, falling
+// back to hex-encoded plaintext only when no key is configured (dev).
+func (h *serverHandler) encryptSecret(plaintext string) ([]byte, error) {
+	if h.cfg.SecretKey != nil {
+		return h.cfg.SecretKey.Seal([]byte(plaintext))
+	}
+	return []byte(hex.EncodeToString([]byte(plaintext))), nil
 }
 
 func normalizePanelBaseURL(raw string) (string, error) {

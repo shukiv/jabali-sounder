@@ -85,6 +85,7 @@ export default function Servers() {
       panel_host: hostnameFromBaseURL(server.base_url),
       scopes: server.scopes,
       insecure_skip_verify: server.insecure_skip_verify,
+      token_id: server.token_id,
     });
     setDrawerOpen(true);
   };
@@ -106,6 +107,10 @@ export default function Servers() {
           base_url: baseURL,
           scopes: values.scopes,
           insecure_skip_verify: values.insecure_skip_verify,
+          token_id: values.token_id,
+          ...(values.token_secret
+            ? { token_secret: values.token_secret }
+            : {}),
         });
         message.success("Server updated successfully");
       } else {
@@ -275,25 +280,32 @@ export default function Servers() {
           >
             <Input addonBefore="https://" addonAfter=":8443" placeholder="panel-01.example.com" />
           </Form.Item>
-          {!editingServer && (
-            <>
-              <Form.Item
-                name="token_id"
-                label="Automation Token ID"
-                rules={[{ required: true, message: "Enter the token ID (ULID)" }]}
-              >
-                <Input placeholder="01J..." />
-              </Form.Item>
-              <Form.Item
-                name="token_secret"
-                label="Automation Token Secret"
-                rules={[{ required: true, message: "Enter the token secret" }]}
-                extra="The hex secret shown once when the token was minted on the managed server."
-              >
-                <Input.Password placeholder="64-char hex string" />
-              </Form.Item>
-            </>
-          )}
+          <Form.Item
+            name="token_id"
+            label="Automation Token ID"
+            rules={[{ required: true, message: "Enter the token ID (ULID)" }]}
+          >
+            <Input placeholder="01J..." />
+          </Form.Item>
+          <Form.Item
+            name="token_secret"
+            label="Automation Token Secret"
+            rules={
+              editingServer
+                ? []
+                : [{ required: true, message: "Enter the token secret" }]
+            }
+            extra={
+              editingServer
+                ? "Leave blank to keep the current secret. Enter a new value to rotate it."
+                : "The hex secret shown once when the token was minted on the managed server."
+            }
+          >
+            <Input.Password
+              placeholder={editingServer ? "Leave blank to keep current" : "64-char hex string"}
+              autoComplete="new-password"
+            />
+          </Form.Item>
           <Form.Item name="scopes" label="Scopes">
             <Select
               mode="multiple"
