@@ -40,6 +40,14 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	// /api/v1 — API surface.
 	v1 := r.Group("/api/v1")
 
+	// API responses must never be cached. The desktop WebView (and browsers)
+	// otherwise serve a stale GET after a mutation, so tables would not reflect
+	// enroll/disable/enable/delete until a hard reload.
+	v1.Use(func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	})
+
 	// Auth endpoints (login + me) — no auth required for login.
 	api.RegisterAuthRoutes(v1, api.AuthHandlerConfig{
 		AdminRepo: deps.AdminRepo,
