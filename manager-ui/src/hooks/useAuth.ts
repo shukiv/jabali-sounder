@@ -1,0 +1,66 @@
+import { useState, useCallback } from "react";
+import apiClient from "../apiClient";
+
+export interface AuthState {
+  token: string | null;
+  username: string | null;
+}
+
+const STORAGE_KEY = "jabali-sounder-auth";
+
+export function loadAuth(): AuthState {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { token: parsed.token || null, username: parsed.username || null };
+    }
+  } catch {
+    // ignore
+  }
+  return { token: null, username: null };
+}
+
+export function saveAuth(state: AuthState) {
+  if (state.token) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } else {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+}
+
+export function useAuth() {
+  const [auth, setAuth] = useState<AuthState>(loadAuth);
+
+  const acceptAuthResponse = useCallback((data: { token: string; admin: { username: string } }) => {
+    const newState = { token: data.token, username: data.admin.username };
+    setAuth(newState);
+    saveAuth(newState);
+    apiClient.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+    return newState;
+  }, []);
+
+  const login = useCallback(async (username: string, password: string) => {
+    const resp = await apiClient.post("/auth/login", { username, password });
+    return acceptAuthResponse(resp.data);
+  }, [acceptAuthResponse]);
+
+  const setup = useCallback(async (username: string, password: string) => {
+    const resp = await apiClient.post("/auth/setup", { username, password });
+    return acceptAuthResponse(resp.data);
+  }, [acceptAuthResponse]);
+
+  const logout = useCallback(() => {
+    const newState = { token: null, username: null };
+    setAuth(newState);
+    saveAuth(newState);
+    delete apiClient.defaults.headers.common["Authorization"];
+  }, []);
+
+  // Set auth header on load if token exists.
+  if (auth.token) {
+    apiClient.defaults.headers.common["Authorization"] = `Bearer ${auth.token}`;
+  }
+
+  return { auth, login, setup, logout };
+}

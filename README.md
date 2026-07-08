@@ -1,0 +1,176 @@
+<p align="center">
+  <img src="manager-ui/src/assets/jabali-sounder.svg" alt="Jabali Sounder" width="320" />
+</p>
+
+<h1 align="center">Jabali Sounder</h1>
+
+<p align="center">
+  Central control plane for a sounder of Jabali Panel servers.
+</p>
+
+---
+
+Jabali Sounder is a central control plane for managing multiple Jabali Panel
+servers from one admin UI. It talks to each managed server through the existing
+Jabali Panel HTTP API and scoped automation tokens. It does not SSH into managed
+nodes.
+
+> A *sounder* is a group of wild boar (*jabalí*) — the mark above, and the
+> reason this control plane herds many panels from one place.
+
+The current implementation provides:
+
+- Admin login and JWT-protected API access.
+- Managed server enrollment with HMAC automation credentials.
+- Server health checks and dashboard status.
+- Cross-server domain and user inventory.
+- Monitor tab with live CPU, RAM, IO, load, and summary disk/account/domain data.
+- Mail tab for mailboxes, forwarders, domain forwarders, groups, and
+  autoresponders. This tab is ready on the Sounder side, but requires Jabali
+  Panel automation mail endpoints to be available on managed servers.
+- Standalone Wails desktop target for Windows, macOS, and Linux using local
+  SQLite storage and first-run admin setup.
+
+## Repository Layout
+
+```text
+manager-api/       Go API server, CLI, migrations, repositories, remote clients
+manager-ui/        React/Vite/Ant Design admin SPA
+docs/              Project documentation
+plans/             Historical implementation blueprint and planning notes
+config.example.toml
+Makefile
+```
+
+The project still uses `manager-api` and `manager-ui` as component directory
+names. The product, binary, module, UI branding, and package names are
+`jabali-sounder`.
+
+## Quick Start
+
+Install frontend dependencies once:
+
+```bash
+make ui-install
+```
+
+Create a local configuration or use environment variables:
+
+```bash
+cp config.example.toml config.local.toml
+```
+
+Run database migrations:
+
+```bash
+JABALI_SOUNDER_CONFIG=./config.local.toml make migrate-up
+```
+
+Create or update the admin user:
+
+```bash
+JABALI_SOUNDER_CONFIG=./config.local.toml go run ./manager-api/cmd/server admin set-password -u admin
+```
+
+Run the API:
+
+```bash
+JABALI_SOUNDER_CONFIG=./config.local.toml make run
+```
+
+Build the UI:
+
+```bash
+make ui-build
+```
+
+For the deployed test server, the UI is currently served at:
+
+```text
+http://10.0.3.14:8485/
+```
+
+## Core Commands
+
+```bash
+make build          # build ./bin/jabali-sounder
+make run            # run the API server
+make test           # go test -race
+make ui-build       # TypeScript + Vite production build
+make test-ui        # Vitest
+make lint           # golangci-lint
+make fmt            # go fmt
+make vet            # go vet
+make tidy           # go mod tidy
+```
+
+UI-specific commands live in `manager-ui/package.json`:
+
+```bash
+npm run lint
+npm run build
+npm test
+```
+
+## Configuration
+
+Default config path:
+
+```text
+/etc/jabali-sounder/config.toml
+```
+
+Important environment variables:
+
+- `JABALI_SOUNDER_CONFIG`
+- `JABALI_SOUNDER_ADDR`
+- `JABALI_SOUNDER_ENV`
+- `JABALI_SOUNDER_DATABASE_DRIVER`
+- `JABALI_SOUNDER_DATABASE_URL`
+- `JABALI_SOUNDER_SECRET_KEY_FILE`
+- `JABALI_SOUNDER_JWT_SECRET`
+
+Legacy `JABALI_MANAGER_*` names are still accepted as compatibility fallbacks
+for existing installs.
+
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [API Reference](docs/API.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Database](docs/DATABASE.md)
+- [Desktop Standalone App](docs/DESKTOP.md)
+- [Frontend](docs/FRONTEND.md)
+- [Operations](docs/OPERATIONS.md)
+- [Managed Panel Requirements](docs/MANAGED-PANEL-REQUIREMENTS.md)
+- [Security](docs/SECURITY.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+
+## Security Model
+
+Sounder stores per-server automation token IDs and encrypted token secrets.
+Remote requests are HMAC-signed and scoped by the token permissions on the
+managed Jabali Panel server. Sounder does not assume shell access to managed
+servers.
+
+Token secret encryption uses a local 32-byte key file configured by
+`[secrets].key_file`. If the key cannot be loaded, the code has a development
+fallback that stores hex-encoded plaintext; do not use that fallback in
+production.
+
+## Known External Dependency
+
+The Mail tab calls proposed read-only Jabali Panel automation endpoints:
+
+- `GET /api/v1/automation/mail/mailboxes`
+- `GET /api/v1/automation/mail/forwarders`
+- `GET /api/v1/automation/mail/domain-forwarders`
+- `GET /api/v1/automation/mail/groups`
+- `GET /api/v1/automation/mail/autoresponders`
+
+Until managed Panel servers ship these endpoints, Sounder shows per-server
+HTTP 404 errors and empty mail tables.

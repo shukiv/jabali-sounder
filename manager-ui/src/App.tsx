@@ -1,0 +1,44 @@
+import { Routes, Route, Navigate } from "react-router";
+import { ConfigProvider } from "antd";
+import AdminLayout from "./shells/AdminLayout";
+import Dashboard from "./admin/Dashboard";
+import Servers from "./admin/Servers";
+import Monitor from "./admin/Monitor";
+import Mail from "./admin/Mail";
+import Domains from "./admin/Domains";
+import Users from "./admin/Users";
+import Settings from "./admin/Settings";
+import Login from "./admin/Login";
+import { useAuth } from "./hooks/useAuth";
+import { useThemeMode } from "./theme/ThemeModeContext";
+import { useTheme } from "./hooks/useTheme";
+
+export default function App() {
+  const { auth } = useAuth();
+  const { mode } = useThemeMode();
+  const cfg = useTheme(mode);
+
+  return (
+    <ConfigProvider {...cfg}>
+      {!auth.token ? (
+        <Routes>
+          <Route path="*" element={<Login />} />
+        </Routes>
+      ) : (
+        <Routes>
+          <Route path="/" element={<AdminLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="servers" element={<Servers />} />
+            <Route path="monitor" element={<Monitor />} />
+            <Route path="mail" element={<Mail />} />
+            <Route path="domains" element={<Domains />} />
+            <Route path="users" element={<Users />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="login" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      )}
+    </ConfigProvider>
+  );
+}

@@ -1,0 +1,178 @@
+package api
+
+import (
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
+
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/ids"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
+)
+
+// AuthHandlerConfig wires the auth endpoints.
+type AuthHandlerConfig struct {
+	AdminRepo repository.AdminRepository
+	JWTSecret string
+	JWTTTL    time.Duration
+}
+
+// RegisterAuthRoutes mounts POST /api/v1/auth/login + GET /api/v1/auth/me.
+func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
+	if cfg.AdminRepo == nil || cfg.JWTSecret == "" {
+		return
+	}
+	h := &authHandler{cfg: cfg}
+	auth := g.Group("/auth")
+	auth.POST("/login", h.login)
+	auth.GET("/setup", h.setupStatus)
+	auth.POST("/setup", h.setup)
+	auth.GET("/me", middleware.AuthMiddleware(cfg.JWTSecret), h.me)
+}
+
+type authHandler struct{ cfg AuthHandlerConfig }
+
+type loginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type setupRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+func (h *authHandler) login(c *gin.Context) {
+	var req loginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		return
+	}
+
+	req.Username = strings.TrimSpace(req.Username)
+	admin, err := h.cfg.AdminRepo.FindByUsername(c.Request.Context(), req.Username)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		return
+	}
+
+	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, h.cfg.JWTTTL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "mint token: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":      token,
+		"expires_at": expiresAt,
+		"admin": gin.H{
+			"id":       admin.ID,
+			"username": admin.Username,
+		},
+	})
+}
+
+func (h *authHandler) me(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"id":       middleware.AdminID(c),
+		"username": middleware.AdminUsername(c),
+	})
+}
+
+func (h *authHandler) setupStatus(c *gin.Context) {
+	count, err := h.cfg.AdminRepo.Count(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"available": count == 0})
+}
+
+func (h *authHandler) setup(c *gin.Context) {
+	count, err := h.cfg.AdminRepo.Count(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "setup already completed"})
+		return
+	}
+
+	var req setupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	if req.Username == "" {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "username is required"})
+		return
+	}
+	if len(req.Password) < 8 {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "password must be at least 8 characters"})
+		return
+	}
+
+	admin, err := NewAdmin(req.Username, req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "create admin: " + err.Error()})
+		return
+	}
+	if err := h.cfg.AdminRepo.Create(c.Request.Context(), admin); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "create admin: " + err.Error()})
+		return
+	}
+
+	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, h.cfg.JWTTTL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "mint token: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{
+		"token":      token,
+		"expires_at": expiresAt,
+		"admin": gin.H{
+			"id":       admin.ID,
+			"username": admin.Username,
+		},
+	})
+}
+
+// HashPassword returns a bcrypt hash of the password. Used by the CLI
+// admin set-password command.
+func HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+// NewAdmin creates an Admin model with a bcrypt-hashed password.
+// Used by the CLI admin set-password command.
+func NewAdmin(username, password string) (*models.Admin, error) {
+	hash, err := HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+	return &models.Admin{
+		ID:           ids.NewULID(),
+		Username:     username,
+		PasswordHash: hash,
+	}, nil
+}

@@ -1,0 +1,304 @@
+import { useState } from "react";
+import {
+  Card,
+  Table,
+  Tag,
+  Button,
+  Drawer,
+  Form,
+  Input,
+  Space,
+  App,
+  Select,
+  Tooltip,
+} from "antd";
+import { PlusOutlined, DeleteOutlined, ReloadOutlined, EditOutlined } from "@ant-design/icons";
+import {
+  useServers,
+  useCreateServer,
+  useUpdateServer,
+  useDeleteServer,
+  useCheckHealth,
+} from "../hooks/useServers";
+import type { Server } from "../types";
+
+const scopeOptions = [
+  { label: "read:* (all read access)", value: "read:*" },
+  { label: "read:domains", value: "read:domains" },
+  { label: "read:users", value: "read:users" },
+  { label: "read:applications", value: "read:applications" },
+  { label: "read:mail", value: "read:mail" },
+  { label: "read:status", value: "read:status" },
+  { label: "read:metrics", value: "read:metrics" },
+];
+
+function statusTag(status: string) {
+  const color =
+    status === "active" ? "green" :
+    status === "unreachable" ? "red" :
+    "default";
+  return <Tag color={color}>{status}</Tag>;
+}
+
+function credTag(cred: string) {
+  const color =
+    cred === "valid" ? "green" :
+    cred === "invalid" ? "red" :
+    "orange";
+  return <Tag color={color}>{cred}</Tag>;
+}
+
+function panelBaseURL(hostname: string) {
+  return `https://${hostname.trim()}:8443`;
+}
+
+function hostnameFromBaseURL(baseURL: string) {
+  try {
+    return new URL(baseURL).hostname;
+  } catch {
+    return baseURL.replace(/^https?:\/\//, "").replace(/:8443\/?$/, "");
+  }
+}
+
+export default function Servers() {
+  const { data: servers, isLoading } = useServers();
+  const createMut = useCreateServer();
+  const updateMut = useUpdateServer();
+  const deleteMut = useDeleteServer();
+  const checkMut = useCheckHealth();
+  const { message } = App.useApp();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingServer, setEditingServer] = useState<Server | null>(null);
+  const [form] = Form.useForm();
+
+  const openCreate = () => {
+    setEditingServer(null);
+    form.resetFields();
+    setDrawerOpen(true);
+  };
+
+  const openEdit = (server: Server) => {
+    setEditingServer(server);
+    form.setFieldsValue({
+      name: server.name,
+      panel_host: hostnameFromBaseURL(server.base_url),
+      scopes: server.scopes,
+    });
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setEditingServer(null);
+    form.resetFields();
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      const baseURL = panelBaseURL(values.panel_host);
+      if (editingServer) {
+        await updateMut.mutateAsync({
+          id: editingServer.id,
+          name: values.name,
+          base_url: baseURL,
+          scopes: values.scopes,
+        });
+        message.success("Server updated successfully");
+      } else {
+        await createMut.mutateAsync({
+          name: values.name,
+          base_url: baseURL,
+          token_id: values.token_id,
+          token_secret: values.token_secret,
+          scopes: values.scopes,
+        });
+        message.success("Server enrolled successfully");
+      }
+      closeDrawer();
+    } catch (err) {
+      if (err instanceof Error) {
+        message.error(err.message);
+      }
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    await deleteMut.mutateAsync(id);
+    message.success(`Disabled server: ${name}`);
+  };
+
+  const handleCheck = async (id: string) => {
+    try {
+      const result = await checkMut.mutateAsync(id);
+      if (result.reachable && result.credential_valid) {
+        message.success(`Server healthy — version ${result.version}`);
+      } else if (!result.reachable) {
+        message.error("Server unreachable");
+      } else {
+        message.warning("Server reachable but credentials invalid");
+      }
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
+  };
+
+  const columns = [
+    { title: "Name", dataIndex: "name", key: "name" },
+    { title: "Version", dataIndex: "version", key: "version" },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      render: (s: string) => statusTag(s),
+    },
+    {
+      title: "Credentials",
+      dataIndex: "credential_status",
+      key: "credential_status",
+      render: (c: string) => credTag(c),
+    },
+    {
+      title: "Scopes",
+      dataIndex: "scopes",
+      key: "scopes",
+      render: (s: string[]) => (
+        <Space wrap>
+          {(s || []).map((scope) => (
+            <Tag key={scope}>{scope}</Tag>
+          ))}
+        </Space>
+      ),
+    },
+    {
+      title: "URL",
+      dataIndex: "base_url",
+      key: "base_url",
+      render: (u: string) => (
+        <a href={u} target="_blank" rel="noopener noreferrer">
+          {u}
+        </a>
+      ),
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_: unknown, record: Server) => (
+        <Space>
+          <Tooltip title="Edit server">
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => openEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Check health now">
+            <Button
+              size="small"
+              icon={<ReloadOutlined />}
+              loading={checkMut.isPending && checkMut.variables === record.id}
+              onClick={() => handleCheck(record.id)}
+            />
+          </Tooltip>
+          <Tooltip title="Disable server">
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.id, record.name)}
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>Managed Servers</h3>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          Add Server
+        </Button>
+      </Space>
+      <Card>
+        <Table<Server>
+          dataSource={servers || []}
+          columns={columns}
+          rowKey="id"
+          loading={isLoading}
+          pagination={false}
+        />
+      </Card>
+
+      <Drawer
+        title={editingServer ? "Edit Jabali Server" : "Enroll Jabali Server"}
+        open={drawerOpen}
+        onClose={closeDrawer}
+        width={480}
+        extra={
+          <Space>
+            <Button onClick={closeDrawer}>Cancel</Button>
+            <Button
+              type="primary"
+              loading={createMut.isPending || updateMut.isPending}
+              onClick={handleSubmit}
+            >
+              {editingServer ? "Save" : "Enroll"}
+            </Button>
+          </Space>
+        }
+      >
+        <Form form={form} layout="vertical" requiredMark>
+          <Form.Item
+            name="name"
+            label="Server Name"
+            rules={[{ required: true, message: "Enter a display name" }]}
+          >
+            <Input placeholder="e.g. panel-01.example.com" />
+          </Form.Item>
+          <Form.Item
+            name="panel_host"
+            label="Server Hostname"
+            rules={[
+              { required: true, message: "Enter the panel hostname" },
+              {
+                pattern: /^[a-zA-Z0-9.-]+$/,
+                message: "Enter only the hostname, without https:// or port",
+              },
+            ]}
+            extra="Sounder connects to the panel at https://hostname:8443."
+          >
+            <Input addonBefore="https://" addonAfter=":8443" placeholder="panel-01.example.com" />
+          </Form.Item>
+          {!editingServer && (
+            <>
+              <Form.Item
+                name="token_id"
+                label="Automation Token ID"
+                rules={[{ required: true, message: "Enter the token ID (ULID)" }]}
+              >
+                <Input placeholder="01J..." />
+              </Form.Item>
+              <Form.Item
+                name="token_secret"
+                label="Automation Token Secret"
+                rules={[{ required: true, message: "Enter the token secret" }]}
+                extra="The hex secret shown once when the token was minted on the managed server."
+              >
+                <Input.Password placeholder="64-char hex string" />
+              </Form.Item>
+            </>
+          )}
+          <Form.Item name="scopes" label="Scopes">
+            <Select
+              mode="multiple"
+              placeholder="Leave empty for read:* (all read access)"
+              options={scopeOptions}
+            />
+          </Form.Item>
+        </Form>
+      </Drawer>
+    </div>
+  );
+}

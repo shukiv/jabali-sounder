@@ -1,0 +1,34 @@
+# Jabali Sounder — example configuration.
+# Copy to /etc/jabali-sounder/config.toml and edit. Environment variables
+# override anything set here (see manager-api/cmd/server/config.go for the
+# full list of env-var names).
+
+[server]
+addr = "127.0.0.1:8484"
+env  = "development"
+
+[log]
+level  = "info"
+format = "text"
+
+[database]
+# Database driver: mysql for server deployments, sqlite for local desktop mode.
+# Set via JABALI_SOUNDER_DATABASE_DRIVER env.
+driver = "mysql"
+
+# MariaDB DSN or SQLite file path. Set via JABALI_SOUNDER_DATABASE_URL env.
+# Example:
+#   url = "jabali_sounder:CHANGE_ME@tcp(127.0.0.1:3306)/jabali_sounder?parseTime=true&charset=utf8mb4&loc=UTC"
+#   url = "/path/to/sounder.db"
+url = ""
+
+[secrets]
+# Path to the 32-byte AES-256 key file used to encrypt stored automation
+# token secrets. Generate with: openssl rand -out secrets.key 32
+# Set via JABALI_SOUNDER_SECRET_KEY_FILE env.
+key_file = "/etc/jabali-sounder/secrets.key"
+
+[jwt]
+# JWT signing secret for Sounder admin sessions. Set via
+# JABALI_SOUNDER_JWT_SECRET env in production.
+secret = ""
