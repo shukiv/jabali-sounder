@@ -1,0 +1,94 @@
+name: release
+
+# Build the standalone desktop app for Linux, Windows and macOS on a version
+# tag and attach the binaries to a GitHub Release.
+#
+# Cut a release with:
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# NOTE: the desktop app is a hand-rolled `go build` of the Wails v2 entrypoint
+# (manager-api/cmd/desktop) with the SPA embedded from dist/. Each OS needs its
+# native webview: WebKit2GTK on Linux, WebView2 on Windows, WebKit on macOS.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # required to create the Release and upload assets
+
+jobs:
+  build:
+    name: build (${{ matrix.label }})
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: linux-amd64
+            runs-on: ubuntu-latest
+            tags: desktop,production,webkit2_41
+            asset: jabali-sounder-desktop-linux-amd64
+            ldflags: ""
+          - label: windows-amd64
+            runs-on: windows-latest
+            tags: desktop,production
+            asset: jabali-sounder-desktop-windows-amd64.exe
+            ldflags: "-H=windowsgui"
+          - label: macos-arm64
+            runs-on: macos-latest
+            tags: desktop,production
+            asset: jabali-sounder-desktop-macos-arm64
+            ldflags: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: manager-ui/package-lock.json
+
+      # Linux needs the WebKit2GTK dev headers to compile the webview binding.
+      - name: Install Linux webview deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+
+      # Build the SPA and stage it where cmd/desktop embeds it (all:dist).
+      - name: Build & stage frontend
+        shell: bash
+        run: |
+          cd manager-ui
+          npm ci --no-audit --no-fund
+          npm run build
+          cd ..
+          rm -rf manager-api/cmd/desktop/dist
+          mkdir -p manager-api/cmd/desktop/dist
+          cp -R manager-ui/dist/. manager-api/cmd/desktop/dist/
+
+      - name: Build desktop binary
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          mkdir -p bin
+          go build -tags "${{ matrix.tags }}" -ldflags "${{ matrix.ldflags }}" \
+            -o "bin/${{ matrix.asset }}" ./manager-api/cmd/desktop
+          ls -la bin/
+
+      - name: Attach to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/${{ matrix.asset }}
+          fail_on_unmatched_files: true
+          # Assets from every matrix job upsert into the same tagged release.
+          generate_release_notes: true
