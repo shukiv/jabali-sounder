@@ -33,6 +33,7 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 	auth.GET("/setup", h.setupStatus)
 	auth.POST("/setup", h.setup)
 	auth.GET("/me", middleware.AuthMiddleware(cfg.JWTSecret), h.me)
+	auth.POST("/change-password", middleware.AuthMiddleware(cfg.JWTSecret), h.changePassword)
 }
 
 type authHandler struct{ cfg AuthHandlerConfig }
@@ -91,6 +92,51 @@ func (h *authHandler) me(c *gin.Context) {
 		"id":       middleware.AdminID(c),
 		"username": middleware.AdminUsername(c),
 	})
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required"`
+}
+
+// changePassword updates the authenticated admin's password after verifying
+// their current one.
+func (h *authHandler) changePassword(c *gin.Context) {
+	var req changePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "new password must be at least 8 characters"})
+		return
+	}
+
+	admin, err := h.cfg.AdminRepo.FindByUsername(c.Request.Context(), middleware.AdminUsername(c))
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid session"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "current password is incorrect"})
+		return
+	}
+
+	hash, err := HashPassword(req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "hash password: " + err.Error()})
+		return
+	}
+	admin.PasswordHash = hash
+	if err := h.cfg.AdminRepo.Update(c.Request.Context(), admin); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update admin: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func (h *authHandler) setupStatus(c *gin.Context) {

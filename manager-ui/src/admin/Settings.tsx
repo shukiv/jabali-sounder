@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Alert, App, Button, Card, Space, Typography, Upload } from "antd";
-import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
+import { Alert, App, Button, Card, Form, Input, Space, Typography, Upload } from "antd";
+import { DownloadOutlined, UploadOutlined, LockOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
@@ -21,6 +21,30 @@ export default function Settings() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<ImportResult | null>(null);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [pwForm] = Form.useForm();
+
+  const handleChangePassword = async () => {
+    let values;
+    try {
+      values = await pwForm.validateFields();
+    } catch {
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await apiClient.post("/auth/change-password", {
+        current_password: values.current_password,
+        new_password: values.new_password,
+      });
+      message.success("Password changed");
+      pwForm.resetFields();
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const handleExport = async () => {
     setExporting(true);
@@ -126,6 +150,54 @@ export default function Settings() {
             />
           )}
         </Space>
+      </Card>
+
+      <Card title="Change Password" style={{ marginTop: 16 }}>
+        <Form
+          form={pwForm}
+          layout="vertical"
+          style={{ maxWidth: 420 }}
+          requiredMark={false}
+        >
+          <Form.Item
+            name="current_password"
+            label="Current password"
+            rules={[{ required: true, message: "Enter your current password" }]}
+          >
+            <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item
+            name="new_password"
+            label="New password"
+            rules={[
+              { required: true, message: "Enter a new password" },
+              { min: 8, message: "At least 8 characters" },
+            ]}
+          >
+            <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            name="confirm_password"
+            label="Confirm new password"
+            dependencies={["new_password"]}
+            rules={[
+              { required: true, message: "Confirm the new password" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue("new_password") === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error("Passwords do not match"));
+                },
+              }),
+            ]}
+          >
+            <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
+          </Form.Item>
+          <Button type="primary" loading={changingPassword} onClick={handleChangePassword}>
+            Change Password
+          </Button>
+        </Form>
       </Card>
     </div>
   );

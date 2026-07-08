@@ -3,9 +3,12 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"crypto/rand"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -19,6 +22,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/api"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
@@ -29,6 +33,16 @@ import (
 var assets embed.FS
 
 func main() {
+	// Lockout recovery: `jabali-sounder-desktop reset-password [username]`
+	// sets the admin password against the local SQLite DB, then exits.
+	if len(os.Args) > 1 && os.Args[1] == "reset-password" {
+		if err := resetPassword(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	handler, err := newDesktopHandler()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -56,13 +70,9 @@ type desktopHandler struct {
 }
 
 func newDesktopHandler() (http.Handler, error) {
-	dataDir, err := os.UserConfigDir()
+	dataDir, err := appDataDir()
 	if err != nil {
-		return nil, fmt.Errorf("user config dir: %w", err)
-	}
-	dataDir = filepath.Join(dataDir, "Jabali Sounder")
-	if err := os.MkdirAll(dataDir, 0o700); err != nil {
-		return nil, fmt.Errorf("create data dir: %w", err)
+		return nil, err
 	}
 
 	keyPath := filepath.Join(dataDir, "secrets.key")
@@ -164,4 +174,80 @@ func loadOrCreateHexSecret(path string, size int) (string, error) {
 		return "", fmt.Errorf("write %s: %w", path, err)
 	}
 	return secret, nil
+}
+
+// appDataDir returns (creating if needed) the per-user data directory where the
+// desktop app stores its SQLite DB, secret key, and JWT secret.
+func appDataDir() (string, error) {
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("user config dir: %w", err)
+	}
+	dir := filepath.Join(base, "Jabali Sounder")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("create data dir: %w", err)
+	}
+	return dir, nil
+}
+
+// resetPassword sets (or creates) the admin password in the local SQLite DB.
+// Reads the new password from $JABALI_RESET_PASSWORD or stdin. Used for
+// lockout recovery without wiping the database.
+func resetPassword(args []string) error {
+	username := "admin"
+	if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
+		username = strings.TrimSpace(args[0])
+	}
+
+	dataDir, err := appDataDir()
+	if err != nil {
+		return err
+	}
+	dbPath := filepath.Join(dataDir, "sounder.db")
+	if err := db.Migrate("sqlite", dbPath); err != nil {
+		return fmt.Errorf("migrate sqlite: %w", err)
+	}
+	gormDB, err := db.Open("sqlite", dbPath)
+	if err != nil {
+		return fmt.Errorf("open sqlite: %w", err)
+	}
+	repo := repository.NewAdminRepository(gormDB)
+
+	pw := os.Getenv("JABALI_RESET_PASSWORD")
+	if pw == "" {
+		fmt.Fprintf(os.Stderr, "New password for %q: ", username)
+		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		pw = strings.TrimSpace(line)
+	}
+	if len(pw) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+
+	ctx := context.Background()
+	existing, err := repo.FindByUsername(ctx, username)
+	switch {
+	case err == nil:
+		hash, herr := api.HashPassword(pw)
+		if herr != nil {
+			return fmt.Errorf("hash password: %w", herr)
+		}
+		existing.PasswordHash = hash
+		if uerr := repo.Update(ctx, existing); uerr != nil {
+			return fmt.Errorf("update admin: %w", uerr)
+		}
+		fmt.Fprintf(os.Stderr, "Password updated for admin %q\n", username)
+		return nil
+	case errors.Is(err, repository.ErrNotFound):
+		admin, aerr := api.NewAdmin(username, pw)
+		if aerr != nil {
+			return fmt.Errorf("create admin: %w", aerr)
+		}
+		if cerr := repo.Create(ctx, admin); cerr != nil {
+			return fmt.Errorf("create admin: %w", cerr)
+		}
+		fmt.Fprintf(os.Stderr, "Admin %q created\n", username)
+		return nil
+	default:
+		return fmt.Errorf("lookup admin: %w", err)
+	}
 }
