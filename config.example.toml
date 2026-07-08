@@ -29,6 +29,16 @@ url = ""
 key_file = "/etc/jabali-sounder/secrets.key"
 
 [jwt]
-# JWT signing secret for Sounder admin sessions. Set via
-# JABALI_SOUNDER_JWT_SECRET env in production.
+# JWT signing secret for Sounder admin sessions. REQUIRED in any non-development
+# env — the server refuses to start without it (env="development" generates a
+# random ephemeral secret instead). Set via JABALI_SOUNDER_JWT_SECRET env in
+# production. Never ship a shared/known value: anyone with the secret can forge
+# admin sessions.
 secret = ""
+
+[remote]
+# Disable TLS certificate verification on outbound calls to managed panels.
+# Default false (verify). HMAC authenticates requests but NOT responses, so
+# enabling this exposes the manager<->panel data plane to MITM. Enable ONLY for
+# panels using self-signed certificates. Env: JABALI_SOUNDER_REMOTE_INSECURE_SKIP_VERIFY=true
+insecure_skip_verify = false

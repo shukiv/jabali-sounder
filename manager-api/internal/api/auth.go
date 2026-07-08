@@ -133,7 +133,11 @@ func (h *authHandler) setup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "create admin: " + err.Error()})
 		return
 	}
-	if err := h.cfg.AdminRepo.Create(c.Request.Context(), admin); err != nil {
+	if err := h.cfg.AdminRepo.CreateFirst(c.Request.Context(), admin); err != nil {
+		if errors.Is(err, repository.ErrSetupCompleted) {
+			c.JSON(http.StatusConflict, gin.H{"error": "setup already completed"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "create admin: " + err.Error()})
 		return
 	}

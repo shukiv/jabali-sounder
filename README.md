@@ -128,7 +128,8 @@ Important environment variables:
 - `JABALI_SOUNDER_DATABASE_DRIVER`
 - `JABALI_SOUNDER_DATABASE_URL`
 - `JABALI_SOUNDER_SECRET_KEY_FILE`
-- `JABALI_SOUNDER_JWT_SECRET`
+- `JABALI_SOUNDER_JWT_SECRET` (required outside `development` env)
+- `JABALI_SOUNDER_REMOTE_INSECURE_SKIP_VERIFY` (`true` only for self-signed panels)
 
 Legacy `JABALI_MANAGER_*` names are still accepted as compatibility fallbacks
 for existing installs.

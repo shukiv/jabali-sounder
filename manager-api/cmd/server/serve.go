@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,6 +16,7 @@ import (
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/remote"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
 )
@@ -81,9 +84,24 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	if jwtSecret != "" {
 		log.Info("JWT auth enabled")
+	} else if cfg.Server.Env == "development" {
+		// Dev convenience only: generate a random ephemeral secret so admin
+		// routes are still gated, but with an unpredictable key. Sessions do
+		// not survive a restart. Never use a hardcoded fallback — it would be
+		// a public, forgeable signing key.
+		ephemeral := make([]byte, 32)
+		if _, err := rand.Read(ephemeral); err != nil {
+			return fmt.Errorf("generate ephemeral jwt secret: %w", err)
+		}
+		jwtSecret = hex.EncodeToString(ephemeral)
+		log.Warn("JWT secret not set — generated ephemeral dev secret; sessions reset on restart")
 	} else {
-		log.Warn("JWT secret not set — admin routes unprotected")
-		jwtSecret = "jabali-sounder-dev-fallback"
+		return fmt.Errorf("JWT secret required in %q env: set JABALI_SOUNDER_JWT_SECRET or [jwt].secret", cfg.Server.Env)
+	}
+
+	remote.SetInsecureSkipVerify(cfg.Remote.InsecureSkipVerify)
+	if cfg.Remote.InsecureSkipVerify {
+		log.Warn("TLS verification disabled for outbound panel calls — data plane exposed to MITM; use only for self-signed panels")
 	}
 
 	deps := app.Deps{

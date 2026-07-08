@@ -15,6 +15,7 @@ type config struct {
 	Database databaseConfig `toml:"database"`
 	Secrets  secretsConfig  `toml:"secrets"`
 	JWT      jwtConfig      `toml:"jwt"`
+	Remote   remoteConfig   `toml:"remote"`
 }
 
 type serverConfig struct {
@@ -38,6 +39,14 @@ type secretsConfig struct {
 
 type jwtConfig struct {
 	Secret string `toml:"secret"`
+}
+
+type remoteConfig struct {
+	// InsecureSkipVerify disables TLS certificate verification on outbound
+	// calls to managed panels. HMAC authenticates requests but NOT responses,
+	// so enabling this exposes the data plane to MITM. Default false; enable
+	// only for deployments whose panels use self-signed certificates.
+	InsecureSkipVerify bool `toml:"insecure_skip_verify"`
 }
 
 // Defaults returns the default config values.
@@ -99,6 +108,9 @@ func loadConfig(path string) (*config, error) {
 	}
 	if v := envFirst("JABALI_SOUNDER_JWT_SECRET", "JABALI_MANAGER_JWT_SECRET"); v != "" {
 		cfg.JWT.Secret = v
+	}
+	if v := envFirst("JABALI_SOUNDER_REMOTE_INSECURE_SKIP_VERIFY", "JABALI_MANAGER_REMOTE_INSECURE_SKIP_VERIFY"); v != "" {
+		cfg.Remote.InsecureSkipVerify = strings.EqualFold(v, "true") || v == "1"
 	}
 
 	// Normalize: strip trailing slash from URL-like fields.
