@@ -96,13 +96,59 @@ jobs:
             -o "bin/${{ matrix.asset }}" ./manager-api/cmd/desktop
           ls -la bin/
 
-      # Always publish the binary as a workflow artifact — this is what makes a
-      # manual (workflow_dispatch) run useful for testing without a Release.
-      - name: Upload build artifact
+      # Linux + Windows: the raw binary is the deliverable.
+      - name: Package binary (non-macOS)
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          mkdir -p out
+          cp "bin/${{ matrix.asset }}" "out/${{ matrix.asset }}"
+
+      # macOS: wrap the binary in a .app bundle (Info.plist + .icns) and a
+      # drag-to-install .dmg. Also keep the raw binary for CLI users.
+      - name: Package .app + .dmg (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
+          if ! printf '%s' "$VER" | grep -qE '^[0-9]'; then VER="0.0.0-dev"; fi
+
+          APP="Jabali Sounder.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp "bin/${{ matrix.asset }}" "$APP/Contents/MacOS/jabali-sounder"
+          chmod +x "$APP/Contents/MacOS/jabali-sounder"
+
+          # Info.plist from the committed template, version substituted.
+          sed "s/__VERSION__/${VER}/g" build/darwin/Info.plist > "$APP/Contents/Info.plist"
+
+          # Build the .icns from the committed 1024px app icon.
+          mkdir -p icon.iconset
+          for s in 16 32 128 256 512; do
+            sips -z "$s" "$s" build/darwin/appicon.png --out "icon.iconset/icon_${s}x${s}.png"
+            d=$((s * 2))
+            sips -z "$d" "$d" build/darwin/appicon.png --out "icon.iconset/icon_${s}x${s}@2x.png"
+          done
+          iconutil -c icns icon.iconset -o "$APP/Contents/Resources/icon.icns"
+
+          # Assemble a drag-to-install DMG (app + /Applications alias).
+          mkdir -p out dmgroot
+          cp -R "$APP" dmgroot/
+          ln -s /Applications dmgroot/Applications
+          hdiutil create -volname "Jabali Sounder" -srcfolder dmgroot \
+            -ov -format UDZO "out/jabali-sounder-${VER}-macos-arm64.dmg"
+
+          # Keep the raw binary too.
+          cp "bin/${{ matrix.asset }}" "out/${{ matrix.asset }}"
+          ls -la out/
+
+      # Always publish artifacts — makes manual (workflow_dispatch) runs useful
+      # for testing without cutting a Release.
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset }}
-          path: bin/${{ matrix.asset }}
+          name: ${{ matrix.label }}
+          path: out/*
           if-no-files-found: error
 
       # Only publish to a GitHub Release on a version-tag push.
@@ -110,7 +156,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: bin/${{ matrix.asset }}
+          files: out/*
           fail_on_unmatched_files: true
           # Assets from every matrix job upsert into the same tagged release.
           generate_release_notes: true
