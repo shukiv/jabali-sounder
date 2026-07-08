@@ -23,6 +23,7 @@ export function useCreateServer() {
       token_id: string;
       token_secret: string;
       scopes?: string[];
+      insecure_skip_verify?: boolean;
     }) => {
       const resp = await apiClient.post<Server>("/admin/servers", input);
       return resp.data;
@@ -39,6 +40,7 @@ export function useUpdateServer() {
       name?: string;
       base_url?: string;
       scopes?: string[];
+      insecure_skip_verify?: boolean;
     }) => {
       const { id, ...payload } = input;
       const resp = await apiClient.patch<Server>(`/admin/servers/${id}`, payload);

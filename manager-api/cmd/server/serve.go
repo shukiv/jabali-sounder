@@ -16,7 +16,6 @@ import (
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
-	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/remote"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
 )
@@ -97,11 +96,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		log.Warn("JWT secret not set — generated ephemeral dev secret; sessions reset on restart")
 	} else {
 		return fmt.Errorf("JWT secret required in %q env: set JABALI_SOUNDER_JWT_SECRET or [jwt].secret", cfg.Server.Env)
-	}
-
-	remote.SetInsecureSkipVerify(cfg.Remote.InsecureSkipVerify)
-	if cfg.Remote.InsecureSkipVerify {
-		log.Warn("TLS verification disabled for outbound panel calls — data plane exposed to MITM; use only for self-signed panels")
 	}
 
 	deps := app.Deps{

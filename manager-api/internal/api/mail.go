@@ -214,7 +214,7 @@ func (h *mailHandler) clientForServer(s *models.Server) (*remote.Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	return remote.NewClient(s.BaseURL, s.TokenID, secret), nil
+	return remote.NewClient(s.BaseURL, s.TokenID, secret, s.InsecureSkipVerify), nil
 }
 
 func mailRemoteError(part string, code int, err error) string {

@@ -85,6 +85,7 @@ Response item:
   "base_url": "https://panel-01.example.com",
   "token_id": "01...",
   "scopes": ["read:*"],
+  "insecure_skip_verify": false,
   "version": "v0.1.0",
   "status": "active",
   "credential_status": "valid",
@@ -106,11 +107,18 @@ Request:
   "base_url": "https://panel-01.example.com",
   "token_id": "01...",
   "token_secret": "secret-shown-once-by-panel",
-  "scopes": ["read:domains", "read:users", "read:status", "read:metrics"]
+  "scopes": ["read:domains", "read:users", "read:status", "read:metrics"],
+  "insecure_skip_verify": false
 }
 ```
 
 If `scopes` is omitted or null, Sounder stores `["read:*"]`.
+
+`insecure_skip_verify` (default `false`) is a per-server opt-in that skips TLS
+certificate verification on outbound calls to that panel. Enable it only for
+panels using self-signed certificates on a trusted network. HMAC still
+authenticates each request, but responses are not verified against a CA, so
+enabling it widens the MITM surface for that server's data plane.
 
 ### `GET /api/v1/admin/servers/:id`
 
@@ -126,7 +134,8 @@ Request:
 {
   "name": "new-name",
   "base_url": "https://new-url.example.com",
-  "scopes": ["read:*"]
+  "scopes": ["read:*"],
+  "insecure_skip_verify": true
 }
 ```
 

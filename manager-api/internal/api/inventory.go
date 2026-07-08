@@ -73,7 +73,7 @@ func (h *inventoryHandler) domains(c *gin.Context) {
 				h.cfg.Log.Warn("decrypt secret failed", "server", s.Name, "error", err)
 				return nil
 			}
-			client := remote.NewClient(s.BaseURL, s.TokenID, secret)
+			client := remote.NewClient(s.BaseURL, s.TokenID, secret, s.InsecureSkipVerify)
 			ctx, cancel := context.WithTimeout(gctx, 10*time.Second)
 			defer cancel()
 			resp, _, err := client.Domains(ctx)
@@ -140,7 +140,7 @@ func (h *inventoryHandler) users(c *gin.Context) {
 				h.cfg.Log.Warn("decrypt secret failed", "server", s.Name, "error", err)
 				return nil
 			}
-			client := remote.NewClient(s.BaseURL, s.TokenID, secret)
+			client := remote.NewClient(s.BaseURL, s.TokenID, secret, s.InsecureSkipVerify)
 			ctx, cancel := context.WithTimeout(gctx, 10*time.Second)
 			defer cancel()
 			resp, _, err := client.Users(ctx)

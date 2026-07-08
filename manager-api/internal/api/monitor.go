@@ -312,7 +312,7 @@ func (h *monitorHandler) clientForServer(s *models.Server) (*remote.Client, erro
 	if err != nil {
 		return nil, err
 	}
-	return remote.NewClient(s.BaseURL, s.TokenID, secret), nil
+	return remote.NewClient(s.BaseURL, s.TokenID, secret, s.InsecureSkipVerify), nil
 }
 
 func (h *monitorHandler) decryptSecret(s *models.Server) (string, error) {

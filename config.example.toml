@@ -36,9 +36,6 @@ key_file = "/etc/jabali-sounder/secrets.key"
 # admin sessions.
 secret = ""
 
-[remote]
-# Disable TLS certificate verification on outbound calls to managed panels.
-# Default false (verify). HMAC authenticates requests but NOT responses, so
-# enabling this exposes the manager<->panel data plane to MITM. Enable ONLY for
-# panels using self-signed certificates. Env: JABALI_SOUNDER_REMOTE_INSECURE_SKIP_VERIFY=true
-insecure_skip_verify = false
+# TLS verification for outbound calls to managed panels is configured
+# per-server (the "Allow self-signed TLS certificate" toggle at enrollment),
+# not globally here. See docs/API.md — POST /api/v1/admin/servers.

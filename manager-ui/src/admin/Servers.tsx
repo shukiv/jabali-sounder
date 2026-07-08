@@ -11,6 +11,7 @@ import {
   App,
   Select,
   Tooltip,
+  Checkbox,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, ReloadOutlined, EditOutlined } from "@ant-design/icons";
 import {
@@ -83,6 +84,7 @@ export default function Servers() {
       name: server.name,
       panel_host: hostnameFromBaseURL(server.base_url),
       scopes: server.scopes,
+      insecure_skip_verify: server.insecure_skip_verify,
     });
     setDrawerOpen(true);
   };
@@ -103,6 +105,7 @@ export default function Servers() {
           name: values.name,
           base_url: baseURL,
           scopes: values.scopes,
+          insecure_skip_verify: values.insecure_skip_verify,
         });
         message.success("Server updated successfully");
       } else {
@@ -112,6 +115,7 @@ export default function Servers() {
           token_id: values.token_id,
           token_secret: values.token_secret,
           scopes: values.scopes,
+          insecure_skip_verify: values.insecure_skip_verify,
         });
         message.success("Server enrolled successfully");
       }
@@ -296,6 +300,14 @@ export default function Servers() {
               placeholder="Leave empty for read:* (all read access)"
               options={scopeOptions}
             />
+          </Form.Item>
+          <Form.Item
+            name="insecure_skip_verify"
+            valuePropName="checked"
+            initialValue={false}
+            tooltip="Only for panels with self-signed certificates on a trusted LAN. HMAC still authenticates requests, but responses are not verified against a CA."
+          >
+            <Checkbox>Allow self-signed TLS certificate</Checkbox>
           </Form.Item>
         </Form>
       </Drawer>

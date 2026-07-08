@@ -56,6 +56,8 @@ type createServerRequest struct {
 	TokenID     string   `json:"token_id" binding:"required"`
 	TokenSecret string   `json:"token_secret" binding:"required"`
 	Scopes      []string `json:"scopes"`
+	// InsecureSkipVerify skips TLS cert verification for this panel (self-signed).
+	InsecureSkipVerify bool `json:"insecure_skip_verify"`
 }
 
 func (h *serverHandler) create(c *gin.Context) {
@@ -79,7 +81,7 @@ func (h *serverHandler) create(c *gin.Context) {
 	}
 
 	// Probe /health before enrolling — fail fast on unreachable.
-	client := remote.NewClient(baseURL, req.TokenID, req.TokenSecret)
+	client := remote.NewClient(baseURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify)
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 	healthResp, hcode, err := client.Health(ctx)
@@ -110,16 +112,17 @@ func (h *serverHandler) create(c *gin.Context) {
 	}
 
 	server := &models.Server{
-		ID:               ids.NewULID(),
-		Name:             req.Name,
-		BaseURL:          baseURL,
-		TokenID:          req.TokenID,
-		TokenSecretEnc:   secretEnc,
-		Scopes:           models.JSONStringArray(scopes),
-		Version:          healthResp.Version,
-		HealthURL:        baseURL + "/health",
-		Status:           models.ServerStatusActive,
-		CredentialStatus: models.CredentialUnknown,
+		ID:                 ids.NewULID(),
+		Name:               req.Name,
+		BaseURL:            baseURL,
+		TokenID:            req.TokenID,
+		TokenSecretEnc:     secretEnc,
+		Scopes:             models.JSONStringArray(scopes),
+		InsecureSkipVerify: req.InsecureSkipVerify,
+		Version:            healthResp.Version,
+		HealthURL:          baseURL + "/health",
+		Status:             models.ServerStatusActive,
+		CredentialStatus:   models.CredentialUnknown,
 	}
 
 	if err := h.cfg.Repo.Create(c.Request.Context(), server); err != nil {
@@ -163,9 +166,10 @@ func (h *serverHandler) detail(c *gin.Context) {
 }
 
 type updateServerRequest struct {
-	Name    *string   `json:"name"`
-	BaseURL *string   `json:"base_url"`
-	Scopes  *[]string `json:"scopes"`
+	Name               *string   `json:"name"`
+	BaseURL            *string   `json:"base_url"`
+	Scopes             *[]string `json:"scopes"`
+	InsecureSkipVerify *bool     `json:"insecure_skip_verify"`
 }
 
 func (h *serverHandler) update(c *gin.Context) {
@@ -199,6 +203,9 @@ func (h *serverHandler) update(c *gin.Context) {
 	}
 	if req.Scopes != nil {
 		s.Scopes = models.JSONStringArray(*req.Scopes)
+	}
+	if req.InsecureSkipVerify != nil {
+		s.InsecureSkipVerify = *req.InsecureSkipVerify
 	}
 
 	if err := h.cfg.Repo.Update(c.Request.Context(), s); err != nil {
@@ -281,7 +288,7 @@ func (h *serverHandler) checkHealth(c *gin.Context) {
 		return
 	}
 
-	client := remote.NewClient(s.BaseURL, s.TokenID, secretStr)
+	client := remote.NewClient(s.BaseURL, s.TokenID, secretStr, s.InsecureSkipVerify)
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
 	result, err := client.CheckHealth(ctx)

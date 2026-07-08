@@ -4,6 +4,7 @@ export interface Server {
   base_url: string;
   token_id: string;
   scopes: string[];
+  insecure_skip_verify: boolean;
   version: string;
   status: "active" | "disabled" | "unreachable";
   credential_status: "valid" | "invalid" | "unknown";

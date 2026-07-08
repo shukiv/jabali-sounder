@@ -102,7 +102,7 @@ func TestGoldenSignature(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			client := NewClient(srv.URL, tokenID, secret)
+			client := NewClient(srv.URL, tokenID, secret, false)
 			resp, err := client.Do(t.Context(), tt.method, tt.path, tt.body)
 			if err != nil {
 				t.Fatalf("Do: %v", err)

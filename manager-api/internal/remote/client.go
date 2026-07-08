@@ -30,18 +30,6 @@ const (
 	maxBody        = 1 << 20 // 1 MiB — mirrors jabali2's autoMaxBody
 )
 
-// insecureSkipVerify controls TLS certificate verification for outbound calls
-// to managed servers. Default false (verify certs). HMAC authenticates
-// requests but NOT responses, so skipping verification exposes the data plane
-// to MITM — only enable via config for panels using self-signed certs.
-// Configured once at startup via SetInsecureSkipVerify before any client is
-// built, so it needs no synchronization.
-var insecureSkipVerify = false
-
-// SetInsecureSkipVerify sets the TLS verification policy for clients created
-// afterwards. Call once at startup from config.
-func SetInsecureSkipVerify(v bool) { insecureSkipVerify = v }
-
 // Client is an authenticated HTTP client for one managed Jabali server.
 type Client struct {
 	baseURL string
@@ -50,8 +38,12 @@ type Client struct {
 	http    *http.Client
 }
 
-// NewClient returns a remote client for the given server.
-func NewClient(baseURL, tokenID, secret string) *Client {
+// NewClient returns a remote client for the given server. insecureSkipVerify
+// disables TLS certificate verification — set it only for panels using
+// self-signed certs. HMAC authenticates requests but NOT responses, so
+// skipping verification exposes the data plane to MITM; it is a per-server
+// opt-in stored on the enrolled server, defaulting to false (verify).
+func NewClient(baseURL, tokenID, secret string, insecureSkipVerify bool) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		tokenID: tokenID,
@@ -60,7 +52,7 @@ func NewClient(baseURL, tokenID, secret string) *Client {
 			Timeout: defaultTimeout,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // opt-in via [remote].insecure_skip_verify for self-signed panels; default false
+					InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // per-server opt-in for self-signed panels; default false
 				},
 			},
 		},
