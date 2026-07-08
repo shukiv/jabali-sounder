@@ -36,16 +36,21 @@ jobs:
             tags: desktop,production,webkit2_41
             asset: jabali-sounder-desktop-linux-amd64
             ldflags: ""
+            cgo_ldflags: ""
           - label: windows-amd64
             runs-on: windows-latest
             tags: desktop,production
             asset: jabali-sounder-desktop-windows-amd64.exe
             ldflags: "-H=windowsgui"
+            cgo_ldflags: ""
           - label: macos-arm64
             runs-on: macos-latest
             tags: desktop,production
             asset: jabali-sounder-desktop-macos-arm64
             ldflags: ""
+            # Wails' darwin code references UTType but its link flags omit the
+            # framework on recent macOS SDKs -> "Undefined symbols _UTType".
+            cgo_ldflags: "-framework UniformTypeIdentifiers"
 
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +89,7 @@ jobs:
         shell: bash
         env:
           CGO_ENABLED: "1"
+          CGO_LDFLAGS: ${{ matrix.cgo_ldflags }}
         run: |
           mkdir -p bin
           go build -tags "${{ matrix.tags }}" -ldflags "${{ matrix.ldflags }}" \
