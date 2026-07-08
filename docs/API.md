@@ -143,16 +143,26 @@ All fields are optional.
 
 ### `DELETE /api/v1/admin/servers/:id`
 
-Soft-disables a server by setting `status = "disabled"`.
+Permanently deletes a server and its heartbeat history (cascade). Irreversible.
+To keep the record but stop polling it, use `disable` instead.
 
 Response:
 
 ```json
 {
   "id": "01...",
-  "disabled": true
+  "deleted": true
 }
 ```
+
+### `POST /api/v1/admin/servers/:id/disable`
+
+Sets `status = "disabled"` (soft, reversible). Stored credentials and
+`credential_status` are preserved. Returns the updated server record.
+
+### `POST /api/v1/admin/servers/:id/enable`
+
+Sets `status = "active"`. Returns the updated server record.
 
 ### `POST /api/v1/admin/servers/:id/check`
 

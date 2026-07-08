@@ -45,6 +45,8 @@ func RegisterServerRoutes(g *gin.RouterGroup, cfg ServerHandlerConfig) {
 	servers.GET("/:id", h.detail)
 	servers.PATCH("/:id", h.update)
 	servers.DELETE("/:id", h.remove)
+	servers.POST("/:id/disable", h.disable)
+	servers.POST("/:id/enable", h.enable)
 	servers.POST("/:id/check", h.checkHealth)
 }
 
@@ -282,9 +284,32 @@ func normalizePanelBaseURL(raw string) (string, error) {
 	return "https://" + net.JoinHostPort(host, "8443"), nil
 }
 
+// remove hard-deletes a server (heartbeats cascade). This is irreversible;
+// to keep a server but stop polling it, use disable instead.
 func (h *serverHandler) remove(c *gin.Context) {
 	id := c.Param("id")
-	s, err := h.cfg.Repo.FindByID(c.Request.Context(), id)
+	if _, err := h.cfg.Repo.FindByID(c.Request.Context(), id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.cfg.Repo.Delete(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": id, "deleted": true})
+}
+
+func (h *serverHandler) disable(c *gin.Context) { h.setStatus(c, models.ServerStatusDisabled) }
+func (h *serverHandler) enable(c *gin.Context)  { h.setStatus(c, models.ServerStatusActive) }
+
+// setStatus flips a server between active and disabled, preserving its stored
+// credentials and credential_status.
+func (h *serverHandler) setStatus(c *gin.Context, status models.ServerStatus) {
+	s, err := h.cfg.Repo.FindByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
@@ -293,14 +318,12 @@ func (h *serverHandler) remove(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Soft-delete: set status to disabled.
-	s.Status = models.ServerStatusDisabled
+	s.Status = status
 	if err := h.cfg.Repo.Update(c.Request.Context(), s); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "disable: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "set status: " + err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": id, "disabled": true})
+	c.JSON(http.StatusOK, s)
 }
 
 // checkHealth probes the server's /health + /automation/status on demand.

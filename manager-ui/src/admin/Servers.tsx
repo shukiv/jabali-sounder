@@ -12,13 +12,23 @@ import {
   Select,
   Tooltip,
   Checkbox,
+  Popconfirm,
 } from "antd";
-import { PlusOutlined, DeleteOutlined, ReloadOutlined, EditOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  ReloadOutlined,
+  EditOutlined,
+  PoweroffOutlined,
+  PlayCircleOutlined,
+} from "@ant-design/icons";
 import {
   useServers,
   useCreateServer,
   useUpdateServer,
   useDeleteServer,
+  useDisableServer,
+  useEnableServer,
   useCheckHealth,
 } from "../hooks/useServers";
 import type { Server } from "../types";
@@ -66,6 +76,8 @@ export default function Servers() {
   const createMut = useCreateServer();
   const updateMut = useUpdateServer();
   const deleteMut = useDeleteServer();
+  const disableMut = useDisableServer();
+  const enableMut = useEnableServer();
   const checkMut = useCheckHealth();
   const { message } = App.useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -133,8 +145,30 @@ export default function Servers() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    await deleteMut.mutateAsync(id);
-    message.success(`Disabled server: ${name}`);
+    try {
+      await deleteMut.mutateAsync(id);
+      message.success(`Deleted server: ${name}`);
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
+  };
+
+  const handleDisable = async (id: string, name: string) => {
+    try {
+      await disableMut.mutateAsync(id);
+      message.success(`Disabled server: ${name}`);
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
+  };
+
+  const handleEnable = async (id: string, name: string) => {
+    try {
+      await enableMut.mutateAsync(id);
+      message.success(`Enabled server: ${name}`);
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
   };
 
   const handleCheck = async (id: string) => {
@@ -209,14 +243,42 @@ export default function Servers() {
               onClick={() => handleCheck(record.id)}
             />
           </Tooltip>
-          <Tooltip title="Disable server">
-            <Button
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record.id, record.name)}
-            />
-          </Tooltip>
+          {record.status === "disabled" ? (
+            <Tooltip title="Enable server">
+              <Button
+                size="small"
+                icon={<PlayCircleOutlined />}
+                loading={enableMut.isPending && enableMut.variables === record.id}
+                onClick={() => handleEnable(record.id, record.name)}
+              />
+            </Tooltip>
+          ) : (
+            <Tooltip title="Disable server">
+              <Button
+                size="small"
+                icon={<PoweroffOutlined />}
+                loading={disableMut.isPending && disableMut.variables === record.id}
+                onClick={() => handleDisable(record.id, record.name)}
+              />
+            </Tooltip>
+          )}
+          <Popconfirm
+            title="Delete this server?"
+            description="Permanently removes it and its heartbeat history. This cannot be undone."
+            okText="Delete"
+            okButtonProps={{ danger: true }}
+            cancelText="Cancel"
+            onConfirm={() => handleDelete(record.id, record.name)}
+          >
+            <Tooltip title="Delete server">
+              <Button
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                loading={deleteMut.isPending && deleteMut.variables === record.id}
+              />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },

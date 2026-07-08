@@ -114,3 +114,58 @@ func TestUpdateServerBlankSecretKeepsCurrent(t *testing.T) {
 		t.Errorf("token_id changed unexpectedly: got %q", got.TokenID)
 	}
 }
+
+func doServerAction(t *testing.T, repo repository.ServerRepository, method, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	RegisterServerRoutes(r.Group("/api/v1"), ServerHandlerConfig{Repo: repo})
+	req := httptest.NewRequest(method, path, nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// TestDeleteServerHardRemoves verifies DELETE actually removes the row.
+func TestDeleteServerHardRemoves(t *testing.T) {
+	repo := newTestServerRepo(t)
+	srv := seedServer(t, repo)
+
+	w := doServerAction(t, repo, http.MethodDelete, "/api/v1/admin/servers/"+srv.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if _, err := repo.FindByID(context.Background(), srv.ID); err == nil {
+		t.Fatalf("server still exists after delete")
+	}
+}
+
+// TestDisableEnableServer verifies the status toggles and the row survives.
+func TestDisableEnableServer(t *testing.T) {
+	repo := newTestServerRepo(t)
+	srv := seedServer(t, repo)
+
+	w := doServerAction(t, repo, http.MethodPost, "/api/v1/admin/servers/"+srv.ID+"/disable")
+	if w.Code != http.StatusOK {
+		t.Fatalf("disable status = %d, body = %s", w.Code, w.Body.String())
+	}
+	got, err := repo.FindByID(context.Background(), srv.ID)
+	if err != nil {
+		t.Fatalf("find after disable: %v", err)
+	}
+	if got.Status != models.ServerStatusDisabled {
+		t.Errorf("status = %q, want disabled", got.Status)
+	}
+
+	w = doServerAction(t, repo, http.MethodPost, "/api/v1/admin/servers/"+srv.ID+"/enable")
+	if w.Code != http.StatusOK {
+		t.Fatalf("enable status = %d, body = %s", w.Code, w.Body.String())
+	}
+	got, err = repo.FindByID(context.Background(), srv.ID)
+	if err != nil {
+		t.Fatalf("find after enable: %v", err)
+	}
+	if got.Status != models.ServerStatusActive {
+		t.Errorf("status = %q, want active", got.Status)
+	}
+}

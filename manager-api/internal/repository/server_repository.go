@@ -21,6 +21,8 @@ type ServerRepository interface {
 	List(ctx context.Context) ([]models.Server, error)
 	Update(ctx context.Context, s *models.Server) error
 	UpdateStatus(ctx context.Context, id string, status models.ServerStatus, credStatus models.CredentialStatus) error
+	// Delete hard-removes a server row (heartbeats cascade on MariaDB).
+	Delete(ctx context.Context, id string) error
 }
 
 type serverRepo struct{ db *gorm.DB }
@@ -75,6 +77,13 @@ func (r *serverRepo) UpdateStatus(ctx context.Context, id string, status models.
 	}
 	if res.RowsAffected == 0 {
 		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *serverRepo) Delete(ctx context.Context, id string) error {
+	if err := r.db.WithContext(ctx).Delete(&models.Server{}, "id = ?", id).Error; err != nil {
+		return fmt.Errorf("server delete: %w", err)
 	}
 	return nil
 }
