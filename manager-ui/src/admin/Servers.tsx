@@ -10,10 +10,10 @@ import {
   Space,
   App,
   Select,
-  Tooltip,
   Checkbox,
-  Popconfirm,
+  Dropdown,
 } from "antd";
+import type { MenuProps } from "antd";
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -21,6 +21,7 @@ import {
   EditOutlined,
   PoweroffOutlined,
   PlayCircleOutlined,
+  MoreOutlined,
 } from "@ant-design/icons";
 import {
   useServers,
@@ -79,7 +80,7 @@ export default function Servers() {
   const disableMut = useDisableServer();
   const enableMut = useEnableServer();
   const checkMut = useCheckHealth();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<Server | null>(null);
   const [form] = Form.useForm();
@@ -186,6 +187,48 @@ export default function Servers() {
     }
   };
 
+  const confirmDelete = (record: Server) => {
+    modal.confirm({
+      title: `Delete server "${record.name}"?`,
+      content:
+        "Permanently removes it and its heartbeat history. This cannot be undone.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: () => handleDelete(record.id, record.name),
+    });
+  };
+
+  const actionMenuItems = (record: Server): MenuProps["items"] => [
+    {
+      key: "edit",
+      icon: <EditOutlined />,
+      label: "Edit",
+      onClick: () => openEdit(record),
+    },
+    record.status === "disabled"
+      ? {
+          key: "enable",
+          icon: <PlayCircleOutlined />,
+          label: "Enable",
+          onClick: () => handleEnable(record.id, record.name),
+        }
+      : {
+          key: "disable",
+          icon: <PoweroffOutlined />,
+          label: "Disable",
+          onClick: () => handleDisable(record.id, record.name),
+        },
+    { type: "divider" },
+    {
+      key: "delete",
+      icon: <DeleteOutlined />,
+      label: "Delete",
+      danger: true,
+      onClick: () => confirmDelete(record),
+    },
+  ];
+
   const columns = [
     { title: "Name", dataIndex: "name", key: "name" },
     { title: "Version", dataIndex: "version", key: "version" },
@@ -228,57 +271,21 @@ export default function Servers() {
       key: "actions",
       render: (_: unknown, record: Server) => (
         <Space>
-          <Tooltip title="Edit server">
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => openEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Check health now">
-            <Button
-              size="small"
-              icon={<ReloadOutlined />}
-              loading={checkMut.isPending && checkMut.variables === record.id}
-              onClick={() => handleCheck(record.id)}
-            />
-          </Tooltip>
-          {record.status === "disabled" ? (
-            <Tooltip title="Enable server">
-              <Button
-                size="small"
-                icon={<PlayCircleOutlined />}
-                loading={enableMut.isPending && enableMut.variables === record.id}
-                onClick={() => handleEnable(record.id, record.name)}
-              />
-            </Tooltip>
-          ) : (
-            <Tooltip title="Disable server">
-              <Button
-                size="small"
-                icon={<PoweroffOutlined />}
-                loading={disableMut.isPending && disableMut.variables === record.id}
-                onClick={() => handleDisable(record.id, record.name)}
-              />
-            </Tooltip>
-          )}
-          <Popconfirm
-            title="Delete this server?"
-            description="Permanently removes it and its heartbeat history. This cannot be undone."
-            okText="Delete"
-            okButtonProps={{ danger: true }}
-            cancelText="Cancel"
-            onConfirm={() => handleDelete(record.id, record.name)}
+          <Button
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={checkMut.isPending && checkMut.variables === record.id}
+            onClick={() => handleCheck(record.id)}
           >
-            <Tooltip title="Delete server">
-              <Button
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                loading={deleteMut.isPending && deleteMut.variables === record.id}
-              />
-            </Tooltip>
-          </Popconfirm>
+            Check
+          </Button>
+          <Dropdown
+            trigger={["click"]}
+            placement="bottomRight"
+            menu={{ items: actionMenuItems(record) }}
+          >
+            <Button size="small" icon={<MoreOutlined />} />
+          </Dropdown>
         </Space>
       ),
     },
