@@ -338,10 +338,14 @@ func (h *serverHandler) checkHealth(c *gin.Context) {
 		return
 	}
 
-	// Decrypt token secret.
+	// Decrypt token secret. A failure here almost always means the stored
+	// secret was encrypted by a different install (e.g. imported settings) —
+	// surface a clear, actionable message instead of a raw crypto error.
 	secretStr, err := h.decryptSecret(s)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "decrypt: " + err.Error()})
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
+			"error": "stored token secret can't be decrypted here — edit the server and re-enter the token secret",
+		})
 		return
 	}
 

@@ -176,6 +176,21 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	if item.CredentialStatus == string(models.CredentialInvalid) {
 		credStatus = models.CredentialInvalid
 	}
+
+	// A token secret encrypted by a DIFFERENT Sounder install can't be
+	// decrypted with this install's key. Don't store an unusable blob (later
+	// panel calls would fail with "message authentication failed") — drop it,
+	// mark the credential invalid, and tell the operator to re-enter the
+	// secret. The server still imports so it can be edited.
+	if len(secretEnc) > 0 && h.cfg.SecretKey != nil && item.TokenSecret == "" {
+		if _, oerr := h.cfg.SecretKey.Open(secretEnc); oerr != nil {
+			secretEnc = nil
+			credStatus = models.CredentialInvalid
+			result.Errors = append(result.Errors,
+				fmt.Sprintf("%s: token secret is from a different Sounder install and can't be decrypted here — edit the server and re-enter the token secret", name))
+		}
+	}
+
 	scopes := item.Scopes
 	if len(scopes) == 0 {
 		scopes = []string{remote.ScopeReadAll}
