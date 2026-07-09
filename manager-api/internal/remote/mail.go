@@ -31,6 +31,12 @@ type MailboxListResp struct {
 }
 
 // Mailboxes calls GET /api/v1/automation/mail/mailboxes on the managed server.
+//
+// jabali2's automation endpoint (JAB-77) emits a thin shape with DIFFERENT
+// field names than Sounder's output contract: {email, domain, owner,
+// quota_bytes, last_usage_bytes, disabled}. Decode that wire shape, then map it
+// onto Mailbox so the Sounder API keeps exposing domain_name/user_username/
+// is_disabled to the UI.
 func (c *Client) Mailboxes(ctx context.Context) (*MailboxListResp, int, error) {
 	resp, err := c.Get(ctx, "/api/v1/automation/mail/mailboxes")
 	if err != nil {
@@ -40,9 +46,30 @@ func (c *Client) Mailboxes(ctx context.Context) (*MailboxListResp, int, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, resp.StatusCode, fmt.Errorf("mailboxes: HTTP %d", resp.StatusCode)
 	}
-	var result MailboxListResp
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var wire struct {
+		Data []struct {
+			Email          string `json:"email"`
+			Domain         string `json:"domain"`
+			Owner          string `json:"owner"`
+			QuotaBytes     uint64 `json:"quota_bytes"`
+			LastUsageBytes uint64 `json:"last_usage_bytes"`
+			Disabled       bool   `json:"disabled"`
+		} `json:"data"`
+		Total int `json:"total"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&wire); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("mailboxes decode: %w", err)
+	}
+	result := MailboxListResp{Total: wire.Total, Data: make([]Mailbox, 0, len(wire.Data))}
+	for _, m := range wire.Data {
+		result.Data = append(result.Data, Mailbox{
+			Email:          m.Email,
+			DomainName:     m.Domain,
+			UserUsername:   m.Owner,
+			QuotaBytes:     m.QuotaBytes,
+			LastUsageBytes: m.LastUsageBytes,
+			IsDisabled:     m.Disabled,
+		})
 	}
 	return &result, resp.StatusCode, nil
 }
