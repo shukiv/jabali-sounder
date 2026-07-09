@@ -161,3 +161,52 @@ jobs:
           fail_on_unmatched_files: true
           # Assets from every matrix job upsert into the same tagged release.
           generate_release_notes: true
+
+  # Headless Linux server binary with the SPA embedded (one binary, one port).
+  # This is what the curl|bash installer downloads. Pure-Go (CGO disabled) so it
+  # runs on any glibc/musl Linux without extra libraries.
+  server:
+    name: build (server-linux-amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: manager-ui/package-lock.json
+      - name: Build & stage frontend
+        shell: bash
+        run: |
+          cd manager-ui
+          npm ci --no-audit --no-fund
+          npm run build
+          cd ..
+          rm -rf manager-api/cmd/server/dist
+          mkdir -p manager-api/cmd/server/dist
+          cp -R manager-ui/dist/. manager-api/cmd/server/dist/
+      - name: Build server binary
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p out
+          go build -tags embedui -o out/jabali-sounder-server-linux-amd64 ./manager-api/cmd/server
+          ls -la out/
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-linux-amd64
+          path: out/jabali-sounder-server-linux-amd64
+          if-no-files-found: error
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/jabali-sounder-server-linux-amd64
+          fail_on_unmatched_files: true
+          generate_release_notes: true

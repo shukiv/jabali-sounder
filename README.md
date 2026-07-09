@@ -50,6 +50,28 @@ Notes:
 - macOS build is Apple Silicon (arm64) only. On Linux, `chmod +x` the binary
   before running.
 
+## Install (Linux server)
+
+One-liner for a Debian/Ubuntu server. Installs a single static binary that
+serves both the API and the UI on one port (no Go, Node, or MariaDB required),
+with a hardened systemd service and a SQLite database:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shukiv/jabali-sounder/main/install.sh | sudo bash
+```
+
+The installer prints the URL and a generated admin password when it finishes.
+Change the password in **Settings** after logging in.
+
+- Listens on `0.0.0.0:8484` over plain HTTP — front it with a TLS reverse proxy
+  for anything public. Override the bind address with `JABALI_SOUNDER_ADDR`.
+- Files: config + encryption key in `/etc/jabali-sounder/`, database in
+  `/var/lib/jabali-sounder/`, service `jabali-sounder` (`systemctl status
+  jabali-sounder`, `journalctl -u jabali-sounder -f`).
+- Preset the admin: `JABALI_SOUNDER_ADMIN` / `JABALI_SOUNDER_ADMIN_PASSWORD`.
+
+For desktop use instead, grab a build from [Downloads](#downloads).
+
 ## Repository Layout
 
 ```text

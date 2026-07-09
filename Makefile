@@ -1,6 +1,6 @@
 .PHONY: help build run test test-short test-coverage lint fmt vet tidy clean \
 	test-ui test-e2e test-all ui-install ui-build migrate-up migrate-down \
-	desktop-stage desktop-build
+	desktop-stage desktop-build server-stage server-build
 
 GO         := go
 API_PKG    := ./manager-api/...
@@ -77,3 +77,12 @@ desktop-stage: ui-build ## Stage built SPA assets for the Wails desktop entrypoi
 desktop-build: desktop-stage ## Build the local standalone desktop binary for the current OS
 	mkdir -p bin
 	$(GO) build -tags $(DESKTOP_TAGS) -o ./bin/jabali-sounder-desktop ./manager-api/cmd/desktop
+
+server-stage: ui-build ## Stage the built SPA for the embedded-UI server binary
+	rm -rf manager-api/cmd/server/dist
+	mkdir -p manager-api/cmd/server/dist
+	cp -R manager-ui/dist/. manager-api/cmd/server/dist/
+
+server-build: server-stage ## Build the headless server binary with the SPA embedded (one binary, one port)
+	mkdir -p bin
+	CGO_ENABLED=0 $(GO) build -tags embedui -o ./bin/jabali-sounder-server ./manager-api/cmd/server

@@ -107,6 +107,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	ginEngine := app.NewWithDeps(deps)
+	attachSPA(ginEngine) // serves the embedded SPA when built with -tags embedui
 
 	srv := &http.Server{
 		Addr:              cfg.Server.Addr,
