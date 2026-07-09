@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
@@ -20,7 +21,14 @@ import (
 // Open returns a GORM DB connected to the configured database driver.
 func Open(dbDriver, dsn string) (*gorm.DB, error) {
 	gormCfg := &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
+		// Warn level, but don't log ErrRecordNotFound: repositories use
+		// "not found" as normal control flow (e.g. admin set-password checks
+		// for an existing admin before creating it), so logging it just spams
+		// a fake-looking error — noticeably during install.
+		Logger: logger.New(log.New(os.Stderr, "", log.LstdFlags), logger.Config{
+			LogLevel:                  logger.Warn,
+			IgnoreRecordNotFoundError: true,
+		}),
 	}
 	var (
 		db  *gorm.DB
