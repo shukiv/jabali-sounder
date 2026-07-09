@@ -16,6 +16,8 @@ export function BrandLogo({ mode, size = "header" }: BrandLogoProps) {
   const textStyle = {
     margin: 0,
     lineHeight: 1,
+    fontSize: size === "login" ? 30 : size === "footer" ? 16 : 30,
+    fontWeight: 700,
     color: mode === "dark" ? "#fff" : "#111827",
   };
 
