@@ -8,6 +8,17 @@
   Central control plane for a sounder of Jabali Panel servers.
 </p>
 
+<p align="center">
+  <a href="https://github.com/shukiv/jabali-sounder/releases"><img alt="Release" src="https://img.shields.io/github/v/release/shukiv/jabali-sounder?sort=semver" /></a>
+  <img alt="Status" src="https://img.shields.io/badge/status-early-orange" />
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React-18-20232A?logo=react&logoColor=61DAFB" />
+  <img alt="Ant Design" src="https://img.shields.io/badge/Ant%20Design-6-0170FE?logo=antdesign&logoColor=white" />
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white" />
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" />
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-AGPL--3.0-blue" /></a>
+</p>
+
 ---
 
 Jabali Sounder is a central control plane for managing multiple Jabali Panel
