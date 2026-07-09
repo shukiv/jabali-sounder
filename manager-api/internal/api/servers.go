@@ -343,6 +343,9 @@ func (h *serverHandler) checkHealth(c *gin.Context) {
 	// surface a clear, actionable message instead of a raw crypto error.
 	secretStr, err := h.decryptSecret(s)
 	if err != nil {
+		// Can't decrypt the stored secret -> the credential is unusable.
+		// Persist that so the table stops showing it as valid.
+		_ = h.cfg.Repo.UpdateStatus(c.Request.Context(), s.ID, s.Status, models.CredentialInvalid)
 		c.JSON(http.StatusUnprocessableEntity, gin.H{
 			"error": "stored token secret can't be decrypted here — edit the server and re-enter the token secret",
 		})
