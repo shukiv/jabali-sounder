@@ -269,6 +269,13 @@ type Bridge struct {
 
 func (b *Bridge) startup(ctx context.Context) { b.ctx = ctx }
 
+// OpenExternal opens a URL in the user's default system browser. The webview
+// does not open target="_blank" links itself. Bound to JS as
+// window.go.main.Bridge.OpenExternal.
+func (b *Bridge) OpenExternal(url string) {
+	runtime.BrowserOpenURL(b.ctx, url)
+}
+
 // SaveFile opens a native "Save As" dialog seeded with defaultName and writes
 // content to the chosen path. Returns the saved path, or "" if the user
 // cancelled. Bound to JS as window.go.main.Bridge.SaveFile.

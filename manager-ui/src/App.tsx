@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router";
 import { ConfigProvider } from "antd";
 import AdminLayout from "./shells/AdminLayout";
@@ -12,11 +13,16 @@ import Login from "./admin/Login";
 import { useAuth } from "./hooks/useAuth";
 import { useThemeMode } from "./theme/ThemeModeContext";
 import { useTheme } from "./hooks/useTheme";
+import { installExternalLinkHandler } from "./lib/desktop";
 
 export default function App() {
   const { auth } = useAuth();
   const { mode } = useThemeMode();
   const cfg = useTheme(mode);
+
+  // Desktop: open external links in the system browser (the webview ignores
+  // target="_blank"). No-op in the browser build.
+  useEffect(() => installExternalLinkHandler(), []);
 
   return (
     <ConfigProvider {...cfg}>
