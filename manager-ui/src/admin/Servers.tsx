@@ -11,9 +11,7 @@ import {
   App,
   Select,
   Checkbox,
-  Dropdown,
 } from "antd";
-import type { MenuProps } from "antd";
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -21,7 +19,6 @@ import {
   EditOutlined,
   PoweroffOutlined,
   PlayCircleOutlined,
-  MoreOutlined,
 } from "@ant-design/icons";
 import {
   useServers,
@@ -32,6 +29,7 @@ import {
   useEnableServer,
   useCheckHealth,
 } from "../hooks/useServers";
+import { RowActions } from "../components/RowActions";
 import type { Server } from "../types";
 
 const scopeOptions = [
@@ -80,7 +78,7 @@ export default function Servers() {
   const disableMut = useDisableServer();
   const enableMut = useEnableServer();
   const checkMut = useCheckHealth();
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<Server | null>(null);
   const [form] = Form.useForm();
@@ -187,48 +185,6 @@ export default function Servers() {
     }
   };
 
-  const confirmDelete = (record: Server) => {
-    modal.confirm({
-      title: `Delete server "${record.name}"?`,
-      content:
-        "Permanently removes it and its heartbeat history. This cannot be undone.",
-      okText: "Delete",
-      okButtonProps: { danger: true },
-      cancelText: "Cancel",
-      onOk: () => handleDelete(record.id, record.name),
-    });
-  };
-
-  const actionMenuItems = (record: Server): MenuProps["items"] => [
-    {
-      key: "edit",
-      icon: <EditOutlined />,
-      label: "Edit",
-      onClick: () => openEdit(record),
-    },
-    record.status === "disabled"
-      ? {
-          key: "enable",
-          icon: <PlayCircleOutlined />,
-          label: "Enable",
-          onClick: () => handleEnable(record.id, record.name),
-        }
-      : {
-          key: "disable",
-          icon: <PoweroffOutlined />,
-          label: "Disable",
-          onClick: () => handleDisable(record.id, record.name),
-        },
-    { type: "divider" },
-    {
-      key: "delete",
-      icon: <DeleteOutlined />,
-      label: "Delete",
-      danger: true,
-      onClick: () => confirmDelete(record),
-    },
-  ];
-
   const columns = [
     { title: "Name", dataIndex: "name", key: "name" },
     { title: "Version", dataIndex: "version", key: "version" },
@@ -270,23 +226,49 @@ export default function Servers() {
       title: "Actions",
       key: "actions",
       render: (_: unknown, record: Server) => (
-        <Space>
-          <Button
-            size="small"
-            icon={<ReloadOutlined />}
-            loading={checkMut.isPending && checkMut.variables === record.id}
-            onClick={() => handleCheck(record.id)}
-          >
-            Check
-          </Button>
-          <Dropdown
-            trigger={["click"]}
-            placement="bottomRight"
-            menu={{ items: actionMenuItems(record) }}
-          >
-            <Button size="small" icon={<MoreOutlined />} />
-          </Dropdown>
-        </Space>
+        <RowActions
+          actions={[
+            {
+              key: "check",
+              label: "Check",
+              icon: <ReloadOutlined />,
+              loading: checkMut.isPending && checkMut.variables === record.id,
+              onClick: () => handleCheck(record.id),
+            },
+            {
+              key: "edit",
+              label: "Edit",
+              icon: <EditOutlined />,
+              onClick: () => openEdit(record),
+            },
+            record.status === "disabled"
+              ? {
+                  key: "enable",
+                  label: "Enable",
+                  icon: <PlayCircleOutlined />,
+                  onClick: () => handleEnable(record.id, record.name),
+                }
+              : {
+                  key: "disable",
+                  label: "Disable",
+                  icon: <PoweroffOutlined />,
+                  onClick: () => handleDisable(record.id, record.name),
+                },
+            {
+              key: "delete",
+              label: "Delete",
+              icon: <DeleteOutlined />,
+              danger: true,
+              onClick: () => handleDelete(record.id, record.name),
+              confirm: {
+                title: `Delete server "${record.name}"?`,
+                description:
+                  "Permanently removes it and its heartbeat history. This cannot be undone.",
+                okText: "Delete",
+              },
+            },
+          ]}
+        />
       ),
     },
   ];
