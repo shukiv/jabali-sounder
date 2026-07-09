@@ -53,6 +53,9 @@ func main() {
 		Title:  "Jabali Sounder",
 		Width:  1280,
 		Height: 820,
+		// Start maximized (fills the screen); the user can restore/resize.
+		// Width/Height above are the restored (un-maximized) size.
+		WindowStartState: options.Maximised,
 		AssetServer: &assetserver.Options{
 			Assets:  assets,
 			Handler: handler,
