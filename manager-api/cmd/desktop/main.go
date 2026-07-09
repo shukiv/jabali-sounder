@@ -21,6 +21,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	runtime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/api"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
@@ -49,6 +50,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	bridge := &Bridge{}
+
 	if err := wails.Run(&options.App{
 		Title:  "Jabali Sounder",
 		Width:  1280,
@@ -56,6 +59,8 @@ func main() {
 		// Start maximized (fills the screen); the user can restore/resize.
 		// Width/Height above are the restored (un-maximized) size.
 		WindowStartState: options.Maximised,
+		OnStartup:        bridge.startup,
+		Bind:             []interface{}{bridge},
 		AssetServer: &assetserver.Options{
 			Assets:  assets,
 			Handler: handler,
@@ -253,4 +258,34 @@ func resetPassword(args []string) error {
 	default:
 		return fmt.Errorf("lookup admin: %w", err)
 	}
+}
+
+// Bridge exposes native desktop capabilities to the SPA over the Wails runtime.
+// The browser <a download> trick does not trigger a save in the WebKit webview,
+// so file export goes through a native Save As dialog here instead.
+type Bridge struct {
+	ctx context.Context
+}
+
+func (b *Bridge) startup(ctx context.Context) { b.ctx = ctx }
+
+// SaveFile opens a native "Save As" dialog seeded with defaultName and writes
+// content to the chosen path. Returns the saved path, or "" if the user
+// cancelled. Bound to JS as window.go.main.Bridge.SaveFile.
+func (b *Bridge) SaveFile(defaultName, content string) (string, error) {
+	path, err := runtime.SaveFileDialog(b.ctx, runtime.SaveDialogOptions{
+		DefaultFilename:      defaultName,
+		Title:                "Save Jabali Sounder settings",
+		CanCreateDirectories: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		return "", fmt.Errorf("write %s: %w", path, err)
+	}
+	return path, nil
 }

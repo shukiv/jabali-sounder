@@ -7,6 +7,12 @@ import apiClient from "../apiClient";
 
 const { Title, Text, Paragraph } = Typography;
 
+// Native bridge exposed by the Wails desktop build (window.go.main.Bridge).
+// Absent in the browser/server build.
+interface WailsBridgeWindow {
+  go?: { main?: { Bridge?: { SaveFile?: (name: string, content: string) => Promise<string> } } };
+}
+
 interface ImportResult {
   imported: number;
   updated: number;
@@ -52,12 +58,23 @@ export default function Settings() {
       const resp = await apiClient.get("/admin/settings/export", {
         responseType: "blob",
       });
-      const blob = new Blob([resp.data], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const text = await (resp.data as Blob).text();
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      const filename = `jabali-sounder-settings-${stamp}.json`;
+
+      // Desktop (Wails): open a native Save As dialog. The browser <a download>
+      // trick below is a no-op inside the WebKit webview.
+      const bridge = (window as unknown as WailsBridgeWindow).go?.main?.Bridge;
+      if (bridge?.SaveFile) {
+        const saved = await bridge.SaveFile(filename, text);
+        if (saved) message.success(`Exported to ${saved}`);
+        return;
+      }
+
+      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      const link = document.createElement("a");
       link.href = url;
-      link.download = `jabali-sounder-settings-${stamp}.json`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
