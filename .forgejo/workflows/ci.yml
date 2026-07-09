@@ -6,10 +6,13 @@
 name: CI
 
 on:
+  # Only run on pushes (which require write access) and manual dispatch.
+  # This repo is public and the jabali-ci runner is self-hosted (shared with
+  # jabali2), so we must NOT auto-run untrusted fork PRs on it — a malicious PR
+  # could execute code (npm postinstall, tests, build scripts) on the runner.
+  # Maintainers get pre-merge CI by pushing their feature branch.
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: ["**"]
   workflow_dispatch:
 
 concurrency:
