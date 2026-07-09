@@ -39,9 +39,9 @@ const navItems = [
   { key: "/", label: "Dashboard", icon: <HomeOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/servers", label: "Servers", icon: <CloudServerOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/monitor", label: "Monitor", icon: <DashboardOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/mail", label: "Mail", icon: <MailOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/domains", label: "Domains", icon: <GlobalOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/users", label: "Users", icon: <TeamOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/domains", label: "Domains", icon: <GlobalOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/mail", label: "Mail", icon: <MailOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/settings", label: "Settings", icon: <SettingOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
 ];
 
