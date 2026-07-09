@@ -11,8 +11,8 @@ interface BrandLogoProps {
 }
 
 export function BrandLogo({ mode, size = "header" }: BrandLogoProps) {
-  const logoHeight = size === "login" ? 52 : size === "footer" ? 24 : 46;
-  const titleLevel = size === "login" ? 3 : 4;
+  const logoHeight = size === "login" ? 52 : size === "footer" ? 24 : 54;
+  const titleLevel = size === "footer" ? 4 : 3;
   const textStyle = {
     margin: 0,
     lineHeight: 1,
