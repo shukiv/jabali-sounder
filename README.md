@@ -31,6 +31,25 @@ The current implementation provides:
 - Standalone Wails desktop target for Windows, macOS, and Linux using local
   SQLite storage and first-run admin setup.
 
+## Downloads
+
+Prebuilt standalone desktop app (latest release):
+
+| Platform | Download |
+|----------|----------|
+| Linux (x86-64) | [jabali-sounder-desktop-linux-amd64](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-desktop-linux-amd64) |
+| Windows (x86-64) | [jabali-sounder-desktop-windows-amd64.exe](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-desktop-windows-amd64.exe) |
+| macOS (Apple Silicon) | [jabali-sounder-macos-arm64.dmg](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-macos-arm64.dmg) |
+
+All versions: [Releases](https://github.com/shukiv/jabali-sounder/releases).
+
+Notes:
+
+- Binaries are **unsigned**. macOS: right-click the app → **Open** the first
+  time (Gatekeeper). Windows: **More info → Run anyway** (SmartScreen).
+- macOS build is Apple Silicon (arm64) only. On Linux, `chmod +x` the binary
+  before running.
+
 ## Repository Layout
 
 ```text

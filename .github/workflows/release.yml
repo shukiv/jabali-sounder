@@ -135,8 +135,9 @@ jobs:
           mkdir -p out dmgroot
           cp -R "$APP" dmgroot/
           ln -s /Applications dmgroot/Applications
+          # Version-less name so releases/latest/download/<name> stays stable.
           hdiutil create -volname "Jabali Sounder" -srcfolder dmgroot \
-            -ov -format UDZO "out/jabali-sounder-${VER}-macos-arm64.dmg"
+            -ov -format UDZO "out/jabali-sounder-macos-arm64.dmg"
 
           # Keep the raw binary too.
           cp "bin/${{ matrix.asset }}" "out/${{ matrix.asset }}"
