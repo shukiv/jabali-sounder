@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,6 +27,10 @@ type ServerHandlerConfig struct {
 	Repo      repository.ServerRepository
 	SecretKey *secrets.Key
 	Log       *slog.Logger
+	// AllowPrivateTargets disables the SSRF guard (SND-4).
+	AllowPrivateTargets bool
+	// AllowPlaintext permits the dev hex-plaintext token fallback (SND-6).
+	AllowPlaintext bool
 }
 
 // RegisterServerRoutes mounts /api/v1/admin/servers.
@@ -58,6 +62,7 @@ type createServerRequest struct {
 	TokenID     string   `json:"token_id" binding:"required"`
 	TokenSecret string   `json:"token_secret" binding:"required"`
 	Scopes      []string `json:"scopes"`
+	Tags        []string `json:"tags"`
 	// InsecureSkipVerify skips TLS cert verification for this panel (self-signed).
 	InsecureSkipVerify bool `json:"insecure_skip_verify"`
 }
@@ -65,13 +70,17 @@ type createServerRequest struct {
 func (h *serverHandler) create(c *gin.Context) {
 	var req createServerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
 		return
 	}
 
 	baseURL, err := normalizePanelBaseURL(req.BaseURL)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid panel hostname"})
+		return
+	}
+	if err := h.validateTargetHost(baseURL); err != nil {
+		failCode(c, h.cfg.Log, http.StatusUnprocessableEntity, "target_not_allowed", err)
 		return
 	}
 
@@ -81,31 +90,38 @@ func (h *serverHandler) create(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "name must be 1-200 chars"})
 		return
 	}
-
-	// Probe /health before enrolling — fail fast on unreachable.
-	client := remote.NewClient(baseURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify)
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
-	defer cancel()
-	healthResp, hcode, err := client.Health(ctx)
-	if err != nil || hcode != http.StatusOK {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"error":  "server_unreachable",
-			"detail": fmt.Sprintf("GET /health failed: %v (HTTP %d)", err, hcode),
-		})
+	tags, err := normalizeServerTags(req.Tags)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_tags"})
 		return
 	}
 
-	// Encrypt the token secret.
-	var secretEnc []byte
-	if h.cfg.SecretKey != nil {
-		secretEnc, err = h.cfg.SecretKey.Seal([]byte(req.TokenSecret))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "encrypt token secret: " + err.Error()})
-			return
+	// Verify reachability AND that the automation credentials actually work
+	// before enrolling. Probing only /health (unauthenticated) let servers with
+	// a bad token get added and then show as active/invalid; instead reject the
+	// enrollment outright if the token is rejected.
+	client := remote.NewClient(baseURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+	check, err := client.CheckHealth(ctx)
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	if status, code, ok := enrollmentGate(check); !ok {
+		detail := fmt.Sprintf("GET /health failed (HTTP %d)", check.HealthCode)
+		if code == "invalid_credentials" {
+			detail = fmt.Sprintf("automation token was rejected by the panel (HTTP %d)", check.StatusCode)
 		}
-	} else {
-		// No key — store hex-encoded plaintext (dev only).
-		secretEnc = []byte(hex.EncodeToString([]byte(req.TokenSecret)))
+		c.JSON(status, gin.H{"error": code, "detail": detail})
+		return
+	}
+
+	// Encrypt the token secret (SND-6: single fallback location).
+	secretEnc, err := h.encryptSecret(req.TokenSecret)
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
 	}
 
 	scopes := req.Scopes
@@ -120,11 +136,12 @@ func (h *serverHandler) create(c *gin.Context) {
 		TokenID:            req.TokenID,
 		TokenSecretEnc:     secretEnc,
 		Scopes:             models.JSONStringArray(scopes),
+		Tags:               models.JSONStringArray(tags),
 		InsecureSkipVerify: req.InsecureSkipVerify,
-		Version:            healthResp.Version,
+		Version:            check.Version,
 		HealthURL:          baseURL + "/health",
 		Status:             models.ServerStatusActive,
-		CredentialStatus:   models.CredentialUnknown,
+		CredentialStatus:   models.CredentialValid,
 	}
 
 	if err := h.cfg.Repo.Create(c.Request.Context(), server); err != nil {
@@ -133,17 +150,33 @@ func (h *serverHandler) create(c *gin.Context) {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "duplicate name or token_id"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "create server: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
 	c.JSON(http.StatusCreated, server)
 }
 
+// enrollmentGate decides whether a health-check result permits enrolling a
+// server. A server must be reachable AND present valid automation credentials —
+// a panel that only answers /health but rejects the token is not enrolled, so
+// broken credentials never land in the managed list. ok=false -> reject with the
+// returned status + opaque code.
+func enrollmentGate(check *remote.CheckResult) (status int, code string, ok bool) {
+	switch {
+	case check == nil || !check.Reachable:
+		return http.StatusUnprocessableEntity, "server_unreachable", false
+	case !check.CredentialValid:
+		return http.StatusUnprocessableEntity, "invalid_credentials", false
+	default:
+		return http.StatusCreated, "", true
+	}
+}
+
 func (h *serverHandler) list(c *gin.Context) {
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -161,7 +194,7 @@ func (h *serverHandler) detail(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusOK, s)
@@ -171,6 +204,7 @@ type updateServerRequest struct {
 	Name               *string   `json:"name"`
 	BaseURL            *string   `json:"base_url"`
 	Scopes             *[]string `json:"scopes"`
+	Tags               *[]string `json:"tags"`
 	InsecureSkipVerify *bool     `json:"insecure_skip_verify"`
 	TokenID            *string   `json:"token_id"`
 	TokenSecret        *string   `json:"token_secret"`
@@ -183,13 +217,13 @@ func (h *serverHandler) update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
 	var req updateServerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
 		return
 	}
 
@@ -202,11 +236,23 @@ func (h *serverHandler) update(c *gin.Context) {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid panel hostname"})
 			return
 		}
+		if err := h.validateTargetHost(baseURL); err != nil {
+			failCode(c, h.cfg.Log, http.StatusUnprocessableEntity, "target_not_allowed", err)
+			return
+		}
 		s.BaseURL = baseURL
 		s.HealthURL = s.BaseURL + "/health"
 	}
 	if req.Scopes != nil {
 		s.Scopes = models.JSONStringArray(*req.Scopes)
+	}
+	if req.Tags != nil {
+		tags, err := normalizeServerTags(*req.Tags)
+		if err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_tags"})
+			return
+		}
+		s.Tags = models.JSONStringArray(tags)
 	}
 	if req.InsecureSkipVerify != nil {
 		s.InsecureSkipVerify = *req.InsecureSkipVerify
@@ -223,7 +269,7 @@ func (h *serverHandler) update(c *gin.Context) {
 		if ts := strings.TrimSpace(*req.TokenSecret); ts != "" {
 			enc, err := h.encryptSecret(ts)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "encrypt token secret: " + err.Error()})
+				failInternal(c, h.cfg.Log, err)
 				return
 			}
 			s.TokenSecretEnc = enc
@@ -236,19 +282,97 @@ func (h *serverHandler) update(c *gin.Context) {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "duplicate name or token_id"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "update: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusOK, s)
 }
 
-// encryptSecret seals a plaintext token secret with the manager key, falling
-// back to hex-encoded plaintext only when no key is configured (dev).
+// encryptSecret seals a plaintext token secret; the hex-plaintext dev fallback
+// lives solely in secrets.SealSecret (SND-6).
 func (h *serverHandler) encryptSecret(plaintext string) ([]byte, error) {
-	if h.cfg.SecretKey != nil {
-		return h.cfg.SecretKey.Seal([]byte(plaintext))
+	return secrets.SealSecret(h.cfg.SecretKey, plaintext, h.cfg.AllowPlaintext)
+}
+
+// validateTargetHost guards against SSRF (SND-4) using the handler's config.
+func (h *serverHandler) validateTargetHost(baseURL string) error {
+	return validatePublicTarget(baseURL, h.cfg.AllowPrivateTargets)
+}
+
+// validatePublicTarget resolves the panel host and rejects private, loopback,
+// link-local, unspecified, CGNAT, or multicast addresses unless private targets
+// are explicitly allowed (SND-4). Shared by enrollment, update, and import.
+func validatePublicTarget(baseURL string, allowPrivate bool) error {
+	if allowPrivate {
+		return nil
 	}
-	return []byte(hex.EncodeToString([]byte(plaintext))), nil
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return fmt.Errorf("parse target url: %w", err)
+	}
+	host := u.Hostname()
+	if ip := net.ParseIP(host); ip != nil {
+		if !isPublicIP(ip) {
+			return fmt.Errorf("target address %s is not public", host)
+		}
+		return nil
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return fmt.Errorf("target host %q does not resolve", host)
+	}
+	for _, ip := range ips {
+		if !isPublicIP(ip) {
+			return fmt.Errorf("target host %q resolves to a non-public address", host)
+		}
+	}
+	return nil
+}
+
+// isPublicIP reports whether ip is a globally routable unicast address.
+func isPublicIP(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() {
+		return false
+	}
+	if ip4 := ip.To4(); ip4 != nil && ip4[0] == 100 && ip4[1]&0xc0 == 64 {
+		return false // 100.64.0.0/10 CGNAT
+	}
+	return true
+}
+
+const (
+	maxServerTags      = 20
+	maxServerTagLength = 40
+)
+
+var serverTagPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+
+// normalizeServerTags applies the server-tag contract at the API boundary.
+func normalizeServerTags(input []string) ([]string, error) {
+	tags := make([]string, 0, len(input))
+	seen := make(map[string]struct{}, len(input))
+	for _, raw := range input {
+		tag := strings.ToLower(strings.TrimSpace(raw))
+		if tag == "" {
+			return nil, fmt.Errorf("tags must not contain empty values")
+		}
+		if len(tag) > maxServerTagLength {
+			return nil, fmt.Errorf("tag %q must be at most %d characters", tag, maxServerTagLength)
+		}
+		if !serverTagPattern.MatchString(tag) {
+			return nil, fmt.Errorf("tag %q must start with a letter or number and contain only letters, numbers, dots, underscores, or hyphens", tag)
+		}
+		if _, exists := seen[tag]; exists {
+			continue
+		}
+		seen[tag] = struct{}{}
+		tags = append(tags, tag)
+		if len(tags) > maxServerTags {
+			return nil, fmt.Errorf("tags must contain at most %d values", maxServerTags)
+		}
+	}
+	return tags, nil
 }
 
 func normalizePanelBaseURL(raw string) (string, error) {
@@ -293,11 +417,11 @@ func (h *serverHandler) remove(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	if err := h.cfg.Repo.Delete(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"id": id, "deleted": true})
@@ -315,12 +439,12 @@ func (h *serverHandler) setStatus(c *gin.Context, status models.ServerStatus) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	s.Status = status
 	if err := h.cfg.Repo.Update(c.Request.Context(), s); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "set status: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusOK, s)
@@ -334,7 +458,7 @@ func (h *serverHandler) checkHealth(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
@@ -357,7 +481,7 @@ func (h *serverHandler) checkHealth(c *gin.Context) {
 	defer cancel()
 	result, err := client.CheckHealth(ctx)
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "check failed: " + err.Error()})
+		failCode(c, h.cfg.Log, http.StatusServiceUnavailable, "check_failed", err)
 		return
 	}
 
@@ -385,21 +509,9 @@ func (h *serverHandler) checkHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// decryptSecret decrypts the stored token secret, or hex-decodes it (dev fallback).
+// decryptSecret decrypts the stored token secret via the shared codec (SND-6).
 func (h *serverHandler) decryptSecret(s *models.Server) (string, error) {
-	if h.cfg.SecretKey != nil {
-		plaintext, err := h.cfg.SecretKey.Open(s.TokenSecretEnc)
-		if err != nil {
-			return "", fmt.Errorf("open secret: %w", err)
-		}
-		return string(plaintext), nil
-	}
-	// Dev fallback — hex-encoded plaintext.
-	decoded, err := hex.DecodeString(string(s.TokenSecretEnc))
-	if err != nil {
-		return "", fmt.Errorf("hex decode: %w", err)
-	}
-	return string(decoded), nil
+	return secrets.OpenSecret(h.cfg.SecretKey, s.TokenSecretEnc, h.cfg.AllowPlaintext)
 }
 
 // Ensure json import is used.

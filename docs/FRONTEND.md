@@ -32,7 +32,7 @@ Authenticated routes:
 | Path | Page |
 | --- | --- |
 | `/` | Dashboard |
-| `/servers` | Managed server enrollment and checks |
+| `/servers` | Managed server enrollment, tags, filtering, and checks |
 | `/monitor` | Live and summary server metrics |
 | `/mail` | Mail stack inventory |
 | `/domains` | Cross-server domains |

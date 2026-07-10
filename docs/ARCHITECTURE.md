@@ -120,6 +120,7 @@ Server enrollment stores:
 - Automation token ID.
 - Encrypted automation token secret.
 - Requested scopes.
+- Operator-defined tags used for grouping and filtering.
 - Version, health URL, status, credential status.
 - Timestamps.
 

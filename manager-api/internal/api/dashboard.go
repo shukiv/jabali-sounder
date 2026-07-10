@@ -33,7 +33,7 @@ type dashboardHandler struct{ cfg DashboardHandlerConfig }
 func (h *dashboardHandler) get(c *gin.Context) {
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 

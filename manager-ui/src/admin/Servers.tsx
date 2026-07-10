@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   Table,
@@ -81,7 +81,20 @@ export default function Servers() {
   const { message } = App.useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<Server | null>(null);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [form] = Form.useForm();
+
+  const tagOptions = useMemo(
+    () => Array.from(new Set((servers || []).flatMap((server) => server.tags || [])))
+      .sort()
+      .map((tag) => ({ label: tag, value: tag })),
+    [servers],
+  );
+  const filteredServers = useMemo(
+    () => (servers || []).filter((server) =>
+      tagFilter.every((tag) => (server.tags || []).includes(tag))),
+    [servers, tagFilter],
+  );
 
   const openCreate = () => {
     setEditingServer(null);
@@ -95,6 +108,7 @@ export default function Servers() {
       name: server.name,
       panel_host: hostnameFromBaseURL(server.base_url),
       scopes: server.scopes,
+      tags: server.tags,
       insecure_skip_verify: server.insecure_skip_verify,
       token_id: server.token_id,
     });
@@ -117,6 +131,7 @@ export default function Servers() {
           name: values.name,
           base_url: baseURL,
           scopes: values.scopes,
+          tags: values.tags,
           insecure_skip_verify: values.insecure_skip_verify,
           token_id: values.token_id,
           ...(values.token_secret
@@ -131,6 +146,7 @@ export default function Servers() {
           token_id: values.token_id,
           token_secret: values.token_secret,
           scopes: values.scopes,
+          tags: values.tags,
           insecure_skip_verify: values.insecure_skip_verify,
         });
         message.success("Server enrolled successfully");
@@ -188,6 +204,18 @@ export default function Servers() {
   const columns = [
     { title: "Name", dataIndex: "name", key: "name" },
     { title: "Version", dataIndex: "version", key: "version" },
+    {
+      title: "Tags",
+      dataIndex: "tags",
+      key: "tags",
+      render: (tags: string[]) => (
+        <Space wrap size={[0, 4]}>
+          {(tags || []).map((tag) => (
+            <Tag key={tag} color="blue">{tag}</Tag>
+          ))}
+        </Space>
+      ),
+    },
     {
       title: "Status",
       dataIndex: "status",
@@ -276,14 +304,27 @@ export default function Servers() {
   return (
     <div>
       <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
-        <h3 style={{ margin: 0 }}>Managed Servers</h3>
+        <Space wrap>
+          <h3 style={{ margin: 0 }}>Managed Servers</h3>
+          <Select
+            mode="multiple"
+            allowClear
+            aria-label="Filter servers by tags"
+            placeholder="Filter by tags"
+            value={tagFilter}
+            options={tagOptions}
+            onChange={setTagFilter}
+            maxTagCount="responsive"
+            style={{ minWidth: 240 }}
+          />
+        </Space>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           Add Server
         </Button>
       </Space>
       <Card>
         <Table<Server>
-          dataSource={servers || []}
+          dataSource={filteredServers}
           columns={columns}
           rowKey="id"
           loading={isLoading}
@@ -362,6 +403,31 @@ export default function Servers() {
               mode="multiple"
               placeholder="Leave empty for read:* (all read access)"
               options={scopeOptions}
+            />
+          </Form.Item>
+          <Form.Item
+            name="tags"
+            label="Tags"
+            rules={[
+              {
+                validator: async (_, tags: string[] = []) => {
+                  if (tags.length > 20) {
+                    throw new Error("Add no more than 20 tags");
+                  }
+                  const invalid = tags.find((tag) =>
+                    tag.trim().length > 40 || !/^[a-z0-9][a-z0-9._-]*$/i.test(tag.trim()));
+                  if (invalid) {
+                    throw new Error("Tags may contain letters, numbers, dots, underscores, and hyphens");
+                  }
+                },
+              },
+            ]}
+          >
+            <Select
+              mode="tags"
+              tokenSeparators={[","]}
+              maxCount={20}
+              placeholder="production, eu-west, customer-a"
             />
           </Form.Item>
           <Form.Item

@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -23,6 +21,8 @@ type InventoryHandlerConfig struct {
 	Repo      repository.ServerRepository
 	SecretKey *secrets.Key
 	Log       *slog.Logger
+	// AllowPlaintext permits the dev hex-plaintext token fallback (SND-6).
+	AllowPlaintext bool
 }
 
 // RegisterInventoryRoutes mounts GET /api/v1/admin/domains + /api/v1/admin/users.
@@ -53,7 +53,7 @@ type domainRow struct {
 func (h *inventoryHandler) domains(c *gin.Context) {
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list servers: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
@@ -120,7 +120,7 @@ type userRow struct {
 func (h *inventoryHandler) users(c *gin.Context) {
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list servers: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
@@ -175,16 +175,5 @@ func (h *inventoryHandler) users(c *gin.Context) {
 }
 
 func (h *inventoryHandler) decryptSecret(s *models.Server) (string, error) {
-	if h.cfg.SecretKey != nil {
-		plaintext, err := h.cfg.SecretKey.Open(s.TokenSecretEnc)
-		if err != nil {
-			return "", fmt.Errorf("open secret: %w", err)
-		}
-		return string(plaintext), nil
-	}
-	decoded, err := hex.DecodeString(string(s.TokenSecretEnc))
-	if err != nil {
-		return "", fmt.Errorf("hex decode: %w", err)
-	}
-	return string(decoded), nil
+	return secrets.OpenSecret(h.cfg.SecretKey, s.TokenSecretEnc, h.cfg.AllowPlaintext)
 }

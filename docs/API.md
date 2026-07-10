@@ -85,6 +85,7 @@ Response item:
   "base_url": "https://panel-01.example.com",
   "token_id": "01...",
   "scopes": ["read:*"],
+  "tags": ["production", "eu-west"],
   "insecure_skip_verify": false,
   "version": "v0.1.0",
   "status": "active",
@@ -108,11 +109,17 @@ Request:
   "token_id": "01...",
   "token_secret": "secret-shown-once-by-panel",
   "scopes": ["read:domains", "read:users", "read:status", "read:metrics"],
+  "tags": ["production", "eu-west"],
   "insecure_skip_verify": false
 }
 ```
 
 If `scopes` is omitted or null, Sounder stores `["read:*"]`.
+
+Tags are optional operator-defined labels. Sounder trims and lowercases them,
+removes duplicates, and accepts at most 20 tags per server. Each tag is at most
+40 characters, starts with a letter or number, and may contain letters, numbers,
+dots, underscores, and hyphens.
 
 `insecure_skip_verify` (default `false`) is a per-server opt-in that skips TLS
 certificate verification on outbound calls to that panel. Enable it only for
@@ -135,6 +142,7 @@ Request:
   "name": "new-name",
   "base_url": "https://new-url.example.com",
   "scopes": ["read:*"],
+  "tags": ["staging", "us-east"],
   "insecure_skip_verify": true
 }
 ```

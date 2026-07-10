@@ -26,6 +26,7 @@ const (
 	writeTimeout      = 30 * time.Second
 	idleTimeout       = 90 * time.Second
 	shutdownTimeout   = 10 * time.Second
+	maxHeaderBytes    = 1 << 20 // 1 MiB header cap (SND-5)
 )
 
 func newServeCmd() *cobra.Command {
@@ -49,10 +50,22 @@ func runServe(cmd *cobra.Command, args []string) error {
 		"env", cfg.Server.Env,
 	)
 
-	// ---- Secret key ----
+	// ---- Secret key (SND-6) ----
+	// Token secrets are AES-GCM sealed with this key. Missing key = plaintext
+	// storage, which is never acceptable in production. Fail closed unless the
+	// operator explicitly opts into the dev plaintext fallback (and never in
+	// production).
 	key, err := secrets.LoadKey(cfg.Secrets.KeyFile)
 	if err != nil {
-		log.Warn("secret key not loaded — token encryption disabled", "error", err)
+		isProd := cfg.Server.Env != "development"
+		switch {
+		case isProd:
+			return fmt.Errorf("encryption key required in %q env but not loaded from %q: %w", cfg.Server.Env, cfg.Secrets.KeyFile, err)
+		case !cfg.Secrets.AllowPlaintextFallback:
+			return fmt.Errorf("encryption key not loaded from %q: set [secrets].key_file, or enable [secrets].allow_plaintext_fallback for dev: %w", cfg.Secrets.KeyFile, err)
+		default:
+			log.Warn("secret key not loaded — DEV plaintext token fallback enabled; do NOT use in production", "error", err)
+		}
 	} else {
 		log.Info("secret key loaded", "path", cfg.Secrets.KeyFile)
 	}
@@ -99,11 +112,17 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	deps := app.Deps{
-		Log:        log,
-		ServerRepo: serverRepo,
-		AdminRepo:  adminRepo,
-		SecretKey:  key,
-		JWTSecret:  jwtSecret,
+		Log:                   log,
+		ServerRepo:            serverRepo,
+		AdminRepo:             adminRepo,
+		SecretKey:             key,
+		JWTSecret:             jwtSecret,
+		MaxBodyBytes:          cfg.Server.MaxBodyBytes,
+		AllowPrivateTargets:   cfg.Server.AllowPrivateTargets,
+		AllowPlaintextSecrets: cfg.Secrets.AllowPlaintextFallback,
+		LoginMaxFailures:      cfg.Auth.LoginMaxFailures,
+		LoginLockout:          time.Duration(cfg.Auth.LoginLockoutSeconds) * time.Second,
+		LoginWindow:           time.Duration(cfg.Auth.LoginWindowSeconds) * time.Second,
 	}
 
 	ginEngine := app.NewWithDeps(deps)
@@ -116,6 +135,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    maxHeaderBytes,
 	}
 
 	errCh := make(chan error, 1)

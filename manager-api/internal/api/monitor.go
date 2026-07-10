@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -25,6 +24,8 @@ type MonitorHandlerConfig struct {
 	Repo      repository.ServerRepository
 	SecretKey *secrets.Key
 	Log       *slog.Logger
+	// AllowPlaintext permits the dev hex-plaintext token fallback (SND-6).
+	AllowPlaintext bool
 }
 
 // RegisterMonitorRoutes mounts the monitor endpoints.
@@ -85,7 +86,7 @@ type monitorSummaryEntry struct {
 func (h *monitorHandler) live(c *gin.Context) {
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list servers: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
@@ -120,7 +121,7 @@ func (h *monitorHandler) live(c *gin.Context) {
 func (h *monitorHandler) summary(c *gin.Context) {
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list servers: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
@@ -316,18 +317,7 @@ func (h *monitorHandler) clientForServer(s *models.Server) (*remote.Client, erro
 }
 
 func (h *monitorHandler) decryptSecret(s *models.Server) (string, error) {
-	if h.cfg.SecretKey != nil {
-		plaintext, err := h.cfg.SecretKey.Open(s.TokenSecretEnc)
-		if err != nil {
-			return "", fmt.Errorf("open secret: %w", err)
-		}
-		return string(plaintext), nil
-	}
-	decoded, err := hex.DecodeString(string(s.TokenSecretEnc))
-	if err != nil {
-		return "", fmt.Errorf("hex decode: %w", err)
-	}
-	return string(decoded), nil
+	return secrets.OpenSecret(h.cfg.SecretKey, s.TokenSecretEnc, h.cfg.AllowPlaintext)
 }
 
 func serverRef(s models.Server) monitorServerRef {

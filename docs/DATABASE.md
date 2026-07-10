@@ -45,6 +45,7 @@ Stores enrolled managed Jabali Panel servers.
 | `token_id` | `CHAR(26)` | Automation token ID. |
 | `token_secret_enc` | `BLOB` | Encrypted automation token secret. |
 | `scopes` | `TEXT` | JSON array of requested scopes. |
+| `tags` | `TEXT` | JSON array of normalized operator-defined server tags. |
 | `insecure_skip_verify` | `TINYINT(1)` | Per-server opt-in to skip TLS cert verification (self-signed panels). Default `0`. |
 | `version` | `VARCHAR(50)` | Version returned by managed Panel `/health`. |
 | `capabilities` | `TEXT` | Reserved JSON array for future capability discovery. |

@@ -25,6 +25,8 @@ type MailHandlerConfig struct {
 	Repo      repository.ServerRepository
 	SecretKey *secrets.Key
 	Log       *slog.Logger
+	// AllowPlaintext permits the dev hex-plaintext token fallback (SND-6).
+	AllowPlaintext bool
 }
 
 // RegisterMailRoutes mounts GET /api/v1/admin/mail.
@@ -55,7 +57,7 @@ type mailSnapshotEntry struct {
 func (h *mailHandler) list(c *gin.Context) {
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list servers: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
@@ -206,11 +208,7 @@ func newMailSnapshotEntry(s models.Server) mailSnapshotEntry {
 }
 
 func (h *mailHandler) clientForServer(s *models.Server) (*remote.Client, error) {
-	secret, err := (&inventoryHandler{cfg: InventoryHandlerConfig{
-		Repo:      h.cfg.Repo,
-		SecretKey: h.cfg.SecretKey,
-		Log:       h.cfg.Log,
-	}}).decryptSecret(s)
+	secret, err := secrets.OpenSecret(h.cfg.SecretKey, s.TokenSecretEnc, h.cfg.AllowPlaintext)
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,17 @@ type Deps struct {
 	AdminRepo     repository.AdminRepository
 	SecretKey     *secrets.Key
 	JWTSecret     string
+	// MaxBodyBytes caps request body size (SND-5); <=0 uses the default.
+	MaxBodyBytes int64
+	// Login throttle (SND-3); <=0 uses defaults.
+	LoginMaxFailures int
+	LoginLockout     time.Duration
+	LoginWindow      time.Duration
+	// AllowPrivateTargets permits enrolling panels on private IPs (SND-4).
+	AllowPrivateTargets bool
+	// AllowPlaintextSecrets permits the dev hex-plaintext token fallback when
+	// no encryption key is present (SND-6).
+	AllowPlaintextSecrets bool
 }
 
 // NewWithDeps creates a Gin engine with all routes mounted.
@@ -33,6 +44,11 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
+	// Correlation ID on every request so error responses can reference a
+	// server-side log line instead of leaking internals (SND-2).
+	r.Use(middleware.RequestID())
+	// Cap request bodies before any handler reads them (SND-5).
+	r.Use(middleware.BodyLimit(deps.MaxBodyBytes))
 
 	// /health — unauthenticated liveness probe.
 	api.RegisterHealthRoutes(r)
@@ -50,9 +66,13 @@ func NewWithDeps(deps Deps) *gin.Engine {
 
 	// Auth endpoints (login + me) — no auth required for login.
 	api.RegisterAuthRoutes(v1, api.AuthHandlerConfig{
-		AdminRepo: deps.AdminRepo,
-		JWTSecret: deps.JWTSecret,
-		JWTTTL:    24 * time.Hour,
+		AdminRepo:        deps.AdminRepo,
+		JWTSecret:        deps.JWTSecret,
+		JWTTTL:           24 * time.Hour,
+		Log:              deps.Log,
+		LoginMaxFailures: deps.LoginMaxFailures,
+		LoginLockout:     deps.LoginLockout,
+		LoginWindow:      deps.LoginWindow,
 	})
 
 	// Protected admin routes — require JWT.
@@ -63,9 +83,11 @@ func NewWithDeps(deps Deps) *gin.Engine {
 
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{
-		Repo:      deps.ServerRepo,
-		SecretKey: deps.SecretKey,
-		Log:       deps.Log,
+		Repo:                deps.ServerRepo,
+		SecretKey:           deps.SecretKey,
+		Log:                 deps.Log,
+		AllowPrivateTargets: deps.AllowPrivateTargets,
+		AllowPlaintext:      deps.AllowPlaintextSecrets,
 	})
 
 	api.RegisterDashboardRoutes(adminGroup, api.DashboardHandlerConfig{
@@ -75,27 +97,32 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	})
 
 	api.RegisterInventoryRoutes(adminGroup, api.InventoryHandlerConfig{
-		Repo:      deps.ServerRepo,
-		SecretKey: deps.SecretKey,
-		Log:       deps.Log,
+		Repo:           deps.ServerRepo,
+		SecretKey:      deps.SecretKey,
+		Log:            deps.Log,
+		AllowPlaintext: deps.AllowPlaintextSecrets,
 	})
 
 	api.RegisterMonitorRoutes(adminGroup, api.MonitorHandlerConfig{
-		Repo:      deps.ServerRepo,
-		SecretKey: deps.SecretKey,
-		Log:       deps.Log,
+		Repo:           deps.ServerRepo,
+		SecretKey:      deps.SecretKey,
+		Log:            deps.Log,
+		AllowPlaintext: deps.AllowPlaintextSecrets,
 	})
 
 	api.RegisterMailRoutes(adminGroup, api.MailHandlerConfig{
-		Repo:      deps.ServerRepo,
-		SecretKey: deps.SecretKey,
-		Log:       deps.Log,
+		Repo:           deps.ServerRepo,
+		SecretKey:      deps.SecretKey,
+		Log:            deps.Log,
+		AllowPlaintext: deps.AllowPlaintextSecrets,
 	})
 
 	api.RegisterSettingsRoutes(adminGroup, api.SettingsHandlerConfig{
-		Repo:      deps.ServerRepo,
-		SecretKey: deps.SecretKey,
-		Log:       deps.Log,
+		Repo:                deps.ServerRepo,
+		SecretKey:           deps.SecretKey,
+		Log:                 deps.Log,
+		AllowPrivateTargets: deps.AllowPrivateTargets,
+		AllowPlaintext:      deps.AllowPlaintextSecrets,
 	})
 
 	return r
