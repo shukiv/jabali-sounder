@@ -167,3 +167,64 @@ func parseAuthParams(s string) map[string]string {
 // Ensure time is used (the client uses time.Now for ts).
 var _ = time.Now
 var _ = strconv.Itoa
+
+// TestDecodeJSONBodyBounded verifies a hostile/compromised managed panel that
+// returns an oversized response body yields a bounded error rather than reading
+// unbounded bytes into memory (issue #113). A body at/under maxBody still
+// decodes normally.
+func TestDecodeJSONBodyBounded(t *testing.T) {
+	t.Run("oversized body errors", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			// A valid-JSON string far larger than maxBody: `"` + filler + `"`.
+			_, _ = w.Write([]byte{'"'})
+			chunk := strings.Repeat("A", 64*1024)
+			for written := 0; written < (maxBody + 4*1024*1024); written += len(chunk) {
+				if _, err := w.Write([]byte(chunk)); err != nil {
+					return
+				}
+			}
+			_, _ = w.Write([]byte{'"'})
+		}))
+		defer srv.Close()
+
+		resp, err := http.Get(srv.URL)
+		if err != nil {
+			t.Fatalf("get: %v", err)
+		}
+		defer resp.Body.Close()
+
+		var v any
+		err = decodeJSONBody(resp, &v)
+		if err == nil {
+			t.Fatal("expected bounded error for oversized body, got nil")
+		}
+		if !strings.Contains(err.Error(), "exceeds") {
+			t.Fatalf("expected size-cap error, got: %v", err)
+		}
+	})
+
+	t.Run("normal body decodes", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		}))
+		defer srv.Close()
+
+		resp, err := http.Get(srv.URL)
+		if err != nil {
+			t.Fatalf("get: %v", err)
+		}
+		defer resp.Body.Close()
+
+		var v map[string]string
+		if err := decodeJSONBody(resp, &v); err != nil {
+			t.Fatalf("decode normal body: %v", err)
+		}
+		if v["status"] != "ok" {
+			t.Fatalf("wrong decode: %v", v)
+		}
+	})
+}

@@ -2,7 +2,6 @@ package remote
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -88,7 +87,7 @@ func (c *Client) ServerStatus(ctx context.Context) (*ServerStatusResp, int, erro
 		return nil, resp.StatusCode, fmt.Errorf("server status: HTTP %d", resp.StatusCode)
 	}
 	var result ServerStatusResp
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := decodeJSONBody(resp, &result); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("server status decode: %w", err)
 	}
 	return &result, resp.StatusCode, nil

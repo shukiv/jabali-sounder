@@ -2,7 +2,6 @@ package remote
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -31,7 +30,7 @@ func (c *Client) Health(ctx context.Context) (*HealthResp, int, error) {
 		return nil, resp.StatusCode, fmt.Errorf("health: HTTP %d", resp.StatusCode)
 	}
 	var h HealthResp
-	if err := json.NewDecoder(resp.Body).Decode(&h); err != nil {
+	if err := decodeJSONBody(resp, &h); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("health decode: %w", err)
 	}
 	return &h, resp.StatusCode, nil
@@ -49,7 +48,7 @@ func (c *Client) AutomationStatus(ctx context.Context) (*AutomationStatusResp, i
 		return nil, resp.StatusCode, fmt.Errorf("automation status: HTTP %d", resp.StatusCode)
 	}
 	var s AutomationStatusResp
-	if err := json.NewDecoder(resp.Body).Decode(&s); err != nil {
+	if err := decodeJSONBody(resp, &s); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("automation status decode: %w", err)
 	}
 	return &s, resp.StatusCode, nil
