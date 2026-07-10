@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -92,7 +91,8 @@ func (h *mailHandler) fetchServerMail(ctx context.Context, s models.Server) mail
 	entry := newMailSnapshotEntry(s)
 	client, err := h.clientForServer(&s)
 	if err != nil {
-		entry.Error = err.Error()
+		h.cfg.Log.Warn("decrypt secret failed", "server", s.Name, "error", err)
+		entry.Error = "server credential unavailable"
 		return entry
 	}
 
@@ -119,7 +119,7 @@ func (h *mailHandler) fetchServerMail(ctx context.Context, s models.Server) mail
 		defer cancel()
 		resp, code, err := client.Mailboxes(subCtx)
 		if err != nil {
-			addErr(mailRemoteError("mailboxes", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "mailboxes", code, err))
 			return nil
 		}
 		mu.Lock()
@@ -134,7 +134,7 @@ func (h *mailHandler) fetchServerMail(ctx context.Context, s models.Server) mail
 		defer cancel()
 		resp, code, err := client.MailGroups(subCtx)
 		if err != nil {
-			addErr(mailRemoteError("groups", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "groups", code, err))
 			return nil
 		}
 		mu.Lock()
@@ -149,7 +149,7 @@ func (h *mailHandler) fetchServerMail(ctx context.Context, s models.Server) mail
 		defer cancel()
 		resp, code, err := client.MailForwarders(subCtx)
 		if err != nil {
-			addErr(mailRemoteError("forwarders", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "forwarders", code, err))
 			return nil
 		}
 		mu.Lock()
@@ -164,7 +164,7 @@ func (h *mailHandler) fetchServerMail(ctx context.Context, s models.Server) mail
 		defer cancel()
 		resp, code, err := client.DomainForwarders(subCtx)
 		if err != nil {
-			addErr(mailRemoteError("domain forwarders", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "domain forwarders", code, err))
 			return nil
 		}
 		mu.Lock()
@@ -179,7 +179,7 @@ func (h *mailHandler) fetchServerMail(ctx context.Context, s models.Server) mail
 		defer cancel()
 		resp, code, err := client.MailAutoresponders(subCtx)
 		if err != nil {
-			addErr(mailRemoteError("autoresponders", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "autoresponders", code, err))
 			return nil
 		}
 		markAvailable()
@@ -213,11 +213,4 @@ func (h *mailHandler) clientForServer(s *models.Server) (*remote.Client, error) 
 		return nil, err
 	}
 	return remote.NewClient(s.BaseURL, s.TokenID, secret, s.InsecureSkipVerify), nil
-}
-
-func mailRemoteError(part string, code int, err error) string {
-	if code > 0 {
-		return fmt.Sprintf("%s unavailable: HTTP %d: %v", part, code, err)
-	}
-	return fmt.Sprintf("%s unavailable: %v", part, err)
 }

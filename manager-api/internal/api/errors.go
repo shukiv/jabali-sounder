@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -34,4 +35,37 @@ func failCode(c *gin.Context, log *slog.Logger, status int, code string, err err
 		)
 	}
 	c.JSON(status, gin.H{"error": code, "request_id": rid})
+}
+
+// safeRemoteError logs a managed-panel fetch failure server-side and returns a
+// user-safe summary for the per-server "error" field in monitor/mail responses,
+// never leaking the raw error (dial errors expose internal IPs; crypto errors
+// expose key state) to API consumers (SND-9).
+func safeRemoteError(log *slog.Logger, server, part string, code int, err error) string {
+	if log == nil {
+		log = slog.Default()
+	}
+	log.Warn("remote fetch failed", "server", server, "part", part, "code", code, "error", err)
+	if code > 0 {
+		return part + " unavailable (HTTP " + strconv.Itoa(code) + ")"
+	}
+	return part + " unavailable"
+}
+
+// auditServerMutation emits a structured audit record for a privileged server
+// mutation (SND-10): the acting admin, the action, the target server, source IP,
+// and correlation ID. Never logs secret material.
+func auditServerMutation(log *slog.Logger, c *gin.Context, action, serverID, serverName string) {
+	if log == nil {
+		log = slog.Default()
+	}
+	log.Info("audit",
+		"event", "server."+action,
+		"actor", middleware.AdminUsername(c),
+		"actor_id", middleware.AdminID(c),
+		"server_id", serverID,
+		"server_name", serverName,
+		"source_ip", c.ClientIP(),
+		"request_id", middleware.GetRequestID(c),
+	)
 }

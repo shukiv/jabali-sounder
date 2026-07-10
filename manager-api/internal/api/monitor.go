@@ -157,7 +157,8 @@ func (h *monitorHandler) fetchLive(ctx context.Context, s models.Server) monitor
 	entry := monitorLiveEntry{Server: serverRef(s)}
 	client, err := h.clientForServer(&s)
 	if err != nil {
-		entry.Error = err.Error()
+		h.cfg.Log.Warn("decrypt secret failed", "server", s.Name, "error", err)
+		entry.Error = "server credential unavailable"
 		return entry
 	}
 
@@ -165,7 +166,7 @@ func (h *monitorHandler) fetchLive(ctx context.Context, s models.Server) monitor
 	defer cancel()
 	status, code, err := client.ServerStatus(subCtx)
 	if err != nil {
-		entry.Error = monitorRemoteError("metrics", code, err)
+		entry.Error = safeRemoteError(h.cfg.Log, s.Name, "metrics", code, err)
 		return entry
 	}
 
@@ -213,7 +214,8 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 	entry := monitorSummaryEntry{Server: serverRef(s)}
 	client, err := h.clientForServer(&s)
 	if err != nil {
-		entry.Error = err.Error()
+		h.cfg.Log.Warn("decrypt secret failed", "server", s.Name, "error", err)
+		entry.Error = "server credential unavailable"
 		return entry
 	}
 
@@ -235,7 +237,7 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 		defer cancel()
 		status, code, err := client.ServerStatus(subCtx)
 		if err != nil {
-			addErr(monitorRemoteError("metrics", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "metrics", code, err))
 			return nil
 		}
 		mu.Lock()
@@ -264,7 +266,7 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 		defer cancel()
 		resp, code, err := client.Users(subCtx)
 		if err != nil {
-			addErr(monitorRemoteError("users", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "users", code, err))
 			return nil
 		}
 		mu.Lock()
@@ -278,7 +280,7 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 		defer cancel()
 		resp, code, err := client.Domains(subCtx)
 		if err != nil {
-			addErr(monitorRemoteError("domains", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "domains", code, err))
 			return nil
 		}
 		mu.Lock()
@@ -292,7 +294,7 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 		defer cancel()
 		resp, code, err := client.Applications(subCtx)
 		if err != nil {
-			addErr(monitorRemoteError("applications", code, err))
+			addErr(safeRemoteError(h.cfg.Log, s.Name, "applications", code, err))
 			return nil
 		}
 		mu.Lock()
@@ -345,13 +347,6 @@ func primaryDisk(partitions []remote.Partition) (int64, int64, bool) {
 		total += p.TotalBytes
 	}
 	return used, total, total > 0
-}
-
-func monitorRemoteError(part string, code int, err error) string {
-	if code > 0 {
-		return fmt.Sprintf("%s unavailable: HTTP %d: %v", part, code, err)
-	}
-	return fmt.Sprintf("%s unavailable: %v", part, err)
 }
 
 func ptrFloat(v float64) *float64 { return &v }

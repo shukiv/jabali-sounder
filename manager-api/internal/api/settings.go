@@ -235,6 +235,7 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 		}
 		result.Updated++
 		result.Imported++
+		auditServerMutation(h.cfg.Log, c, "import-update", server.ID, server.Name)
 		return nil
 	}
 
@@ -244,6 +245,7 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	}
 	result.Created++
 	result.Imported++
+	auditServerMutation(h.cfg.Log, c, "import-create", server.ID, server.Name)
 	return nil
 }
 

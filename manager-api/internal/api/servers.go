@@ -154,6 +154,7 @@ func (h *serverHandler) create(c *gin.Context) {
 		return
 	}
 
+	auditServerMutation(h.cfg.Log, c, "enroll", server.ID, server.Name)
 	c.JSON(http.StatusCreated, server)
 }
 
@@ -285,6 +286,7 @@ func (h *serverHandler) update(c *gin.Context) {
 		failInternal(c, h.cfg.Log, err)
 		return
 	}
+	auditServerMutation(h.cfg.Log, c, "update", s.ID, s.Name)
 	c.JSON(http.StatusOK, s)
 }
 
@@ -412,7 +414,8 @@ func normalizePanelBaseURL(raw string) (string, error) {
 // to keep a server but stop polling it, use disable instead.
 func (h *serverHandler) remove(c *gin.Context) {
 	id := c.Param("id")
-	if _, err := h.cfg.Repo.FindByID(c.Request.Context(), id); err != nil {
+	srv, err := h.cfg.Repo.FindByID(c.Request.Context(), id)
+	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
 			return
@@ -424,6 +427,7 @@ func (h *serverHandler) remove(c *gin.Context) {
 		failInternal(c, h.cfg.Log, err)
 		return
 	}
+	auditServerMutation(h.cfg.Log, c, "delete", srv.ID, srv.Name)
 	c.JSON(http.StatusOK, gin.H{"id": id, "deleted": true})
 }
 
@@ -447,6 +451,11 @@ func (h *serverHandler) setStatus(c *gin.Context, status models.ServerStatus) {
 		failInternal(c, h.cfg.Log, err)
 		return
 	}
+	action := "enable"
+	if status == models.ServerStatusDisabled {
+		action = "disable"
+	}
+	auditServerMutation(h.cfg.Log, c, action, s.ID, s.Name)
 	c.JSON(http.StatusOK, s)
 }
 
