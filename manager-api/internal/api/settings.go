@@ -54,20 +54,21 @@ type settingsExport struct {
 }
 
 type settingsServerExport struct {
-	ID               string   `json:"id,omitempty"`
-	Name             string   `json:"name"`
-	BaseURL          string   `json:"base_url"`
-	TokenID          string   `json:"token_id"`
-	TokenSecret      string   `json:"token_secret,omitempty"`
-	TokenSecretEnc   string   `json:"token_secret_enc,omitempty"`
-	SecretFormat     string   `json:"secret_format,omitempty"`
-	Scopes           []string `json:"scopes"`
-	Tags             []string `json:"tags,omitempty"`
-	Version          string   `json:"version,omitempty"`
-	Capabilities     []string `json:"capabilities,omitempty"`
-	HealthURL        string   `json:"health_url,omitempty"`
-	Status           string   `json:"status,omitempty"`
-	CredentialStatus string   `json:"credential_status,omitempty"`
+	ID                 string   `json:"id,omitempty"`
+	Name               string   `json:"name"`
+	BaseURL            string   `json:"base_url"`
+	TokenID            string   `json:"token_id"`
+	TokenSecret        string   `json:"token_secret,omitempty"`
+	TokenSecretEnc     string   `json:"token_secret_enc,omitempty"`
+	SecretFormat       string   `json:"secret_format,omitempty"`
+	Scopes             []string `json:"scopes"`
+	InsecureSkipVerify bool     `json:"insecure_skip_verify"`
+	Tags               []string `json:"tags,omitempty"`
+	Version            string   `json:"version,omitempty"`
+	Capabilities       []string `json:"capabilities,omitempty"`
+	HealthURL          string   `json:"health_url,omitempty"`
+	Status             string   `json:"status,omitempty"`
+	CredentialStatus   string   `json:"credential_status,omitempty"`
 }
 
 type settingsImportResult struct {
@@ -97,19 +98,20 @@ func (h *settingsHandler) export(c *gin.Context) {
 	}
 	for _, server := range servers {
 		out.Servers = append(out.Servers, settingsServerExport{
-			ID:               server.ID,
-			Name:             server.Name,
-			BaseURL:          server.BaseURL,
-			TokenID:          server.TokenID,
-			TokenSecretEnc:   base64.StdEncoding.EncodeToString(server.TokenSecretEnc),
-			SecretFormat:     "sounder-local-encrypted",
-			Scopes:           []string(server.Scopes),
-			Tags:             []string(server.Tags),
-			Version:          server.Version,
-			Capabilities:     []string(server.Capabilities),
-			HealthURL:        server.HealthURL,
-			Status:           string(server.Status),
-			CredentialStatus: string(server.CredentialStatus),
+			ID:                 server.ID,
+			Name:               server.Name,
+			BaseURL:            server.BaseURL,
+			TokenID:            server.TokenID,
+			TokenSecretEnc:     base64.StdEncoding.EncodeToString(server.TokenSecretEnc),
+			SecretFormat:       "sounder-local-encrypted",
+			Scopes:             []string(server.Scopes),
+			InsecureSkipVerify: server.InsecureSkipVerify,
+			Tags:               []string(server.Tags),
+			Version:            server.Version,
+			Capabilities:       []string(server.Capabilities),
+			HealthURL:          server.HealthURL,
+			Status:             string(server.Status),
+			CredentialStatus:   string(server.CredentialStatus),
 		})
 	}
 
@@ -210,18 +212,19 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	}
 
 	server := &models.Server{
-		ID:               item.ID,
-		Name:             name,
-		BaseURL:          baseURL,
-		TokenID:          strings.TrimSpace(item.TokenID),
-		TokenSecretEnc:   secretEnc,
-		Scopes:           models.JSONStringArray(scopes),
-		Tags:             models.JSONStringArray(tags),
-		Version:          item.Version,
-		Capabilities:     models.JSONStringArray(item.Capabilities),
-		HealthURL:        baseURL + "/health",
-		Status:           status,
-		CredentialStatus: credStatus,
+		ID:                 item.ID,
+		Name:               name,
+		BaseURL:            baseURL,
+		TokenID:            strings.TrimSpace(item.TokenID),
+		TokenSecretEnc:     secretEnc,
+		InsecureSkipVerify: item.InsecureSkipVerify,
+		Scopes:             models.JSONStringArray(scopes),
+		Tags:               models.JSONStringArray(tags),
+		Version:            item.Version,
+		Capabilities:       models.JSONStringArray(item.Capabilities),
+		HealthURL:          baseURL + "/health",
+		Status:             status,
+		CredentialStatus:   credStatus,
 	}
 	if server.ID == "" {
 		server.ID = ids.NewULID()
