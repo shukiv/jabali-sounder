@@ -251,6 +251,10 @@ func (h *serverHandler) encryptSecret(plaintext string) ([]byte, error) {
 	return []byte(hex.EncodeToString([]byte(plaintext))), nil
 }
 
+// defaultPanelPort is used only when the operator does not specify one. A
+// user-supplied port is preserved so panels not on 8443 can be enrolled (#109).
+const defaultPanelPort = "8443"
+
 func normalizePanelBaseURL(raw string) (string, error) {
 	input := strings.TrimSpace(raw)
 	if input == "" {
@@ -265,23 +269,31 @@ func normalizePanelBaseURL(raw string) (string, error) {
 		if u.Path != "" && u.Path != "/" {
 			return "", fmt.Errorf("panel URL must not include a path")
 		}
-		return "https://" + net.JoinHostPort(u.Hostname(), "8443"), nil
+		port := u.Port()
+		if port == "" {
+			port = defaultPanelPort
+		}
+		return "https://" + net.JoinHostPort(u.Hostname(), port), nil
 	}
 
 	if strings.ContainsAny(input, "/?#") {
 		return "", fmt.Errorf("hostname must not include URL path, query, or fragment")
 	}
 	host := input
+	port := defaultPanelPort
 	if strings.Contains(input, ":") {
 		u, err := url.Parse("//" + input)
 		if err == nil && u.Hostname() != "" {
 			host = u.Hostname()
+			if p := u.Port(); p != "" {
+				port = p
+			}
 		}
 	}
 	if strings.TrimSpace(host) == "" {
 		return "", fmt.Errorf("empty hostname")
 	}
-	return "https://" + net.JoinHostPort(host, "8443"), nil
+	return "https://" + net.JoinHostPort(host, port), nil
 }
 
 // remove hard-deletes a server (heartbeats cascade). This is irreversible;
