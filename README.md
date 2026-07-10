@@ -45,7 +45,7 @@ The current implementation provides:
 ## Downloads
 
 Grab the standalone desktop app for your platform from the
-[latest release](https://github.com/shukiv/jabali-sounder/releases/latest) — each
+[latest release](https://codeberg.org/shukivaknin/jabali-sounder/releases/latest) — each
 file is version-stamped:
 
 | Platform | File on the release page |
@@ -54,7 +54,7 @@ file is version-stamped:
 | Windows (x86-64) | `jabali-sounder-windows-amd64-<version>.exe` |
 | macOS (Apple Silicon) | `jabali-sounder-macos-arm64-<version>.dmg` |
 
-All versions: [Releases](https://github.com/shukiv/jabali-sounder/releases).
+All versions: [Releases](https://codeberg.org/shukivaknin/jabali-sounder/releases).
 
 Notes:
 
