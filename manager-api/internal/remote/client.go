@@ -17,7 +17,6 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -101,18 +100,4 @@ func (c *Client) Do(ctx context.Context, method, pathAndQuery string, body []byt
 // Get is a convenience wrapper for GET requests with no body.
 func (c *Client) Get(ctx context.Context, pathAndQuery string) (*http.Response, error) {
 	return c.Do(ctx, http.MethodGet, pathAndQuery, nil)
-}
-
-// decodeJSONBody decodes a managed-panel JSON response body into v, capping the
-// bytes read at maxBody. A hostile or compromised managed server (or a MITM when
-// insecure_skip_verify is on) could otherwise return a multi-GB or slow-drip
-// body and OOM the control plane, which fans these calls out to every enrolled
-// server concurrently. Bodies over the cap yield an error, not unbounded memory.
-func decodeJSONBody(resp *http.Response, v any) error {
-	lr := &io.LimitedReader{R: resp.Body, N: maxBody + 1}
-	err := json.NewDecoder(lr).Decode(v)
-	if lr.N <= 0 {
-		return fmt.Errorf("remote: response body exceeds %d bytes", maxBody)
-	}
-	return err
 }

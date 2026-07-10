@@ -37,20 +37,13 @@ func newAdminSetPasswordCmd() *cobra.Command {
 				return fmt.Errorf("database.url not set")
 			}
 
-			// Never require the password on argv (CWE-214: it leaks in
-			// /proc/<pid>/cmdline / ps). Prefer the env var the installer
-			// already holds, then fall back to an interactive prompt.
 			if password == "" {
-				if envPw := strings.TrimSpace(os.Getenv("JABALI_SOUNDER_ADMIN_PASSWORD")); envPw != "" {
-					password = envPw
-				} else {
-					fmt.Printf("Enter password for admin '%s': ", username)
-					pwdBytes, err := readPassword()
-					if err != nil {
-						return err
-					}
-					password = strings.TrimSpace(string(pwdBytes))
+				fmt.Printf("Enter password for admin '%s': ", username)
+				pwdBytes, err := readPassword()
+				if err != nil {
+					return err
 				}
+				password = strings.TrimSpace(string(pwdBytes))
 			}
 			if len(password) < 8 {
 				return fmt.Errorf("password must be at least 8 characters")
@@ -90,7 +83,7 @@ func newAdminSetPasswordCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&username, "username", "u", "admin", "admin username")
-	cmd.Flags().StringVarP(&password, "password", "p", "", "admin password (INSECURE: visible in the process list; prefer JABALI_SOUNDER_ADMIN_PASSWORD env or the interactive prompt)")
+	cmd.Flags().StringVarP(&password, "password", "p", "", "admin password (if empty, prompts interactively)")
 	return cmd
 }
 

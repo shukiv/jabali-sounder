@@ -19,7 +19,6 @@ import {
   EditOutlined,
   PoweroffOutlined,
   PlayCircleOutlined,
-  WarningOutlined,
 } from "@ant-design/icons";
 import {
   useServers,
@@ -57,21 +56,6 @@ function credTag(cred: string) {
     cred === "invalid" ? "red" :
     "orange";
   return <Tag color={color}>{cred}</Tag>;
-}
-
-// healthTag rolls the automation-credential state into the prominent Status
-// badge. A reachable server whose token is invalid must not read as fully
-// healthy green — it shows an amber "auth failed" warning so the broken
-// credential is obvious without reading the secondary Credentials column (#111).
-function healthTag(server: Server) {
-  if (server.status === "active" && server.credential_status === "invalid") {
-    return (
-      <Tag icon={<WarningOutlined />} color="warning">
-        auth failed
-      </Tag>
-    );
-  }
-  return statusTag(server.status);
 }
 
 function panelBaseURL(hostname: string) {
@@ -208,7 +192,7 @@ export default function Servers() {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      render: (_: string, record: Server) => healthTag(record),
+      render: (s: string) => statusTag(s),
     },
     {
       title: "Credentials",

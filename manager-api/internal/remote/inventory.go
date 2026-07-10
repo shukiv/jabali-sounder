@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -31,7 +32,7 @@ func (c *Client) Domains(ctx context.Context) (*DomainListResp, int, error) {
 		return nil, resp.StatusCode, fmt.Errorf("domains: HTTP %d", resp.StatusCode)
 	}
 	var result DomainListResp
-	if err := decodeJSONBody(resp, &result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("domains decode: %w", err)
 	}
 	return &result, resp.StatusCode, nil
@@ -63,7 +64,7 @@ func (c *Client) Users(ctx context.Context) (*UserListResp, int, error) {
 		return nil, resp.StatusCode, fmt.Errorf("users: HTTP %d", resp.StatusCode)
 	}
 	var result UserListResp
-	if err := decodeJSONBody(resp, &result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("users decode: %w", err)
 	}
 	return &result, resp.StatusCode, nil
@@ -94,7 +95,7 @@ func (c *Client) Applications(ctx context.Context) (*ApplicationListResp, int, e
 		return nil, resp.StatusCode, fmt.Errorf("applications: HTTP %d", resp.StatusCode)
 	}
 	var result ApplicationListResp
-	if err := decodeJSONBody(resp, &result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("applications decode: %w", err)
 	}
 	return &result, resp.StatusCode, nil

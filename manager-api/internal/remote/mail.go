@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -56,7 +57,7 @@ func (c *Client) Mailboxes(ctx context.Context) (*MailboxListResp, int, error) {
 		} `json:"data"`
 		Total int `json:"total"`
 	}
-	if err := decodeJSONBody(resp, &wire); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&wire); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("mailboxes decode: %w", err)
 	}
 	result := MailboxListResp{Total: wire.Total, Data: make([]Mailbox, 0, len(wire.Data))}
@@ -112,7 +113,7 @@ func (c *Client) MailGroups(ctx context.Context) (*MailGroupListResp, int, error
 		return nil, resp.StatusCode, fmt.Errorf("mail groups: HTTP %d", resp.StatusCode)
 	}
 	var result MailGroupListResp
-	if err := decodeJSONBody(resp, &result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("mail groups decode: %w", err)
 	}
 	return &result, resp.StatusCode, nil
@@ -150,7 +151,7 @@ func (c *Client) MailForwarders(ctx context.Context) (*MailForwarderListResp, in
 		return nil, resp.StatusCode, fmt.Errorf("mail forwarders: HTTP %d", resp.StatusCode)
 	}
 	var result MailForwarderListResp
-	if err := decodeJSONBody(resp, &result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("mail forwarders decode: %w", err)
 	}
 	return &result, resp.StatusCode, nil
@@ -186,7 +187,7 @@ func (c *Client) DomainForwarders(ctx context.Context) (*DomainForwarderListResp
 		return nil, resp.StatusCode, fmt.Errorf("domain forwarders: HTTP %d", resp.StatusCode)
 	}
 	var result DomainForwarderListResp
-	if err := decodeJSONBody(resp, &result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("domain forwarders decode: %w", err)
 	}
 	return &result, resp.StatusCode, nil
@@ -224,7 +225,7 @@ func (c *Client) MailAutoresponders(ctx context.Context) (*MailAutoresponderList
 		return nil, resp.StatusCode, fmt.Errorf("mail autoresponders: HTTP %d", resp.StatusCode)
 	}
 	var result MailAutoresponderListResp
-	if err := decodeJSONBody(resp, &result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("mail autoresponders decode: %w", err)
 	}
 	return &result, resp.StatusCode, nil

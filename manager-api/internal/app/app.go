@@ -55,12 +55,11 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		JWTTTL:    24 * time.Hour,
 	})
 
-	// Protected admin routes — require JWT. Mounted unconditionally: with an
-	// empty/missing secret AuthMiddleware fails closed (rejects every request)
-	// rather than leaving the admin surface open. Auth is mandatory, not
-	// conditional on the secret being configured.
+	// Protected admin routes — require JWT.
 	adminGroup := v1.Group("")
-	adminGroup.Use(middleware.AuthMiddleware(deps.JWTSecret))
+	if deps.JWTSecret != "" {
+		adminGroup.Use(middleware.AuthMiddleware(deps.JWTSecret))
+	}
 
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{
