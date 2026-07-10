@@ -21,6 +21,15 @@ const (
 // AuthMiddleware verifies a JWT Bearer token and sets the admin identity
 // in the gin context. Returns 401 if missing/invalid.
 func AuthMiddleware(secret string) gin.HandlerFunc {
+	// Fail closed. An empty secret means auth is misconfigured: not only would
+	// every route be effectively open, an attacker could forge a "valid" token
+	// by HMAC-signing it with the empty key. Reject every request rather than
+	// serve the protected surface unauthenticated.
+	if secret == "" {
+		return func(c *gin.Context) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "server auth is misconfigured"})
+		}
+	}
 	return func(c *gin.Context) {
 		raw := c.GetHeader("Authorization")
 		if !strings.HasPrefix(raw, "Bearer ") {

@@ -169,7 +169,12 @@ func ensureRandomFile(path string, size int) error {
 
 func loadOrCreateHexSecret(path string, size int) (string, error) {
 	if data, err := os.ReadFile(path); err == nil {
-		return strings.TrimSpace(string(data)), nil
+		// Fail closed: an empty/truncated secret file (interrupted first write,
+		// full disk) must NOT yield an empty secret — that would leave the local
+		// API unauthenticated. Treat it as missing and regenerate below.
+		if secret := strings.TrimSpace(string(data)); secret != "" {
+			return secret, nil
+		}
 	} else if !os.IsNotExist(err) {
 		return "", fmt.Errorf("read %s: %w", path, err)
 	}
