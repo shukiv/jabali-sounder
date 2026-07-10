@@ -29,7 +29,10 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 	}
 	h := &authHandler{cfg: cfg}
 	auth := g.Group("/auth")
-	auth.POST("/login", h.login)
+	// Throttle brute-force against the sole admin password: repeated failed
+	// logins from one source IP are locked out (issue #110).
+	loginLimiter := middleware.DefaultLoginLimiter()
+	auth.POST("/login", loginLimiter.Middleware(), h.login)
 	auth.GET("/setup", h.setupStatus)
 	auth.POST("/setup", h.setup)
 	auth.GET("/me", middleware.AuthMiddleware(cfg.JWTSecret), h.me)
