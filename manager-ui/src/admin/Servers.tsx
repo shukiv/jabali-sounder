@@ -209,7 +209,7 @@ export default function Servers() {
       dataIndex: "tags",
       key: "tags",
       render: (tags: string[]) => (
-        <Space wrap size={[0, 4]}>
+        <Space wrap size={[4, 4]}>
           {(tags || []).map((tag) => (
             <Tag key={tag} color="blue">{tag}</Tag>
           ))}
