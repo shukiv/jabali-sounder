@@ -96,16 +96,24 @@ func (h *serverHandler) create(c *gin.Context) {
 		return
 	}
 
-	// Probe /health before enrolling — fail fast on unreachable.
+	// Verify reachability AND that the automation credentials actually work
+	// before enrolling. Probing only /health (unauthenticated) let servers with
+	// a bad token get added and then show as active/invalid; instead reject the
+	// enrollment outright if the token is rejected.
 	client := remote.NewClient(baseURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify)
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
-	healthResp, hcode, err := client.Health(ctx)
-	if err != nil || hcode != http.StatusOK {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"error":  "server_unreachable",
-			"detail": fmt.Sprintf("GET /health returned HTTP %d", hcode),
-		})
+	check, err := client.CheckHealth(ctx)
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	if status, code, ok := enrollmentGate(check); !ok {
+		detail := fmt.Sprintf("GET /health failed (HTTP %d)", check.HealthCode)
+		if code == "invalid_credentials" {
+			detail = fmt.Sprintf("automation token was rejected by the panel (HTTP %d)", check.StatusCode)
+		}
+		c.JSON(status, gin.H{"error": code, "detail": detail})
 		return
 	}
 
@@ -130,10 +138,10 @@ func (h *serverHandler) create(c *gin.Context) {
 		Scopes:             models.JSONStringArray(scopes),
 		Tags:               models.JSONStringArray(tags),
 		InsecureSkipVerify: req.InsecureSkipVerify,
-		Version:            healthResp.Version,
+		Version:            check.Version,
 		HealthURL:          baseURL + "/health",
 		Status:             models.ServerStatusActive,
-		CredentialStatus:   models.CredentialUnknown,
+		CredentialStatus:   models.CredentialValid,
 	}
 
 	if err := h.cfg.Repo.Create(c.Request.Context(), server); err != nil {
@@ -147,6 +155,22 @@ func (h *serverHandler) create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, server)
+}
+
+// enrollmentGate decides whether a health-check result permits enrolling a
+// server. A server must be reachable AND present valid automation credentials —
+// a panel that only answers /health but rejects the token is not enrolled, so
+// broken credentials never land in the managed list. ok=false -> reject with the
+// returned status + opaque code.
+func enrollmentGate(check *remote.CheckResult) (status int, code string, ok bool) {
+	switch {
+	case check == nil || !check.Reachable:
+		return http.StatusUnprocessableEntity, "server_unreachable", false
+	case !check.CredentialValid:
+		return http.StatusUnprocessableEntity, "invalid_credentials", false
+	default:
+		return http.StatusCreated, "", true
+	}
 }
 
 func (h *serverHandler) list(c *gin.Context) {
