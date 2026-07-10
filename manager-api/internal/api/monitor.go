@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/remote"
@@ -18,6 +19,12 @@ import (
 )
 
 const monitorTimeout = 10 * time.Second
+
+// statusCacheTTL bounds how long a managed panel's automation-status probe is
+// reused. The Monitor page loads live + summary at once and both need status;
+// two identical same-second HMAC requests trip the panel's replay protection,
+// so a single probe is shared across near-simultaneous callers (SND-7).
+const statusCacheTTL = 5 * time.Second
 
 // MonitorHandlerConfig wires the monitor endpoints.
 type MonitorHandlerConfig struct {
@@ -36,12 +43,31 @@ func RegisterMonitorRoutes(g *gin.RouterGroup, cfg MonitorHandlerConfig) {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	h := &monitorHandler{cfg: cfg}
+	h := &monitorHandler{cfg: cfg, statusCache: map[string]cachedStatus{}, now: time.Now}
 	g.GET("/admin/monitor/live", h.live)
 	g.GET("/admin/monitor/summary", h.summary)
 }
 
-type monitorHandler struct{ cfg MonitorHandlerConfig }
+type monitorHandler struct {
+	cfg         MonitorHandlerConfig
+	sf          singleflight.Group
+	statusMu    sync.Mutex
+	statusCache map[string]cachedStatus
+	now         func() time.Time
+	// probe overrides the real status fetch in tests; nil uses the panel client.
+	probe func(ctx context.Context, s models.Server) (*remote.ServerStatusResp, int, error)
+}
+
+type cachedStatus struct {
+	resp *remote.ServerStatusResp
+	code int
+	at   time.Time
+}
+
+type statusResult struct {
+	resp *remote.ServerStatusResp
+	code int
+}
 
 type monitorServerRef struct {
 	ID               string `json:"id"`
@@ -155,16 +181,7 @@ func (h *monitorHandler) summary(c *gin.Context) {
 
 func (h *monitorHandler) fetchLive(ctx context.Context, s models.Server) monitorLiveEntry {
 	entry := monitorLiveEntry{Server: serverRef(s)}
-	client, err := h.clientForServer(&s)
-	if err != nil {
-		h.cfg.Log.Warn("decrypt secret failed", "server", s.Name, "error", err)
-		entry.Error = "server credential unavailable"
-		return entry
-	}
-
-	subCtx, cancel := context.WithTimeout(ctx, monitorTimeout)
-	defer cancel()
-	status, code, err := client.ServerStatus(subCtx)
+	status, code, err := h.serverStatus(ctx, s)
 	if err != nil {
 		entry.Error = safeRemoteError(h.cfg.Log, s.Name, "metrics", code, err)
 		return entry
@@ -233,9 +250,7 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 	g.SetLimit(4)
 
 	g.Go(func() error {
-		subCtx, cancel := context.WithTimeout(gctx, monitorTimeout)
-		defer cancel()
-		status, code, err := client.ServerStatus(subCtx)
+		status, code, err := h.serverStatus(gctx, s)
 		if err != nil {
 			addErr(safeRemoteError(h.cfg.Log, s.Name, "metrics", code, err))
 			return nil
@@ -308,6 +323,47 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 		entry.Error = fmt.Sprintf("%v", errParts)
 	}
 	return entry
+}
+
+// serverStatus fetches the managed panel's automation status, sharing one probe
+// across concurrent/near-simultaneous callers via singleflight + a short TTL
+// cache keyed by server ID (SND-7). Live and summary both need status, and two
+// identical same-second HMAC requests would trip the panel's replay protection.
+func (h *monitorHandler) serverStatus(ctx context.Context, s models.Server) (*remote.ServerStatusResp, int, error) {
+	h.statusMu.Lock()
+	if e, ok := h.statusCache[s.ID]; ok && h.now().Sub(e.at) < statusCacheTTL {
+		resp, code := e.resp, e.code
+		h.statusMu.Unlock()
+		return resp, code, nil
+	}
+	h.statusMu.Unlock()
+
+	v, err, _ := h.sf.Do(s.ID, func() (any, error) {
+		resp, code, ferr := h.fetchStatus(ctx, s)
+		if ferr != nil {
+			return statusResult{code: code}, ferr
+		}
+		h.statusMu.Lock()
+		h.statusCache[s.ID] = cachedStatus{resp: resp, code: code, at: h.now()}
+		h.statusMu.Unlock()
+		return statusResult{resp: resp, code: code}, nil
+	})
+	res, _ := v.(statusResult)
+	return res.resp, res.code, err
+}
+
+// fetchStatus performs the actual /automation/status probe (or the test override).
+func (h *monitorHandler) fetchStatus(ctx context.Context, s models.Server) (*remote.ServerStatusResp, int, error) {
+	if h.probe != nil {
+		return h.probe(ctx, s)
+	}
+	client, err := h.clientForServer(&s)
+	if err != nil {
+		return nil, 0, err
+	}
+	subCtx, cancel := context.WithTimeout(ctx, monitorTimeout)
+	defer cancel()
+	return client.ServerStatus(subCtx)
 }
 
 func (h *monitorHandler) clientForServer(s *models.Server) (*remote.Client, error) {
