@@ -226,7 +226,7 @@ export default function AdminLayout() {
               </Link>
               <Text type="secondary">·</Text>
               <Text type="secondary">AGPL-3.0</Text>
-              <Text strong>v0.1.0</Text>
+              <Text strong>v{__APP_VERSION__}</Text>
             </Space>
           </Footer>
         </Layout>
