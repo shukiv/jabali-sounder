@@ -12,15 +12,18 @@
 #   3. Runs migrations, creates an admin with a random password, installs and
 #      starts a hardened systemd service, and health-checks it.
 #
-# Overrides (env): JABALI_SOUNDER_ADDR (default 0.0.0.0:8484),
+# Overrides (env): JABALI_SOUNDER_ADDR (default 127.0.0.1:8484 — loopback only;
+# set to 0.0.0.0:PORT to expose, ideally behind a TLS reverse proxy),
 # JABALI_SOUNDER_ADMIN (default admin), JABALI_SOUNDER_ADMIN_PASSWORD,
-# JABALI_SOUNDER_BIN_URL.
+# JABALI_SOUNDER_BIN_URL, JABALI_SOUNDER_SHA256_URL, JABALI_SOUNDER_BIN_SHA256.
 set -Eeuo pipefail
 export DEBIAN_FRONTEND=noninteractive
 export PATH="$PATH:/usr/sbin:/sbin"
 
 REPO="shukiv/jabali-sounder"
 BIN_URL="${JABALI_SOUNDER_BIN_URL:-https://github.com/${REPO}/releases/latest/download/jabali-sounder-server-linux-amd64}"
+# Checksum manifest lives next to the binary in the same release.
+SHA256_URL="${JABALI_SOUNDER_SHA256_URL:-${BIN_URL%/*}/SHA256SUMS}"
 BIN="/usr/local/bin/jabali-sounder"
 CONF_DIR="/etc/jabali-sounder"
 DATA_DIR="/var/lib/jabali-sounder"
@@ -28,7 +31,7 @@ SVC_USER="jabali-sounder"
 SVC="jabali-sounder"
 CONF="${CONF_DIR}/config.toml"
 KEY_FILE="${CONF_DIR}/secrets.key"
-ADDR="${JABALI_SOUNDER_ADDR:-0.0.0.0:8484}"
+ADDR="${JABALI_SOUNDER_ADDR:-127.0.0.1:8484}"
 
 log() { printf '\033[1;34m[sounder]\033[0m %s\n' "$*"; }
 ok()  { printf '\033[1;32m[sounder]\033[0m %s\n' "$*"; }
@@ -42,6 +45,22 @@ done
 log "downloading server binary"
 tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
 curl -fsSL "$BIN_URL" -o "$tmp" || die "download failed: $BIN_URL"
+
+# Verify integrity before installing/executing as root. A pinned hash
+# (JABALI_SOUNDER_BIN_SHA256) wins; otherwise fetch the release SHA256SUMS and
+# match the binary's basename. Abort on mismatch or if no checksum is available.
+got="$(sha256sum "$tmp" | awk '{print $1}')"
+want="${JABALI_SOUNDER_BIN_SHA256:-}"
+if [ -z "$want" ]; then
+  bin_name="${BIN_URL##*/}"
+  sums="$(mktemp)"; trap 'rm -f "$tmp" "$sums"' EXIT
+  curl -fsSL "$SHA256_URL" -o "$sums"     || die "could not fetch checksums ($SHA256_URL); set JABALI_SOUNDER_BIN_SHA256 to install"
+  want="$(awk -v f="$bin_name" '$2==f || $2=="*"f {print $1; exit}' "$sums")"
+  [ -n "$want" ] || die "no checksum for ${bin_name} in SHA256SUMS — refusing to install"
+fi
+[ "$got" = "$want" ] || die "checksum mismatch — refusing to install (expected ${want}, got ${got})"
+ok "verified binary checksum"
+
 install -m 0755 "$tmp" "$BIN"
 ok "installed $BIN"
 
@@ -86,8 +105,10 @@ sudo -u "$SVC_USER" JABALI_SOUNDER_CONFIG="$CONF" "$BIN" migrate up || die "migr
 ADMIN_USER="${JABALI_SOUNDER_ADMIN:-admin}"
 ADMIN_PW="${JABALI_SOUNDER_ADMIN_PASSWORD:-$(openssl rand -hex 12)}"
 log "setting admin password for '${ADMIN_USER}'"
-sudo -u "$SVC_USER" JABALI_SOUNDER_CONFIG="$CONF" "$BIN" admin set-password -u "$ADMIN_USER" -p "$ADMIN_PW" \
-  || die "admin setup failed"
+# Pass the password via env (readable only by the process owner in
+# /proc/<pid>/environ), never on argv where any local user can see it (#117).
+sudo -u "$SVC_USER" JABALI_SOUNDER_CONFIG="$CONF" JABALI_SOUNDER_ADMIN_PASSWORD="$ADMIN_PW" \
+  "$BIN" admin set-password -u "$ADMIN_USER" || die "admin setup failed"
 
 cat > "/etc/systemd/system/${SVC}.service" <<EOF
 [Unit]
@@ -125,13 +146,29 @@ done
 curl -fsS "http://127.0.0.1:${port}/health" >/dev/null 2>&1 \
   || die "service did not become healthy — check: journalctl -u ${SVC} -e"
 
-ip="$(hostname -I 2>/dev/null | awk '{print $1}')"; [ -n "$ip" ] || ip="<server-ip>"
+bind_host="${ADDR%:*}"
+is_loopback=0
+case "$bind_host" in 127.0.0.1|localhost|::1|"[::1]") is_loopback=1 ;; esac
+
 ok "Jabali Sounder is running."
 printf '\n'
-printf '  URL:      http://%s:%s/\n' "$ip" "$port"
+if [ "$is_loopback" -eq 1 ]; then
+  printf '  URL:      http://127.0.0.1:%s/  (loopback only)\n' "$port"
+else
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"; [ -n "$ip" ] || ip="<server-ip>"
+  printf '  URL:      http://%s:%s/\n' "$ip" "$port"
+fi
 printf '  Login:    %s\n' "$ADMIN_USER"
 printf '  Password: %s\n' "$ADMIN_PW"
 printf '\n'
 log "Save the password now, then change it in Settings after logging in."
 log "Manage: systemctl status ${SVC}   ·   journalctl -u ${SVC} -f"
-log "Config: ${CONF}   (serves plain HTTP — put a TLS reverse proxy in front for public use)"
+if [ "$is_loopback" -eq 1 ]; then
+  log "Bound to loopback (safe default). To reach it remotely, front it with a TLS"
+  log "reverse proxy and set JABALI_SOUNDER_ADDR (e.g. 0.0.0.0:8484). It serves plain"
+  log "HTTP — never expose it directly without TLS."
+else
+  log "WARNING: bound to ${ADDR} over plain HTTP — login and tokens travel in cleartext."
+  log "Put a TLS reverse proxy in front and restrict network access."
+fi
+log "Config: ${CONF}"

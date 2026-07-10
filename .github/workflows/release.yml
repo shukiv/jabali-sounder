@@ -210,3 +210,34 @@ jobs:
           files: out/jabali-sounder-server-linux-amd64
           fail_on_unmatched_files: true
           generate_release_notes: true
+
+  # Publish a SHA256SUMS manifest for every release artifact so the installer
+  # (and operators) can verify integrity before executing the binary as root.
+  # Only meaningful on a tagged release; the installer fetches this file.
+  checksums:
+    name: publish checksums
+    needs: [build, server]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Generate SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > SHA256SUMS
+          # Artifacts land in artifacts/<job-name>/<file>. Hash each by basename
+          # so `sha256sum -c` / basename matching works against the flat release.
+          while IFS= read -r f; do
+            ( cd "$(dirname "$f")" && sha256sum "$(basename "$f")" ) >> "${GITHUB_WORKSPACE}/SHA256SUMS"
+          done < <(find artifacts -type f | sort)
+          echo "----- SHA256SUMS -----"
+          cat SHA256SUMS
+      - name: Attach checksums to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SHA256SUMS
+          fail_on_unmatched_files: true
