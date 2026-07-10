@@ -34,19 +34,19 @@ jobs:
           - label: linux-amd64
             runs-on: ubuntu-latest
             tags: desktop,production,webkit2_41
-            asset: jabali-sounder-desktop-linux-amd64
+            asset: jabali-sounder-linux-amd64
             ldflags: ""
             cgo_ldflags: ""
           - label: windows-amd64
             runs-on: windows-latest
             tags: desktop,production
-            asset: jabali-sounder-desktop-windows-amd64.exe
+            asset: jabali-sounder-windows-amd64.exe
             ldflags: "-H=windowsgui"
             cgo_ldflags: ""
           - label: macos-arm64
             runs-on: macos-latest
             tags: desktop,production
-            asset: jabali-sounder-desktop-macos-arm64
+            asset: jabali-sounder-macos-arm64
             ldflags: ""
             # Wails' darwin code references UTType but its link flags omit the
             # framework on recent macOS SDKs -> "Undefined symbols _UTType".
@@ -101,8 +101,13 @@ jobs:
         if: runner.os != 'macOS'
         shell: bash
         run: |
+          set -euo pipefail
+          V="${GITHUB_REF_NAME#v}"; case "$V" in [0-9]*) ;; *) V="0.0.0-dev" ;; esac
           mkdir -p out
-          cp "bin/${{ matrix.asset }}" "out/${{ matrix.asset }}"
+          # Insert the version before any extension: name-<ver>[.exe].
+          name="$(printf '%s' "${{ matrix.asset }}" | sed -E "s/(\.exe)?$/-${V}\1/")"
+          cp "bin/${{ matrix.asset }}" "out/$name"
+          echo "packaged out/$name"
 
       # macOS: wrap the binary in a .app bundle (Info.plist + .icns) and a
       # drag-to-install .dmg. Also keep the raw binary for CLI users.
@@ -135,12 +140,11 @@ jobs:
           mkdir -p out dmgroot
           cp -R "$APP" dmgroot/
           ln -s /Applications dmgroot/Applications
-          # Version-less name so releases/latest/download/<name> stays stable.
           hdiutil create -volname "Jabali Sounder" -srcfolder dmgroot \
-            -ov -format UDZO "out/jabali-sounder-macos-arm64.dmg"
+            -ov -format UDZO "out/jabali-sounder-macos-arm64-${VER}.dmg"
 
-          # Keep the raw binary too.
-          cp "bin/${{ matrix.asset }}" "out/${{ matrix.asset }}"
+          # Keep the raw binary too (versioned).
+          cp "bin/${{ matrix.asset }}" "out/${{ matrix.asset }}-${VER}"
           ls -la out/
 
       # Always publish artifacts — makes manual (workflow_dispatch) runs useful

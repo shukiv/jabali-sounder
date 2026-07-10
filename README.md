@@ -44,13 +44,15 @@ The current implementation provides:
 
 ## Downloads
 
-Prebuilt standalone desktop app (latest release):
+Grab the standalone desktop app for your platform from the
+[latest release](https://github.com/shukiv/jabali-sounder/releases/latest) — each
+file is version-stamped:
 
-| Platform | Download |
-|----------|----------|
-| Linux (x86-64) | [jabali-sounder-desktop-linux-amd64](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-desktop-linux-amd64) |
-| Windows (x86-64) | [jabali-sounder-desktop-windows-amd64.exe](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-desktop-windows-amd64.exe) |
-| macOS (Apple Silicon) | [jabali-sounder-macos-arm64.dmg](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-macos-arm64.dmg) |
+| Platform | File on the release page |
+|----------|--------------------------|
+| Linux (x86-64) | `jabali-sounder-linux-amd64-<version>` |
+| Windows (x86-64) | `jabali-sounder-windows-amd64-<version>.exe` |
+| macOS (Apple Silicon) | `jabali-sounder-macos-arm64-<version>.dmg` |
 
 All versions: [Releases](https://github.com/shukiv/jabali-sounder/releases).
 
