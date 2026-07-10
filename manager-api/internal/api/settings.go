@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,6 +23,10 @@ type SettingsHandlerConfig struct {
 	Repo      repository.ServerRepository
 	SecretKey *secrets.Key
 	Log       *slog.Logger
+	// AllowPrivateTargets disables the SSRF guard on import (SND-4).
+	AllowPrivateTargets bool
+	// AllowPlaintext permits the dev hex-plaintext token fallback (SND-6).
+	AllowPlaintext bool
 }
 
 // RegisterSettingsRoutes mounts /api/v1/admin/settings.
@@ -59,6 +62,7 @@ type settingsServerExport struct {
 	TokenSecretEnc   string   `json:"token_secret_enc,omitempty"`
 	SecretFormat     string   `json:"secret_format,omitempty"`
 	Scopes           []string `json:"scopes"`
+	Tags             []string `json:"tags,omitempty"`
 	Version          string   `json:"version,omitempty"`
 	Capabilities     []string `json:"capabilities,omitempty"`
 	HealthURL        string   `json:"health_url,omitempty"`
@@ -77,7 +81,7 @@ type settingsImportResult struct {
 func (h *settingsHandler) export(c *gin.Context) {
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list servers: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
@@ -100,6 +104,7 @@ func (h *settingsHandler) export(c *gin.Context) {
 			TokenSecretEnc:   base64.StdEncoding.EncodeToString(server.TokenSecretEnc),
 			SecretFormat:     "sounder-local-encrypted",
 			Scopes:           []string(server.Scopes),
+			Tags:             []string(server.Tags),
 			Version:          server.Version,
 			Capabilities:     []string(server.Capabilities),
 			HealthURL:        server.HealthURL,
@@ -115,11 +120,11 @@ func (h *settingsHandler) export(c *gin.Context) {
 func (h *settingsHandler) importSettings(c *gin.Context) {
 	var req settingsExport
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
 		return
 	}
 	if req.Kind != "" && req.Kind != "jabali-sounder-settings" {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unsupported settings export"})
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unsupported_settings_export"})
 		return
 	}
 
@@ -148,6 +153,9 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	if err != nil {
 		return fmt.Errorf("%s: invalid panel hostname or URL", name)
 	}
+	if err := validatePublicTarget(baseURL, h.cfg.AllowPrivateTargets); err != nil {
+		return fmt.Errorf("%s: target host is not an allowed (public) address", name)
+	}
 	if strings.TrimSpace(item.TokenID) == "" {
 		return fmt.Errorf("%s: token_id is required", name)
 	}
@@ -156,7 +164,8 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	if item.ID != "" {
 		existing, err = h.cfg.Repo.FindByID(c.Request.Context(), item.ID)
 		if err != nil && !errors.Is(err, repository.ErrNotFound) {
-			return fmt.Errorf("%s: find existing: %w", name, err)
+			h.cfg.Log.Error("import: find existing failed", "server", name, "error", err)
+			return fmt.Errorf("%s: lookup failed", name)
 		}
 	}
 
@@ -195,6 +204,10 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	if len(scopes) == 0 {
 		scopes = []string{remote.ScopeReadAll}
 	}
+	tags, err := normalizeServerTags(item.Tags)
+	if err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
 
 	server := &models.Server{
 		ID:               item.ID,
@@ -203,6 +216,7 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 		TokenID:          strings.TrimSpace(item.TokenID),
 		TokenSecretEnc:   secretEnc,
 		Scopes:           models.JSONStringArray(scopes),
+		Tags:             models.JSONStringArray(tags),
 		Version:          item.Version,
 		Capabilities:     models.JSONStringArray(item.Capabilities),
 		HealthURL:        baseURL + "/health",
@@ -216,7 +230,8 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	if existing != nil {
 		server.CreatedAt = existing.CreatedAt
 		if err := h.cfg.Repo.Update(c.Request.Context(), server); err != nil {
-			return fmt.Errorf("%s: update: %w", name, err)
+			h.cfg.Log.Error("import: update failed", "server", name, "error", err)
+			return fmt.Errorf("%s: update failed", name)
 		}
 		result.Updated++
 		result.Imported++
@@ -224,7 +239,8 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	}
 
 	if err := h.cfg.Repo.Create(c.Request.Context(), server); err != nil {
-		return fmt.Errorf("%s: create: %w", name, err)
+		h.cfg.Log.Error("import: create failed", "server", name, "error", err)
+		return fmt.Errorf("%s: create failed", name)
 	}
 	result.Created++
 	result.Imported++
@@ -233,19 +249,12 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 
 func (h *settingsHandler) importSecret(item settingsServerExport, existing *models.Server) ([]byte, error) {
 	if item.TokenSecret != "" {
-		if h.cfg.SecretKey != nil {
-			secretEnc, err := h.cfg.SecretKey.Seal([]byte(item.TokenSecret))
-			if err != nil {
-				return nil, fmt.Errorf("encrypt token secret: %w", err)
-			}
-			return secretEnc, nil
-		}
-		return []byte(hex.EncodeToString([]byte(item.TokenSecret))), nil
+		return secrets.SealSecret(h.cfg.SecretKey, item.TokenSecret, h.cfg.AllowPlaintext)
 	}
 	if item.TokenSecretEnc != "" {
 		secretEnc, err := base64.StdEncoding.DecodeString(item.TokenSecretEnc)
 		if err != nil {
-			return nil, fmt.Errorf("decode encrypted token secret: %w", err)
+			return nil, fmt.Errorf("encrypted token secret is not valid base64")
 		}
 		return secretEnc, nil
 	}

@@ -114,6 +114,10 @@ func newDesktopHandler() (http.Handler, error) {
 		AdminRepo:     repository.NewAdminRepository(gormDB),
 		SecretKey:     key,
 		JWTSecret:     jwtSecret,
+		// Desktop is a local admin tool that always has an encryption key and
+		// commonly manages panels on the operator's own LAN, so allow private
+		// enrollment targets (SND-4) but never the plaintext fallback (SND-6).
+		AllowPrivateTargets: true,
 	})
 
 	distFS, err := fs.Sub(assets, "dist")

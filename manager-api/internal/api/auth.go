@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -20,6 +21,11 @@ type AuthHandlerConfig struct {
 	AdminRepo repository.AdminRepository
 	JWTSecret string
 	JWTTTL    time.Duration
+	Log       *slog.Logger
+	// Login throttle (SND-3); <=0 uses limiter defaults.
+	LoginMaxFailures int
+	LoginLockout     time.Duration
+	LoginWindow      time.Duration
 }
 
 // RegisterAuthRoutes mounts POST /api/v1/auth/login + GET /api/v1/auth/me.
@@ -27,9 +33,14 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 	if cfg.AdminRepo == nil || cfg.JWTSecret == "" {
 		return
 	}
+	if cfg.Log == nil {
+		cfg.Log = slog.Default()
+	}
 	h := &authHandler{cfg: cfg}
 	auth := g.Group("/auth")
-	auth.POST("/login", h.login)
+	// Throttle brute force against the sole admin password (SND-3).
+	loginLimiter := middleware.NewLoginLimiter(cfg.LoginMaxFailures, cfg.LoginLockout, cfg.LoginWindow, nil, cfg.Log)
+	auth.POST("/login", loginLimiter.Middleware(), h.login)
 	auth.GET("/setup", h.setupStatus)
 	auth.POST("/setup", h.setup)
 	auth.GET("/me", middleware.AuthMiddleware(cfg.JWTSecret), h.me)
@@ -51,29 +62,32 @@ type setupRequest struct {
 func (h *authHandler) login(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
 		return
 	}
 
+	// SND-2: every failure mode below returns the SAME opaque message so the
+	// unauthenticated login path cannot be used to enumerate usernames or
+	// distinguish missing-admin vs bad-password vs internal error.
 	req.Username = strings.TrimSpace(req.Username)
 	admin, err := h.cfg.AdminRepo.FindByUsername(c.Request.Context(), req.Username)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 		return
 	}
 
 	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, h.cfg.JWTTTL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "mint token: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
@@ -104,7 +118,7 @@ type changePasswordRequest struct {
 func (h *authHandler) changePassword(c *gin.Context) {
 	var req changePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
 		return
 	}
 	if len(req.NewPassword) < 8 {
@@ -115,25 +129,25 @@ func (h *authHandler) changePassword(c *gin.Context) {
 	admin, err := h.cfg.AdminRepo.FindByUsername(c.Request.Context(), middleware.AdminUsername(c))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid session"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_session"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "current password is incorrect"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "current_password_incorrect"})
 		return
 	}
 
 	hash, err := HashPassword(req.NewPassword)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "hash password: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	admin.PasswordHash = hash
 	if err := h.cfg.AdminRepo.Update(c.Request.Context(), admin); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "update admin: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -142,7 +156,7 @@ func (h *authHandler) changePassword(c *gin.Context) {
 func (h *authHandler) setupStatus(c *gin.Context) {
 	count, err := h.cfg.AdminRepo.Count(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"available": count == 0})
@@ -151,17 +165,17 @@ func (h *authHandler) setupStatus(c *gin.Context) {
 func (h *authHandler) setup(c *gin.Context) {
 	count, err := h.cfg.AdminRepo.Count(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	if count > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "setup already completed"})
+		c.JSON(http.StatusConflict, gin.H{"error": "setup_already_completed"})
 		return
 	}
 
 	var req setupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json", "detail": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
 		return
 	}
 	req.Username = strings.TrimSpace(req.Username)
@@ -176,21 +190,21 @@ func (h *authHandler) setup(c *gin.Context) {
 
 	admin, err := NewAdmin(req.Username, req.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "create admin: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	if err := h.cfg.AdminRepo.CreateFirst(c.Request.Context(), admin); err != nil {
 		if errors.Is(err, repository.ErrSetupCompleted) {
-			c.JSON(http.StatusConflict, gin.H{"error": "setup already completed"})
+			c.JSON(http.StatusConflict, gin.H{"error": "setup_already_completed"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "create admin: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 
 	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, h.cfg.JWTTTL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "mint token: " + err.Error()})
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{

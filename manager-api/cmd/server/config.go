@@ -15,11 +15,24 @@ type config struct {
 	Database databaseConfig `toml:"database"`
 	Secrets  secretsConfig  `toml:"secrets"`
 	JWT      jwtConfig      `toml:"jwt"`
+	Auth     authConfig     `toml:"auth"`
 }
 
 type serverConfig struct {
 	Addr string `toml:"addr"`
 	Env  string `toml:"env"`
+	// MaxBodyBytes caps the size of any request body (SND-5). 0 -> default.
+	MaxBodyBytes int64 `toml:"max_body_bytes"`
+	// AllowPrivateTargets permits enrolling panels on private/loopback/
+	// link-local IPs (SND-4). Default false blocks SSRF to internal hosts.
+	AllowPrivateTargets bool `toml:"allow_private_targets"`
+}
+
+type authConfig struct {
+	// Login throttle (SND-3). Non-positive values fall back to defaults.
+	LoginMaxFailures    int `toml:"login_max_failures"`
+	LoginLockoutSeconds int `toml:"login_lockout_seconds"`
+	LoginWindowSeconds  int `toml:"login_window_seconds"`
 }
 
 type logConfig struct {
@@ -34,6 +47,10 @@ type databaseConfig struct {
 
 type secretsConfig struct {
 	KeyFile string `toml:"key_file"`
+	// AllowPlaintextFallback permits storing token secrets as hex plaintext
+	// when no encryption key is present (SND-6). Dev-only; default false, and
+	// production refuses to start without a key regardless.
+	AllowPlaintextFallback bool `toml:"allow_plaintext_fallback"`
 }
 
 type jwtConfig struct {
@@ -44,8 +61,14 @@ type jwtConfig struct {
 func Defaults() config {
 	return config{
 		Server: serverConfig{
-			Addr: "127.0.0.1:8484",
-			Env:  "development",
+			Addr:         "127.0.0.1:8484",
+			Env:          "development",
+			MaxBodyBytes: 1 << 20, // 1 MiB
+		},
+		Auth: authConfig{
+			LoginMaxFailures:    5,
+			LoginLockoutSeconds: 900,
+			LoginWindowSeconds:  900,
 		},
 		Log: logConfig{
 			Level:  "info",
@@ -101,6 +124,13 @@ func loadConfig(path string) (*config, error) {
 		cfg.JWT.Secret = v
 	}
 
+	if v := envFirst("JABALI_SOUNDER_ALLOW_PLAINTEXT_FALLBACK"); v != "" {
+		cfg.Secrets.AllowPlaintextFallback = truthy(v)
+	}
+	if v := envFirst("JABALI_SOUNDER_ALLOW_PRIVATE_TARGETS"); v != "" {
+		cfg.Server.AllowPrivateTargets = truthy(v)
+	}
+
 	// Normalize: strip trailing slash from URL-like fields.
 	cfg.Database.URL = strings.TrimSpace(cfg.Database.URL)
 	cfg.Database.Driver = strings.TrimSpace(cfg.Database.Driver)
@@ -118,4 +148,13 @@ func envFirst(names ...string) string {
 		}
 	}
 	return ""
+}
+
+// truthy parses a boolean-ish env value ("1", "true", "yes", "on").
+func truthy(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }

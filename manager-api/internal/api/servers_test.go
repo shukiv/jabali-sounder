@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -52,9 +53,9 @@ func patchServer(t *testing.T, repo repository.ServerRepository, id, body string
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	// SecretKey nil -> encryptSecret uses the hex fallback, so the test needs
-	// no key material and still exercises the persistence path.
-	RegisterServerRoutes(r.Group("/api/v1"), ServerHandlerConfig{Repo: repo})
+	// SecretKey nil + AllowPlaintext -> encryptSecret uses the hex fallback, so
+	// the test needs no key material and still exercises the persistence path.
+	RegisterServerRoutes(r.Group("/api/v1"), ServerHandlerConfig{Repo: repo, AllowPlaintext: true})
 
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/servers/"+id, bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -115,11 +116,48 @@ func TestUpdateServerBlankSecretKeepsCurrent(t *testing.T) {
 	}
 }
 
+func TestUpdateServerNormalizesTags(t *testing.T) {
+	repo := newTestServerRepo(t)
+	srv := seedServer(t, repo)
+
+	w := patchServer(t, repo, srv.ID, `{"tags":[" Production ","EU-West","production","db.primary"]}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	got, err := repo.FindByID(context.Background(), srv.ID)
+	if err != nil {
+		t.Fatalf("find: %v", err)
+	}
+	want := models.JSONStringArray{"production", "eu-west", "db.primary"}
+	if !reflect.DeepEqual(got.Tags, want) {
+		t.Errorf("tags = %#v, want %#v", got.Tags, want)
+	}
+}
+
+func TestUpdateServerRejectsInvalidTags(t *testing.T) {
+	repo := newTestServerRepo(t)
+	srv := seedServer(t, repo)
+
+	w := patchServer(t, repo, srv.ID, `{"tags":["production team"]}`)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422, body = %s", w.Code, w.Body.String())
+	}
+
+	got, err := repo.FindByID(context.Background(), srv.ID)
+	if err != nil {
+		t.Fatalf("find: %v", err)
+	}
+	if len(got.Tags) != 0 {
+		t.Errorf("invalid tags were saved: %#v", got.Tags)
+	}
+}
+
 func doServerAction(t *testing.T, repo repository.ServerRepository, method, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterServerRoutes(r.Group("/api/v1"), ServerHandlerConfig{Repo: repo})
+	RegisterServerRoutes(r.Group("/api/v1"), ServerHandlerConfig{Repo: repo, AllowPlaintext: true})
 	req := httptest.NewRequest(method, path, nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
