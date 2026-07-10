@@ -47,6 +47,7 @@ func (r *serverRepo) FindByID(ctx context.Context, id string) (*models.Server, e
 		}
 		return nil, fmt.Errorf("server find by id: %w", err)
 	}
+	normalizeServerCollections(&s)
 	return &s, nil
 }
 
@@ -55,7 +56,16 @@ func (r *serverRepo) List(ctx context.Context) ([]models.Server, error) {
 	if err := r.db.WithContext(ctx).Order("name ASC").Find(&rows).Error; err != nil {
 		return nil, fmt.Errorf("server list: %w", err)
 	}
+	for i := range rows {
+		normalizeServerCollections(&rows[i])
+	}
 	return rows, nil
+}
+
+func normalizeServerCollections(s *models.Server) {
+	if s.Tags == nil {
+		s.Tags = models.JSONStringArray{}
+	}
 }
 
 func (r *serverRepo) Update(ctx context.Context, s *models.Server) error {

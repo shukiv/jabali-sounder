@@ -33,6 +33,7 @@ type Server struct {
 	TokenID            string           `gorm:"column:token_id;type:char(26);not null;uniqueIndex" json:"token_id"`
 	TokenSecretEnc     []byte           `gorm:"column:token_secret_enc;type:blob" json:"-"`
 	Scopes             JSONStringArray  `gorm:"column:scopes;type:text;serializer:json" json:"scopes"`
+	Tags               JSONStringArray  `gorm:"column:tags;type:text;serializer:json" json:"tags"`
 	InsecureSkipVerify bool             `gorm:"column:insecure_skip_verify;type:tinyint(1);not null;default:0" json:"insecure_skip_verify"`
 	Version            string           `gorm:"column:version;type:varchar(50)" json:"version"`
 	Capabilities       JSONStringArray  `gorm:"column:capabilities;type:text;serializer:json" json:"capabilities"`
