@@ -23,6 +23,7 @@ import (
 // SettingsHandlerConfig wires import/export endpoints.
 type SettingsHandlerConfig struct {
 	Repo      repository.ServerRepository
+	Audit     repository.AuditRepository
 	SecretKey *secrets.Key
 	Log       *slog.Logger
 	// AllowPrivateTargets disables the SSRF guard on import (SND-4).
@@ -275,7 +276,7 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 		}
 		result.Updated++
 		result.Imported++
-		auditServerMutation(h.cfg.Log, c, "import-update", server.ID, server.Name)
+		auditServerMutation(h.cfg.Log, h.cfg.Audit, c, "import-update", server.ID, server.Name)
 		return nil
 	}
 
@@ -285,7 +286,7 @@ func (h *settingsHandler) importServer(c *gin.Context, item settingsServerExport
 	}
 	result.Created++
 	result.Imported++
-	auditServerMutation(h.cfg.Log, c, "import-create", server.ID, server.Name)
+	auditServerMutation(h.cfg.Log, h.cfg.Audit, c, "import-create", server.ID, server.Name)
 	return nil
 }
 

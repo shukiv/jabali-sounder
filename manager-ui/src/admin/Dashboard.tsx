@@ -8,7 +8,7 @@ import {
   ReloadOutlined,
   DashboardOutlined,
 } from "@ant-design/icons";
-import { useDashboard } from "../hooks/useDashboard";
+import { useDashboard, useFleetSLA } from "../hooks/useDashboard";
 import { useDomains, useUsers } from "../hooks/useInventory";
 import type { DomainRow, UserRow } from "../hooks/useInventory";
 import { StatCard } from "../components/StatCard";
@@ -30,6 +30,7 @@ function credTag(cred: string) {
 
 export default function Dashboard() {
   const { data: servers, isLoading, refetch, isFetching } = useDashboard();
+  const { data: sla } = useFleetSLA();
   const domains = useDomains();
   const users = useUsers();
   const navigate = useNavigate();
@@ -81,7 +82,7 @@ export default function Dashboard() {
       </Space>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={6}>
           <StatCard
             label="Active Servers"
             value={`${healthy} / ${total}`}
@@ -90,7 +91,7 @@ export default function Dashboard() {
             to="/servers"
           />
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={6}>
           <StatCard
             label="Domains"
             value={fmt(domains.data?.length)}
@@ -99,13 +100,22 @@ export default function Dashboard() {
             to="/domains"
           />
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={6}>
           <StatCard
             label="Users"
             value={fmt(users.data?.length)}
             icon={<TeamOutlined />}
             iconColor="#fa8c16"
             to="/users"
+          />
+        </Col>
+        <Col xs={24} sm={6}>
+          <StatCard
+            label={`Fleet SLA (${sla?.window_days ?? 7}d)`}
+            value={sla?.fleet_ratio != null ? `${(sla.fleet_ratio * 100).toFixed(1)}%` : "—"}
+            icon={<DashboardOutlined />}
+            iconColor={sla?.fleet_ratio != null && sla.fleet_ratio >= 0.99 ? "#3f8600" : "#d48806"}
+            to="/monitor"
           />
         </Col>
       </Row>

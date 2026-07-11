@@ -85,6 +85,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	var alertChannelRepo repository.AlertChannelRepository
 	var maintenanceRepo repository.MaintenanceRepository
 	var mutedRepo repository.MutedAlertRepository
+	var auditRepo repository.AuditRepository
 	if cfg.Database.URL != "" {
 		if err := db.Migrate(cfg.Database.Driver, cfg.Database.URL); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -106,6 +107,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		alertChannelRepo = repository.NewAlertChannelRepository(gormDB)
 		maintenanceRepo = repository.NewMaintenanceRepository(gormDB)
 		mutedRepo = repository.NewMutedAlertRepository(gormDB)
+		auditRepo = repository.NewAuditRepository(gormDB)
 		if err := alertRuleRepo.EnsureDefaults(context.Background(), time.Now().UTC()); err != nil {
 			log.Warn("seed default alert rules failed", "error", err)
 		}
@@ -147,6 +149,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		AlertChannelRepo:      alertChannelRepo,
 		MaintenanceRepo:       maintenanceRepo,
 		MutedRepo:             mutedRepo,
+		AuditRepo:             auditRepo,
 		AdminRepo:             adminRepo,
 		SecretKey:             key,
 		JWTSecret:             jwtSecret,

@@ -185,6 +185,7 @@ export interface HeartbeatHistory {
   data: Heartbeat[];
   total: number;
   uptime: { healthy: number; total: number; ratio: number };
+  uptime_window?: { healthy: number; total: number; ratio: number; window_days: number };
 }
 
 export interface MetricSample {

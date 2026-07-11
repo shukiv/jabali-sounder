@@ -120,6 +120,7 @@ func newDesktopHandler() (http.Handler, error) {
 	alertChannelRepo := repository.NewAlertChannelRepository(gormDB)
 	maintenanceRepo := repository.NewMaintenanceRepository(gormDB)
 	mutedRepo := repository.NewMutedAlertRepository(gormDB)
+	auditRepo := repository.NewAuditRepository(gormDB)
 	if err := alertRuleRepo.EnsureDefaults(context.Background(), time.Now().UTC()); err != nil {
 		slog.Warn("seed default alert rules failed", "error", err)
 	}
@@ -135,6 +136,7 @@ func newDesktopHandler() (http.Handler, error) {
 		AlertChannelRepo: alertChannelRepo,
 		MaintenanceRepo:  maintenanceRepo,
 		MutedRepo:        mutedRepo,
+		AuditRepo:        auditRepo,
 		AdminRepo:        repository.NewAdminRepository(gormDB),
 		SecretKey:        key,
 		JWTSecret:        jwtSecret,

@@ -4,10 +4,14 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/ids"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 )
 
 // failInternal logs the real error server-side (with the request correlation ID)
@@ -54,18 +58,42 @@ func safeRemoteError(log *slog.Logger, server, part string, code int, err error)
 
 // auditServerMutation emits a structured audit record for a privileged server
 // mutation (SND-10): the acting admin, the action, the target server, source IP,
-// and correlation ID. Never logs secret material.
-func auditServerMutation(log *slog.Logger, c *gin.Context, action, serverID, serverName string) {
+// and correlation ID. Never logs secret material. When an audit repository is
+// supplied it also persists the record so the trail is queryable (SND-24);
+// persistence failure is non-fatal to the mutation.
+func auditServerMutation(log *slog.Logger, audit repository.AuditRepository, c *gin.Context, action, serverID, serverName string) {
 	if log == nil {
 		log = slog.Default()
 	}
+	event := "server." + action
+	actor := middleware.AdminUsername(c)
+	actorID := middleware.AdminID(c)
+	sourceIP := c.ClientIP()
+	requestID := middleware.GetRequestID(c)
+
 	log.Info("audit",
-		"event", "server."+action,
-		"actor", middleware.AdminUsername(c),
-		"actor_id", middleware.AdminID(c),
+		"event", event,
+		"actor", actor,
+		"actor_id", actorID,
 		"server_id", serverID,
 		"server_name", serverName,
-		"source_ip", c.ClientIP(),
-		"request_id", middleware.GetRequestID(c),
+		"source_ip", sourceIP,
+		"request_id", requestID,
 	)
+	if audit == nil {
+		return
+	}
+	if err := audit.Create(c.Request.Context(), &models.AuditLog{
+		ID:         ids.NewULID(),
+		Event:      event,
+		Actor:      actor,
+		ActorID:    actorID,
+		ServerID:   serverID,
+		ServerName: serverName,
+		SourceIP:   sourceIP,
+		RequestID:  requestID,
+		CreatedAt:  time.Now().UTC(),
+	}); err != nil {
+		log.Warn("audit persist failed", "event", event, "error", err)
+	}
 }

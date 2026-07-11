@@ -129,13 +129,14 @@ export function useServerHeartbeats(id: string | null) {
   });
 }
 
-export function useServerMetrics(id: string | null) {
+export function useServerMetrics(id: string | null, range?: string) {
   return useQuery({
-    queryKey: ["server-metrics", id],
+    queryKey: ["server-metrics", id, range || "live"],
     enabled: !!id,
     queryFn: async () => {
+      const q = range ? `range=${range}` : "limit=100";
       const resp = await apiClient.get<MetricHistory>(
-        `/admin/servers/${id}/metrics?limit=100`,
+        `/admin/servers/${id}/metrics?${q}`,
       );
       return resp.data;
     },

@@ -28,6 +28,7 @@ type Deps struct {
 	AlertChannelRepo repository.AlertChannelRepository
 	MaintenanceRepo  repository.MaintenanceRepository
 	MutedRepo        repository.MutedAlertRepository
+	AuditRepo        repository.AuditRepository
 	AdminRepo        repository.AdminRepository
 	SecretKey        *secrets.Key
 	JWTSecret        string
@@ -110,6 +111,7 @@ func NewWithDeps(deps Deps) *gin.Engine {
 
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{
+		Audit:               deps.AuditRepo,
 		Repo:                deps.ServerRepo,
 		Heartbeats:          deps.HeartbeatRepo,
 		MetricSamples:       deps.MetricSampleRepo,
@@ -161,6 +163,17 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		Log:  deps.Log,
 	})
 
+	api.RegisterPrometheusRoutes(adminGroup, api.PrometheusHandlerConfig{
+		Servers:       deps.ServerRepo,
+		MetricSamples: deps.MetricSampleRepo,
+		Log:           deps.Log,
+	})
+
+	api.RegisterAuditRoutes(adminGroup, api.AuditHandlerConfig{
+		Repo: deps.AuditRepo,
+		Log:  deps.Log,
+	})
+
 	api.RegisterAlertingRoutes(adminGroup, api.AlertingHandlerConfig{
 		Rules:          deps.AlertRuleRepo,
 		Channels:       deps.AlertChannelRepo,
@@ -172,6 +185,7 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	})
 
 	api.RegisterSettingsRoutes(adminGroup, api.SettingsHandlerConfig{
+		Audit:               deps.AuditRepo,
 		Repo:                deps.ServerRepo,
 		SecretKey:           deps.SecretKey,
 		Log:                 deps.Log,

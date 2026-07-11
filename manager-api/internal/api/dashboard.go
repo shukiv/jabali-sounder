@@ -3,9 +3,11 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 )
 
@@ -68,5 +70,36 @@ func (h *dashboardHandler) get(c *gin.Context) {
 		"total":     len(entries),
 		"page":      1,
 		"page_size": len(entries),
+		"sla":       h.fleetSLA(c, servers),
 	})
+}
+
+// fleetSLA computes per-server uptime over the last 7 days plus a fleet average
+// (across servers that have heartbeat data) for the dashboard SLA card (SND-26).
+func (h *dashboardHandler) fleetSLA(c *gin.Context, servers []models.Server) gin.H {
+	const windowDays = 7
+	out := gin.H{"window_days": windowDays, "fleet_ratio": nil, "servers": []gin.H{}}
+	if h.cfg.HeartbeatRepo == nil {
+		return out
+	}
+	since := time.Now().Add(-windowDays * 24 * time.Hour)
+	perServer := make([]gin.H, 0, len(servers))
+	var sum float64
+	var counted int
+	for _, s := range servers {
+		healthy, total, err := h.cfg.HeartbeatRepo.UptimeSince(c.Request.Context(), s.ID, since)
+		if err != nil || total == 0 {
+			perServer = append(perServer, gin.H{"id": s.ID, "name": s.Name, "ratio": nil})
+			continue
+		}
+		ratio := float64(healthy) / float64(total)
+		sum += ratio
+		counted++
+		perServer = append(perServer, gin.H{"id": s.ID, "name": s.Name, "ratio": ratio})
+	}
+	out["servers"] = perServer
+	if counted > 0 {
+		out["fleet_ratio"] = sum / float64(counted)
+	}
+	return out
 }

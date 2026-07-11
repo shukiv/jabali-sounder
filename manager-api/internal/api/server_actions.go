@@ -58,7 +58,7 @@ func (h *serverHandler) respondAction(c *gin.Context, s *models.Server, action s
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": code})
 		return
 	}
-	auditServerMutation(h.cfg.Log, c, "action."+action, s.ID, s.Name)
+	auditServerMutation(h.cfg.Log, h.cfg.Audit, c, "action."+action, s.ID, s.Name)
 	c.JSON(http.StatusOK, res)
 }
 

@@ -29,6 +29,7 @@ type ServerHandlerConfig struct {
 	Repo          repository.ServerRepository
 	Heartbeats    repository.HeartbeatRepository
 	MetricSamples repository.MetricSampleRepository
+	Audit         repository.AuditRepository
 	SecretKey     *secrets.Key
 	Log           *slog.Logger
 	// AllowPrivateTargets disables the SSRF guard (SND-4).
@@ -164,7 +165,7 @@ func (h *serverHandler) create(c *gin.Context) {
 		return
 	}
 
-	auditServerMutation(h.cfg.Log, c, "enroll", server.ID, server.Name)
+	auditServerMutation(h.cfg.Log, h.cfg.Audit, c, "enroll", server.ID, server.Name)
 	c.JSON(http.StatusCreated, server)
 }
 
@@ -300,7 +301,7 @@ func (h *serverHandler) update(c *gin.Context) {
 		failInternal(c, h.cfg.Log, err)
 		return
 	}
-	auditServerMutation(h.cfg.Log, c, "update", s.ID, s.Name)
+	auditServerMutation(h.cfg.Log, h.cfg.Audit, c, "update", s.ID, s.Name)
 	c.JSON(http.StatusOK, s)
 }
 
@@ -451,7 +452,7 @@ func (h *serverHandler) remove(c *gin.Context) {
 		failInternal(c, h.cfg.Log, err)
 		return
 	}
-	auditServerMutation(h.cfg.Log, c, "delete", srv.ID, srv.Name)
+	auditServerMutation(h.cfg.Log, h.cfg.Audit, c, "delete", srv.ID, srv.Name)
 	c.JSON(http.StatusOK, gin.H{"id": id, "deleted": true})
 }
 
@@ -479,7 +480,7 @@ func (h *serverHandler) setStatus(c *gin.Context, status models.ServerStatus) {
 	if status == models.ServerStatusDisabled {
 		action = "disable"
 	}
-	auditServerMutation(h.cfg.Log, c, action, s.ID, s.Name)
+	auditServerMutation(h.cfg.Log, h.cfg.Audit, c, action, s.ID, s.Name)
 	c.JSON(http.StatusOK, s)
 }
 
@@ -526,6 +527,22 @@ func (h *serverHandler) heartbeats(c *gin.Context) {
 	if len(rows) > 0 {
 		ratio = float64(healthy) / float64(len(rows))
 	}
+
+	// Uptime over a longer window (default 7 days) computed across all stored
+	// heartbeats, not just the returned page — this is the SLA figure (SND-26).
+	windowDays := 7
+	if n, err := strconv.Atoi(c.DefaultQuery("uptime_window_days", "7")); err == nil && n > 0 && n <= 365 {
+		windowDays = n
+	}
+	uptimeWindow := gin.H{"healthy": 0, "total": 0, "ratio": 0, "window_days": windowDays}
+	wHealthy, wTotal, err := h.cfg.Heartbeats.UptimeSince(c.Request.Context(), id, time.Now().Add(-time.Duration(windowDays)*24*time.Hour))
+	if err == nil && wTotal > 0 {
+		uptimeWindow = gin.H{
+			"healthy": wHealthy, "total": wTotal,
+			"ratio": float64(wHealthy) / float64(wTotal), "window_days": windowDays,
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"data":  rows,
 		"total": len(rows),
@@ -534,6 +551,7 @@ func (h *serverHandler) heartbeats(c *gin.Context) {
 			"total":   len(rows),
 			"ratio":   ratio,
 		},
+		"uptime_window": uptimeWindow,
 	})
 }
 
@@ -565,12 +583,59 @@ func (h *serverHandler) metrics(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		return
 	}
+
+	// A `range` (6h|24h|7d|30d) selects a time window and downsamples to a
+	// chart-friendly point count; otherwise fall back to the most-recent N.
+	if window, ok := parseRange(c.Query("range")); ok {
+		since := time.Now().Add(-window)
+		rows, err := h.cfg.MetricSamples.Range(c.Request.Context(), id, since, 20000)
+		if err != nil {
+			failInternal(c, h.cfg.Log, err)
+			return
+		}
+		rows = downsampleMetrics(rows, 400)
+		c.JSON(http.StatusOK, gin.H{"data": rows, "total": len(rows), "range": c.Query("range")})
+		return
+	}
+
 	rows, err := h.cfg.MetricSamples.Recent(c.Request.Context(), id, limit)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": rows, "total": len(rows)})
+}
+
+// parseRange maps a range token to a duration.
+func parseRange(r string) (time.Duration, bool) {
+	switch r {
+	case "6h":
+		return 6 * time.Hour, true
+	case "24h":
+		return 24 * time.Hour, true
+	case "7d":
+		return 7 * 24 * time.Hour, true
+	case "30d":
+		return 30 * 24 * time.Hour, true
+	}
+	return 0, false
+}
+
+// downsampleMetrics strides an ordered sample slice down to at most `target`
+// points, always keeping the last sample so the chart ends at "now".
+func downsampleMetrics(rows []models.MetricSample, target int) []models.MetricSample {
+	if target < 1 || len(rows) <= target {
+		return rows
+	}
+	stride := (len(rows) + target - 1) / target
+	out := make([]models.MetricSample, 0, target+1)
+	for i := 0; i < len(rows); i += stride {
+		out = append(out, rows[i])
+	}
+	if last := rows[len(rows)-1]; len(out) == 0 || out[len(out)-1].ID != last.ID {
+		out = append(out, last)
+	}
+	return out
 }
 
 // checkHealth probes the server's /health + /automation/status on demand.

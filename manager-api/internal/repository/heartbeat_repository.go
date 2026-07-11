@@ -18,6 +18,8 @@ type HeartbeatRepository interface {
 	Recent(ctx context.Context, serverID string, n int) ([]models.Heartbeat, error)
 	// PruneOlderThan deletes heartbeats older than cutoff; returns rows deleted.
 	PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
+	// UptimeSince returns (healthy, total) heartbeat counts since `since`.
+	UptimeSince(ctx context.Context, serverID string, since time.Time) (int64, int64, error)
 }
 
 type heartbeatRepo struct{ db *gorm.DB }
@@ -72,4 +74,17 @@ func (r *heartbeatRepo) PruneOlderThan(ctx context.Context, cutoff time.Time) (i
 		return 0, fmt.Errorf("heartbeat prune: %w", res.Error)
 	}
 	return res.RowsAffected, nil
+}
+
+func (r *heartbeatRepo) UptimeSince(ctx context.Context, serverID string, since time.Time) (int64, int64, error) {
+	var total, healthy int64
+	base := r.db.WithContext(ctx).Model(&models.Heartbeat{}).
+		Where("server_id = ? AND checked_at >= ?", serverID, since)
+	if err := base.Count(&total).Error; err != nil {
+		return 0, 0, fmt.Errorf("uptime total: %w", err)
+	}
+	if err := base.Session(&gorm.Session{}).Where("healthy = ?", true).Count(&healthy).Error; err != nil {
+		return 0, 0, fmt.Errorf("uptime healthy: %w", err)
+	}
+	return healthy, total, nil
 }

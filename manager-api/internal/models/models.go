@@ -253,6 +253,22 @@ type MutedAlert struct {
 
 func (MutedAlert) TableName() string { return "muted_alerts" }
 
+// AuditLog is a persisted record of a privileged mutation (SND-24). It mirrors
+// the structured slog "audit" event so the trail is queryable in the UI.
+type AuditLog struct {
+	ID         string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	Event      string    `gorm:"column:event;type:varchar(60);not null;index" json:"event"`
+	Actor      string    `gorm:"column:actor;type:varchar(120);index" json:"actor"`
+	ActorID    string    `gorm:"column:actor_id;type:varchar(40)" json:"actor_id"`
+	ServerID   string    `gorm:"column:server_id;type:char(26);index" json:"server_id"`
+	ServerName string    `gorm:"column:server_name;type:varchar(200)" json:"server_name"`
+	SourceIP   string    `gorm:"column:source_ip;type:varchar(64)" json:"source_ip"`
+	RequestID  string    `gorm:"column:request_id;type:varchar(64)" json:"request_id"`
+	CreatedAt  time.Time `gorm:"column:created_at;index" json:"created_at"`
+}
+
+func (AuditLog) TableName() string { return "audit_logs" }
+
 // JSONStringArray is a []string stored as JSON in a column.
 type JSONStringArray []string
 

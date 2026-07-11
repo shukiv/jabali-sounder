@@ -14,6 +14,8 @@ import (
 type MetricSampleRepository interface {
 	Record(ctx context.Context, m *models.MetricSample) error
 	Recent(ctx context.Context, serverID string, n int) ([]models.MetricSample, error)
+	// Range returns samples since `since` in chronological order, capped at max.
+	Range(ctx context.Context, serverID string, since time.Time, max int) ([]models.MetricSample, error)
 	PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
 }
 
@@ -49,4 +51,19 @@ func (r *metricSampleRepo) PruneOlderThan(ctx context.Context, cutoff time.Time)
 		return 0, fmt.Errorf("metric sample prune: %w", res.Error)
 	}
 	return res.RowsAffected, nil
+}
+
+func (r *metricSampleRepo) Range(ctx context.Context, serverID string, since time.Time, max int) ([]models.MetricSample, error) {
+	if max <= 0 {
+		max = 20000
+	}
+	var rows []models.MetricSample
+	if err := r.db.WithContext(ctx).
+		Where("server_id = ? AND sampled_at >= ?", serverID, since).
+		Order("sampled_at ASC").
+		Limit(max).
+		Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("metric sample range: %w", err)
+	}
+	return rows, nil
 }

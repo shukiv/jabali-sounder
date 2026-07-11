@@ -12,3 +12,20 @@ export function useDashboard() {
     refetchInterval: 30000,
   });
 }
+
+export interface FleetSLA {
+  window_days: number;
+  fleet_ratio: number | null;
+  servers: { id: string; name: string; ratio: number | null }[];
+}
+
+export function useFleetSLA() {
+  return useQuery({
+    queryKey: ["fleet-sla"] as const,
+    queryFn: async () => {
+      const resp = await apiClient.get<{ sla: FleetSLA }>("/admin/dashboard");
+      return resp.data.sla;
+    },
+    refetchInterval: 60000,
+  });
+}
