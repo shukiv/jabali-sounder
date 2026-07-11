@@ -1,13 +1,26 @@
 import { useState } from "react";
-import { Card, Table, Tag, Input, Space, Typography, Statistic, Row, Col } from "antd";
+import { Card, Table, Tag, Input, Space, Typography, Statistic, Row, Col, Button, Popconfirm, App } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useDomains } from "../hooks/useInventory";
+import { useServerAction } from "../hooks/useServers";
+import { roleAtLeast } from "../hooks/useAuth";
 import type { DomainRow } from "../hooks/useInventory";
 
 const { Title } = Typography;
 
 export default function Domains() {
   const { data: domains, isLoading } = useDomains();
+  const { message } = App.useApp();
+  const canWrite = roleAtLeast("operator");
+  const actionMut = useServerAction();
+  const domainAction = async (r: DomainRow, suspended: boolean) => {
+    try {
+      await actionMut.mutateAsync({ id: r.server_id, action: "domain", body: { domain_id: r.id, suspended } });
+      message.success(suspended ? "Domain suspended" : "Domain unsuspended");
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
+  };
   const [search, setSearch] = useState("");
 
   const filtered = (domains || []).filter((d) =>
@@ -34,6 +47,24 @@ export default function Domains() {
       render: (name: string) => <Tag color="blue">{name}</Tag>,
     },
   ];
+
+  const domainActionsCol = {
+    title: "Actions",
+    key: "actions",
+    render: (_: unknown, r: DomainRow) =>
+      r.is_enabled ? (
+        <Popconfirm
+          title={`Suspend ${r.name}?`}
+          okText="Suspend"
+          okButtonProps={{ danger: true }}
+          onConfirm={() => domainAction(r, true)}
+        >
+          <Button danger size="small">Suspend</Button>
+        </Popconfirm>
+      ) : (
+        <Button size="small" onClick={() => domainAction(r, false)}>Unsuspend</Button>
+      ),
+  };
 
   return (
     <div>
@@ -69,7 +100,7 @@ export default function Domains() {
         </Space>
         <Table<DomainRow>
           dataSource={filtered}
-          columns={columns}
+          columns={canWrite ? [...columns, domainActionsCol] : columns}
           rowKey={(r) => r.server_id + ":" + r.id}
           loading={isLoading}
           pagination={{ pageSize: 50, showSizeChanger: true }}

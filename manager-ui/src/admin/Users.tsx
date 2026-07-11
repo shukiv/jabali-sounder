@@ -1,13 +1,26 @@
 import { useState } from "react";
-import { Card, Table, Tag, Input, Space, Typography } from "antd";
+import { Card, Table, Tag, Input, Space, Typography, Button, Popconfirm, App } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useUsers } from "../hooks/useInventory";
+import { useServerAction } from "../hooks/useServers";
+import { roleAtLeast } from "../hooks/useAuth";
 import type { UserRow } from "../hooks/useInventory";
 
 const { Title } = Typography;
 
 export default function Users() {
   const { data: users, isLoading } = useUsers();
+  const { message } = App.useApp();
+  const canWrite = roleAtLeast("operator");
+  const actionMut = useServerAction();
+  const userAction = async (r: UserRow, enabled: boolean) => {
+    try {
+      await actionMut.mutateAsync({ id: r.server_id, action: "user", body: { user_id: r.id, enabled } });
+      message.success(enabled ? "User enabled" : "User disabled");
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
+  };
   const [search, setSearch] = useState("");
 
   const filtered = (users || []).filter((u) =>
@@ -33,6 +46,24 @@ export default function Users() {
     },
   ];
 
+  const userActionsCol = {
+    title: "Actions",
+    key: "actions",
+    render: (_: unknown, r: UserRow) => (
+      <Space>
+        <Popconfirm
+          title={`Disable ${r.email || r.username}?`}
+          okText="Disable"
+          okButtonProps={{ danger: true }}
+          onConfirm={() => userAction(r, false)}
+        >
+          <Button danger size="small">Disable</Button>
+        </Popconfirm>
+        <Button size="small" onClick={() => userAction(r, true)}>Enable</Button>
+      </Space>
+    ),
+  };
+
   return (
     <div>
       <Title level={3} style={{ marginBottom: 16 }}>Users</Title>
@@ -50,7 +81,7 @@ export default function Users() {
         </Space>
         <Table<UserRow>
           dataSource={filtered}
-          columns={columns}
+          columns={canWrite ? [...columns, userActionsCol] : columns}
           rowKey={(r) => r.server_id + ":" + r.id}
           loading={isLoading}
           pagination={{ pageSize: 50, showSizeChanger: true }}

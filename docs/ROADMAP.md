@@ -48,8 +48,9 @@ viewable; cert expiry is shown per server.
   suspend-unsuspend / cache purge / backup + operations + capabilities), write
   scopes in enrollment, Sounder action endpoints (operator+, audited), and
   server-row actions (restart service, purge cache, backup) with confirm.
-  Follow-ups: user/domain actions from the Users/Domains pages, async
-  operation-status polling UI, capability-driven hiding.
+  User disable/enable on the Users page, domain suspend/unsuspend on the Domains
+  page, and backup operation-status polling are wired. Remaining: capability-
+  driven hiding + bulk operations.
 - ⬜ **Bulk operations** — select N servers → check / disable / tag / act at once.
 
 **Dependencies:** jabali2 must expose write-automation endpoints (tracked as

@@ -37,6 +37,7 @@ import { RowActions } from "../components/RowActions";
 import ServerHistoryDrawer from "../components/ServerHistoryDrawer";
 import type { Server } from "../types";
 import { roleAtLeast } from "../hooks/useAuth";
+import apiClient from "../apiClient";
 
 const scopeOptions = [
   { label: "read:* (all read access)", value: "read:*" },
@@ -102,6 +103,26 @@ export default function Servers() {
   const [restartServer, setRestartServer] = useState<Server | null>(null);
   const [restartForm] = Form.useForm();
 
+  const pollOperation = (id: string, opId: string) => {
+    let attempts = 0;
+    const timer = setInterval(async () => {
+      attempts++;
+      try {
+        const resp = await apiClient.get<{ status: string; message?: string }>(
+          `/admin/servers/${id}/operations/${opId}`,
+        );
+        const st = resp.data.status;
+        if (st === "done" || st === "failed" || attempts > 60) {
+          clearInterval(timer);
+          if (st === "done") message.success(`Operation ${opId} completed`);
+          else if (st === "failed") message.error(`Operation ${opId} failed`);
+        }
+      } catch {
+        clearInterval(timer);
+      }
+    }, 5000);
+  };
+
   const runAction = async (
     id: string,
     action: string,
@@ -110,7 +131,12 @@ export default function Servers() {
   ) => {
     try {
       const res = await actionMut.mutateAsync({ id, action, body });
-      message.success(res?.operation_id ? `${okMsg} (op ${res.operation_id})` : okMsg);
+      if (res?.operation_id) {
+        message.success(`${okMsg} (op ${res.operation_id})`);
+        pollOperation(id, res.operation_id);
+      } else {
+        message.success(okMsg);
+      }
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
