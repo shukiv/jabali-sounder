@@ -111,6 +111,87 @@ exists; a report can be scheduled.
 
 ---
 
+## M5 — Alerting & incidents 🔭
+
+**Goal:** turn point notifications into an alerting system that tells the right
+person, once. Compounds the in-app notifications (SND-18) just landed.
+
+- 🔭 **Configurable thresholds + multi-channel routing** (SND-20). Per-metric
+  thresholds (disk/RAM/load/cert) with configurable duration, edited in the UI
+  not TOML; route to ntfy (phone push), SMTP email, PagerDuty/Opsgenie in
+  addition to the existing Slack/Discord webhook; per-channel severity filtering.
+  Today alerting is a single webhook with only up/down + one hardcoded CPU rule.
+- 🔭 **Incidents with ack / snooze / mute + escalation** (SND-21). Group
+  notifications into incidents (open → ack → resolved) with a timeline; ack /
+  snooze / mute per incident and per server; escalate if unacked past a window.
+- 🔭 **Maintenance windows** (SND-22). Suppress alerts for a server/environment
+  during planned work so intentional restarts don't page; scheduled + audited.
+
+**Acceptance:** an operator sets a disk threshold in the UI, gets paged via a
+non-webhook channel, acks the incident, and a scheduled maintenance window
+suppresses alerts for a named server.
+
+---
+
+## M6 — Observability export & audit 🔭
+
+**Goal:** let the fleet's data leave Sounder and make the audit trail readable.
+
+- 🔭 **Prometheus `/metrics` export** (SND-23). Expose fleet health +
+  metric_samples in Prometheus text format behind an API token, so existing
+  Grafana/Alertmanager stacks scrape Sounder directly. Low effort, high leverage.
+- 🔭 **Audit log viewer + CSV export** (SND-24). Audit events are recorded but
+  not viewable; add a filterable/searchable audit page (actor/action/server/time)
+  + CSV export. Closes the M3 accountability loop.
+- 🔭 **Full metric charts with range selection** (SND-25). Sparklines → real
+  time-range charts (zoom, compare servers, fleet-aggregate). Data already exists.
+- 🔭 **Uptime / SLA rollup** (SND-26). Uptime % per server from heartbeat
+  history; availability card + monthly SLA rollup in reports.
+
+**Acceptance:** an external Grafana scrapes Sounder; the audit page answers "who
+restarted what, when"; a server's 30-day uptime is visible.
+
+---
+
+## M7 — Fleet ops 🔭
+
+**Goal:** operational depth that matters as the managed fleet grows.
+
+- 🔭 **Backup management view** (SND-27). Track backups across panels (age, size,
+  last-success), alert on stale/missing, trigger + poll status on top of the M2
+  backup action.
+- 🔭 **Token rotation + credential re-key** (SND-28). One-click rotate a panel's
+  automation token, rotate Sounder API tokens, expiry reminders.
+- 🔭 **Scheduled remediation / runbooks** (SND-29). Gated + audited automation:
+  scheduled backups, auto-restart after N failed checks, respecting maintenance
+  windows.
+
+**Acceptance:** stale backups alert; a panel token can be rotated without
+re-enrollment; a runbook auto-restarts a flapping service under an operator's
+standing approval.
+
+---
+
+## M8 — Hardening 🔭
+
+**Goal:** close the security gaps a fleet-wide control plane accumulates.
+
+- 🔭 **Login rate-limit + brute-force lockout** (SND-30). `/auth/login` is
+  unbounded today; add per-IP + per-account backoff/lockout. Pairs with 2FA.
+- 🔭 **Scoped API tokens + per-token IP allowlist / rate-limit** (SND-31). `snd_`
+  tokens are viewer-all; add read-subset scopes, optional IP allowlist, per-token
+  rate limiting.
+- 🔭 **Config / policy drift detection** (SND-32). Beyond version drift: flag
+  panels with weak TLS, disabled security features, or out-of-policy settings.
+
+**Acceptance:** repeated bad logins are throttled; a token can be scoped +
+IP-restricted; the dashboard flags a non-compliant panel.
+
+---
+
 If you had to pick one to build next: **M1's poller + alerting** — it changes
 what the product *is* (passive → active) and reuses the same plumbing that
-history, cert-expiry, and drift depend on.
+history, cert-expiry, and drift depend on. With M1–M4 shipped, the highest-
+leverage next step is **M5 (alerting v2)** — it compounds SND-18 and turns
+"shows problems" into "pages the right person, once" — or **M6's Prometheus
+export** as the cheapest big win if you already run Grafana.
