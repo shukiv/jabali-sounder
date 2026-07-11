@@ -10,12 +10,19 @@ COVER      := coverage.out
 MIN_COV    := 80
 DESKTOP_TAGS ?= desktop,production,webkit2_41
 
+# Build-time version stamping (update mechanism). Override VERSION on release.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+DATE    ?= $(shell date -u +%Y-%m-%d)
+VPKG    := git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/version
+VLDFLAGS := -X $(VPKG).Version=$(VERSION) -X $(VPKG).Commit=$(COMMIT) -X $(VPKG).Date=$(DATE)
+
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Compile the sounder binary
 	mkdir -p bin
-	$(GO) build -o $(BIN) ./manager-api/cmd/server
+	$(GO) build -ldflags "$(VLDFLAGS)" -o $(BIN) ./manager-api/cmd/server
 
 run: ## Run the sounder server (dev)
 	$(GO) run ./manager-api/cmd/server serve
@@ -76,7 +83,7 @@ desktop-stage: ui-build ## Stage built SPA assets for the Wails desktop entrypoi
 
 desktop-build: desktop-stage ## Build the local standalone desktop binary for the current OS
 	mkdir -p bin
-	$(GO) build -tags $(DESKTOP_TAGS) -o ./bin/jabali-sounder-desktop ./manager-api/cmd/desktop
+	$(GO) build -tags $(DESKTOP_TAGS) -ldflags "$(VLDFLAGS)" -o ./bin/jabali-sounder-desktop ./manager-api/cmd/desktop
 
 server-stage: ui-build ## Stage the built SPA for the embedded-UI server binary
 	rm -rf manager-api/cmd/server/dist
@@ -85,4 +92,4 @@ server-stage: ui-build ## Stage the built SPA for the embedded-UI server binary
 
 server-build: server-stage ## Build the headless server binary with the SPA embedded (one binary, one port)
 	mkdir -p bin
-	CGO_ENABLED=0 $(GO) build -tags embedui -o ./bin/jabali-sounder-server ./manager-api/cmd/server
+	CGO_ENABLED=0 $(GO) build -tags embedui -ldflags "-s -w $(VLDFLAGS)" -o ./bin/jabali-sounder-server ./manager-api/cmd/server

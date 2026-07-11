@@ -92,8 +92,11 @@ jobs:
           CGO_LDFLAGS: ${{ matrix.cgo_ldflags }}
         run: |
           mkdir -p bin
+          VER="${GITHUB_REF_NAME}"; case "${VER#v}" in [0-9]*) ;; *) VER="v0.0.0-dev" ;; esac
+          VPKG="git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/version"
+          VLD="-X $VPKG.Version=$VER -X $VPKG.Commit=${GITHUB_SHA::7} -X $VPKG.Date=$(date -u +%Y-%m-%d)"
           go build -trimpath -tags "${{ matrix.tags }},nomsgpack" \
-            -ldflags "-s -w ${{ matrix.ldflags }}" \
+            -ldflags "-s -w $VLD ${{ matrix.ldflags }}" \
             -o "bin/${{ matrix.asset }}" ./manager-api/cmd/desktop
           echo "desktop raw size: $(stat -c%s "bin/${{ matrix.asset }}" 2>/dev/null || stat -f%z "bin/${{ matrix.asset }}") bytes"
           ls -la bin/
@@ -201,20 +204,56 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p out
-          go build -trimpath -tags "embedui,nomsgpack" -ldflags "-s -w" \
-            -o out/jabali-sounder-server-linux-amd64 ./manager-api/cmd/server
+          VER="${GITHUB_REF_NAME}"; case "${VER#v}" in [0-9]*) ;; *) VER="v0.0.0-dev" ;; esac
+          VPKG="git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/version"
+          VLD="-X $VPKG.Version=$VER -X $VPKG.Commit=${GITHUB_SHA::7} -X $VPKG.Date=$(date -u +%Y-%m-%d)"
+          NAME="jabali-sounder-server-linux-amd64-${VER#v}"
+          go build -trimpath -tags "embedui,nomsgpack" -ldflags "-s -w $VLD" \
+            -o "out/$NAME" ./manager-api/cmd/server
+          # Keep the legacy unversioned name too (the installer references it).
+          cp "out/$NAME" out/jabali-sounder-server-linux-amd64
           echo "server raw size: $(stat -c%s out/jabali-sounder-server-linux-amd64) bytes"
           ls -la out/
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: server-linux-amd64
-          path: out/jabali-sounder-server-linux-amd64
+          path: out/jabali-sounder-server-linux-amd64*
           if-no-files-found: error
       - name: Attach to Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: out/jabali-sounder-server-linux-amd64
+          files: out/jabali-sounder-server-linux-amd64*
           fail_on_unmatched_files: true
           generate_release_notes: true
+
+  # Publish a checksums.txt over every release asset. The desktop self-update
+  # verifies its download against this file, so it must cover all binaries.
+  checksums:
+    name: checksums
+    needs: [build, server]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dl
+      - name: Compute checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p flat
+          # Flatten every artifact file to basenames matching the release assets.
+          find dl -type f -exec cp -n {} flat/ \;
+          cd flat
+          sha256sum * > ../checksums.txt
+          cd ..
+          echo "----- checksums.txt -----"
+          cat checksums.txt
+      - name: Attach checksums to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: checksums.txt
+          fail_on_unmatched_files: true

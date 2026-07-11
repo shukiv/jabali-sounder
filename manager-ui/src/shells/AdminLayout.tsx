@@ -36,6 +36,7 @@ import GlobalSearch from "../components/GlobalSearch";
 import { useThemeMode } from "../theme/ThemeModeContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import NotificationBell from "../components/NotificationBell";
+import UpdatePill from "../components/UpdatePill";
 import { BrandLogo } from "../components/BrandLogo";
 
 const { Header, Sider, Content, Footer } = Layout;
@@ -150,6 +151,7 @@ export default function AdminLayout() {
             onClick={() => setSearchOpen(true)}
             title="Search (Ctrl/Cmd+K)"
           />
+          <UpdatePill />
           <NotificationBell />
           <ThemeToggle />
           <Dropdown menu={userMenu} placement="bottomRight">

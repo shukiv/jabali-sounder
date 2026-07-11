@@ -10,6 +10,7 @@ import ApiTokensSettings from "../components/ApiTokensSettings";
 import AlertRulesSettings from "../components/AlertRulesSettings";
 import AlertChannelsSettings from "../components/AlertChannelsSettings";
 import MaintenanceSettings from "../components/MaintenanceSettings";
+import AboutSettings from "../components/AboutSettings";
 import { roleAtLeast } from "../hooks/useAuth";
 
 const { Title, Text, Paragraph } = Typography;
@@ -270,6 +271,8 @@ export default function Settings() {
       <AlertRulesSettings />
       {roleAtLeast("operator") ? <AlertChannelsSettings /> : null}
       {roleAtLeast("operator") ? <MaintenanceSettings /> : null}
+
+      <AboutSettings />
     </div>
   );
 }

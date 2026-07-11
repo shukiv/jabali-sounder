@@ -13,6 +13,7 @@ import (
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/remote"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/updater"
 )
 
 // Deps bundles the collaborators NewWithDeps needs.
@@ -43,6 +44,10 @@ type Deps struct {
 	// AllowPlaintextSecrets permits the dev hex-plaintext token fallback when
 	// no encryption key is present (SND-6).
 	AllowPlaintextSecrets bool
+	// UpdateRepo is the GitHub owner/name for update checks; empty -> default.
+	UpdateRepo string
+	// DisableUpdateCheck turns off the outbound GitHub release check.
+	DisableUpdateCheck bool
 }
 
 // NewWithDeps creates a Gin engine with all routes mounted.
@@ -161,6 +166,15 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	api.RegisterNotificationRoutes(adminGroup, api.NotificationHandlerConfig{
 		Repo: deps.NotificationRepo,
 		Log:  deps.Log,
+	})
+
+	var updClient *updater.Client
+	if !deps.DisableUpdateCheck {
+		updClient = updater.New(deps.UpdateRepo)
+	}
+	api.RegisterVersionRoutes(adminGroup, api.VersionHandlerConfig{
+		Updater: updClient,
+		Log:     deps.Log,
 	})
 
 	api.RegisterPrometheusRoutes(adminGroup, api.PrometheusHandlerConfig{

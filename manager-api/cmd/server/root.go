@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/version"
 )
 
 var (
@@ -21,7 +23,20 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newServeCmd())
 	root.AddCommand(newMigrateCmd())
 	root.AddCommand(newAdminCmd())
+	root.AddCommand(newVersionCmd())
 	return root
+}
+
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the build version",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			v := version.Current()
+			cmd.Printf("jabali-sounder %s (commit %s, built %s)\n", v.Version, v.Commit, v.Date)
+			return nil
+		},
+	}
 }
 
 func newMigrateCmd() *cobra.Command {
