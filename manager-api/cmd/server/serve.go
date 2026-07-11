@@ -18,6 +18,7 @@ import (
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/poller"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/report"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
 )
@@ -187,6 +188,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 		go hp.Run(pollCtx)
 	} else {
 		log.Info("health poller disabled")
+	}
+
+	// Periodic fleet report to a webhook (M4). Opt-in via a report webhook URL.
+	if cfg.Report.WebhookURL != "" && serverRepo != nil {
+		rep := report.New(report.Config{
+			Servers:    serverRepo,
+			Interval:   time.Duration(cfg.Report.IntervalHours) * time.Hour,
+			WebhookURL: cfg.Report.WebhookURL,
+			Log:        log,
+		})
+		go rep.Run(pollCtx)
+		log.Info("fleet reports enabled")
 	}
 
 	sigCh := make(chan os.Signal, 1)

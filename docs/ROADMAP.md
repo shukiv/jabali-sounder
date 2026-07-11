@@ -77,21 +77,24 @@ acting user.
 
 ---
 
-## M4 — Scale & polish 🚧
+## M4 — Scale & polish ✅
 
 **Goal:** features that matter as the managed fleet grows.
 
 - ✅ **Server groups / environments** — a single-value environment field per
   server (distinct from multi-tags), an environment filter, and a dashboard
   breakdown (servers + healthy per environment).
-- **Fleet version-drift overview** — one glance at "N panels behind latest,"
-  highlighting stragglers.
+- ✅ **Fleet version-drift overview** — dashboard card showing the version
+  distribution, the majority version, and how many servers are off it (panel
+  versions are git SHAs, so this is drift-from-majority, not "N behind latest").
 - ✅ **Global search** (Ctrl/Cmd+K command palette) across enrolled servers and
   the cross-server domain + user inventories, jumping to the relevant page.
 - ✅ **Sounder read-only API tokens** — external tooling authenticates with
   `Authorization: Bearer snd_…` for viewer (read-only) access; mint/list/revoke
   in Settings (operator+), sha256-hashed, optional expiry, shown once.
-- **Scheduled reports** — CSV / PDF fleet summaries.
+- ✅ **Scheduled reports** — periodic fleet-summary report (counts by status/
+  environment/version) delivered to a webhook (`[report] webhook_url`,
+  `interval_hours`).
 
 **Acceptance:** servers can be grouped and filtered; out-of-date panels are
 obvious; a single search spans all inventories; a token-authenticated read API

@@ -19,6 +19,7 @@ type config struct {
 	Auth     authConfig     `toml:"auth"`
 	Poller   pollerConfig   `toml:"poller"`
 	Alert    alertConfig    `toml:"alert"`
+	Report   reportConfig   `toml:"report"`
 }
 
 type serverConfig struct {
@@ -29,6 +30,13 @@ type serverConfig struct {
 	// AllowPrivateTargets permits enrolling panels on private/loopback/
 	// link-local IPs (SND-4). Default false blocks SSRF to internal hosts.
 	AllowPrivateTargets bool `toml:"allow_private_targets"`
+}
+
+type reportConfig struct {
+	// WebhookURL receives periodic fleet reports (M4). Empty disables reports.
+	WebhookURL string `toml:"webhook_url"`
+	// IntervalHours between reports. Non-positive -> 24.
+	IntervalHours int `toml:"interval_hours"`
 }
 
 type alertConfig struct {
@@ -166,6 +174,9 @@ func loadConfig(path string) (*config, error) {
 	}
 	if v := envFirst("JABALI_SOUNDER_ALERT_WEBHOOK_URL"); v != "" {
 		cfg.Alert.WebhookURL = v
+	}
+	if v := envFirst("JABALI_SOUNDER_REPORT_WEBHOOK_URL"); v != "" {
+		cfg.Report.WebhookURL = v
 	}
 
 	// Normalize: strip trailing slash from URL-like fields.

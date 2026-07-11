@@ -48,6 +48,20 @@ export default function Dashboard() {
       .map(([env, v]) => ({ env, ...v }))
       .sort((a, b) => b.total - a.total);
   }, [serverRows]);
+
+  const versionDrift = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const srv of serverRows) {
+      const v = srv.version || "unknown";
+      map.set(v, (map.get(v) || 0) + 1);
+    }
+    const rows = Array.from(map.entries())
+      .map(([version, count]) => ({ version, count }))
+      .sort((a, b) => b.count - a.count);
+    const majority = rows[0]?.version;
+    const drifted = serverRows.filter((s) => (s.version || "unknown") !== majority).length;
+    return { rows, majority, drifted, total: serverRows.length };
+  }, [serverRows]);
   const total = serverRows.length;
   const healthy = serverRows.filter((s) => s.healthy && s.status === "active").length;
 
@@ -166,6 +180,41 @@ export default function Dashboard() {
                 { title: "Environment", dataIndex: "env", key: "env", render: (e: string) => <Tag color="geekblue">{e}</Tag> },
                 { title: "Servers", dataIndex: "total", key: "total" },
                 { title: "Healthy", key: "healthy", render: (_: unknown, r: { total: number; healthy: number }) => `${r.healthy} / ${r.total}` },
+              ]}
+            />
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={12}>
+          <Card
+            title="Version drift"
+            size="small"
+            extra={
+              versionDrift.drifted > 0 ? (
+                <Tag color="warning">{versionDrift.drifted} off majority</Tag>
+              ) : (
+                <Tag color="success">aligned</Tag>
+              )
+            }
+          >
+            <Table
+              size="small"
+              rowKey="version"
+              pagination={false}
+              dataSource={versionDrift.rows}
+              columns={[
+                {
+                  title: "Version",
+                  dataIndex: "version",
+                  key: "version",
+                  render: (v: string) => (
+                    <span>
+                      {v}{" "}
+                      {v === versionDrift.majority ? <Tag color="blue">majority</Tag> : null}
+                    </span>
+                  ),
+                },
+                { title: "Servers", dataIndex: "count", key: "count" },
               ]}
             />
           </Card>
