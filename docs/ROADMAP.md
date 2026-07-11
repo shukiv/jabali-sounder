@@ -85,7 +85,8 @@ acting user.
   per-group dashboards.
 - **Fleet version-drift overview** — one glance at "N panels behind latest,"
   highlighting stragglers.
-- **Global search** across servers / domains / users / mail.
+- ✅ **Global search** (Ctrl/Cmd+K command palette) across enrolled servers and
+  the cross-server domain + user inventories, jumping to the relevant page.
 - ✅ **Sounder read-only API tokens** — external tooling authenticates with
   `Authorization: Bearer snd_…` for viewer (read-only) access; mint/list/revoke
   in Settings (operator+), sha256-hashed, optional expiry, shown once.

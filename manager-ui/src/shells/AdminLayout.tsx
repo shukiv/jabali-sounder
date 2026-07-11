@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Avatar,
   Button,
@@ -25,11 +25,13 @@ import {
   TeamOutlined,
   SettingOutlined,
   SafetyCertificateOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { useAuth, roleAtLeast } from "../hooks/useAuth";
 import apiClient from "../apiClient";
+import GlobalSearch from "../components/GlobalSearch";
 import { useThemeMode } from "../theme/ThemeModeContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { BrandLogo } from "../components/BrandLogo";
@@ -51,10 +53,22 @@ const navItems = [
 export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { auth, logout } = useAuth();
   const { mode } = useThemeMode();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const { token } = theme.useToken();
   const screens = Grid.useBreakpoint();
   const isDesktop = screens.lg ?? (typeof window !== "undefined" ? window.innerWidth >= 992 : true);
@@ -127,6 +141,12 @@ export default function AdminLayout() {
           <BrandLogo mode={mode} />
         </Space>
         <Space size={8}>
+          <Button
+            type="text"
+            icon={<SearchOutlined />}
+            onClick={() => setSearchOpen(true)}
+            title="Search (Ctrl/Cmd+K)"
+          />
           <ThemeToggle />
           <Dropdown menu={userMenu} placement="bottomRight">
             <Button type="text" style={{ height: 40 }}>
@@ -138,6 +158,10 @@ export default function AdminLayout() {
           </Dropdown>
         </Space>
       </Header>
+
+      {searchOpen ? (
+        <GlobalSearch open onClose={() => setSearchOpen(false)} />
+      ) : null}
 
       <Layout>
         {isDesktop ? (
