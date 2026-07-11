@@ -111,25 +111,26 @@ exists; a report can be scheduled.
 
 ---
 
-## M5 — Alerting & incidents 🔭
+## M5 — Alerting & incidents ✅
 
 **Goal:** turn point notifications into an alerting system that tells the right
-person, once. Compounds the in-app notifications (SND-18) just landed.
+person, once. Compounds the in-app notifications (SND-18).
 
-- 🔭 **Configurable thresholds + multi-channel routing** (SND-20). Per-metric
-  thresholds (disk/RAM/load/cert) with configurable duration, edited in the UI
-  not TOML; route to ntfy (phone push), SMTP email, PagerDuty/Opsgenie in
-  addition to the existing Slack/Discord webhook; per-channel severity filtering.
-  Today alerting is a single webhook with only up/down + one hardcoded CPU rule.
-- 🔭 **Incidents with ack / snooze / mute + escalation** (SND-21). Group
-  notifications into incidents (open → ack → resolved) with a timeline; ack /
-  snooze / mute per incident and per server; escalate if unacked past a window.
-- 🔭 **Maintenance windows** (SND-22). Suppress alerts for a server/environment
-  during planned work so intentional restarts don't page; scheduled + audited.
+- ✅ **Configurable thresholds + multi-channel routing** (SND-20). Per-metric
+  alert rules (cpu/ram/disk/load1: threshold + duration + severity + enabled),
+  edited in the UI, seeded with defaults that preserve the prior CPU behaviour.
+  Channels for ntfy (phone push), SMTP email, and PagerDuty alongside the
+  Slack/Discord webhook; a dispatcher routes each event to every channel whose
+  minimum severity admits it. Channel secrets are AES-GCM sealed and write-only.
+- ✅ **Incidents with ack / snooze / mute + escalation** (SND-21). Notifications
+  carry severity and an acknowledge / snooze / mute lifecycle; anything left
+  unacked past a window escalates once. Mute is per (server, kind).
+- ✅ **Maintenance windows** (SND-22). Global / environment / server windows
+  suppress alert creation and delivery while active; scheduled from Settings.
 
-**Acceptance:** an operator sets a disk threshold in the UI, gets paged via a
+**Acceptance:** an operator sets a threshold in the UI, gets notified via a
 non-webhook channel, acks the incident, and a scheduled maintenance window
-suppresses alerts for a named server.
+suppresses alerts for a named server — all shipped.
 
 ---
 
