@@ -7,8 +7,10 @@ package poller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strconv"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -28,6 +30,8 @@ const (
 	defaultRetention = 14 // days
 	pruneInterval    = time.Hour
 	defaultCertWarn  = 14 // days
+	cpuThreshold     = 80.0
+	cpuHighDuration  = 60 * time.Second
 )
 
 // Config wires the poller's collaborators.
@@ -53,10 +57,18 @@ type Config struct {
 	Probe func(ctx context.Context, s models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error)
 	// CertProbe overrides the real TLS cert probe in tests; nil uses the client.
 	CertProbe func(baseURL string) (time.Time, error)
+	// Notifications receives in-app alerts (SND-18). nil disables them.
+	Notifications repository.NotificationRepository
+	// Now overrides the clock in tests; nil uses time.Now.
+	Now func() time.Time
 }
 
 // Poller periodically checks every non-disabled server and records the outcome.
-type Poller struct{ cfg Config }
+type Poller struct {
+	cfg          Config
+	cpuMu        sync.Mutex
+	cpuHighSince map[string]time.Time
+}
 
 // New returns a Poller, applying defaults for interval and logger.
 func New(cfg Config) *Poller {
@@ -72,7 +84,10 @@ func New(cfg Config) *Poller {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	return &Poller{cfg: cfg}
+	if cfg.Now == nil {
+		cfg.Now = time.Now
+	}
+	return &Poller{cfg: cfg, cpuHighSince: map[string]time.Time{}}
 }
 
 // Run polls immediately, then every interval, until ctx is cancelled.
@@ -143,6 +158,11 @@ func (p *Poller) prune(ctx context.Context) {
 			p.cfg.Log.Warn("poller: prune sessions failed", "error", err)
 		}
 	}
+	if p.cfg.Notifications != nil {
+		if _, err := p.cfg.Notifications.PruneOlderThan(ctx, cutoff); err != nil {
+			p.cfg.Log.Warn("poller: prune notifications failed", "error", err)
+		}
+	}
 }
 
 func (p *Poller) pollServer(ctx context.Context, s models.Server) {
@@ -208,6 +228,55 @@ func (p *Poller) recordMetrics(ctx context.Context, s models.Server, st *remote.
 	}
 	if err := p.cfg.MetricSamples.Record(ctx, m); err != nil {
 		p.cfg.Log.Warn("poller: record metric sample failed", "server", s.Name, "error", err)
+	}
+	if snap.CPUPercent != nil {
+		p.evaluateCPU(ctx, s, *snap.CPUPercent, p.cfg.Now())
+	}
+}
+
+// evaluateCPU raises an in-app notification when a server's CPU stays above the
+// threshold continuously for at least cpuHighDuration, deduped to one active
+// incident, and resolves it on recovery (SND-18).
+func (p *Poller) evaluateCPU(ctx context.Context, s models.Server, cpu float64, now time.Time) {
+	if p.cfg.Notifications == nil {
+		return
+	}
+	if cpu > cpuThreshold {
+		p.cpuMu.Lock()
+		since, tracking := p.cpuHighSince[s.ID]
+		if !tracking {
+			p.cpuHighSince[s.ID] = now
+			p.cpuMu.Unlock()
+			return // incident just started; not yet sustained
+		}
+		p.cpuMu.Unlock()
+		if now.Sub(since) < cpuHighDuration {
+			return // high, but not yet for the required duration (transient spike)
+		}
+		if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, "cpu_high"); exists {
+			return // one active notification per incident
+		}
+		_ = p.cfg.Notifications.Create(ctx, &models.Notification{
+			ID:         ids.NewULID(),
+			Kind:       "cpu_high",
+			ServerID:   s.ID,
+			ServerName: s.Name,
+			Metric:     "cpu",
+			Value:      cpu,
+			Threshold:  cpuThreshold,
+			Message:    fmt.Sprintf("CPU at %.0f%% for over %ds", cpu, int(cpuHighDuration.Seconds())),
+			CreatedAt:  now.UTC(),
+		})
+		p.cfg.Log.Info("poller: cpu-high notification", "server", s.Name, "cpu", cpu)
+		return
+	}
+	// Recovered (at or below threshold): clear tracking and resolve any incident.
+	p.cpuMu.Lock()
+	_, was := p.cpuHighSince[s.ID]
+	delete(p.cpuHighSince, s.ID)
+	p.cpuMu.Unlock()
+	if was {
+		_ = p.cfg.Notifications.ResolveActive(ctx, s.ID, "cpu_high")
 	}
 }
 

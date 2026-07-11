@@ -152,6 +152,24 @@ type APIToken struct {
 
 func (APIToken) TableName() string { return "api_tokens" }
 
+// Notification is an in-app fleet alert surfaced in the header bell (SND-18).
+// Global (not per-admin); an active incident has ResolvedAt NULL.
+type Notification struct {
+	ID         string       `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	Kind       string       `gorm:"column:kind;type:varchar(40);not null;index" json:"kind"`
+	ServerID   string       `gorm:"column:server_id;type:char(26);index" json:"server_id"`
+	ServerName string       `gorm:"column:server_name;type:varchar(200)" json:"server_name"`
+	Metric     string       `gorm:"column:metric;type:varchar(40)" json:"metric"`
+	Value      float64      `gorm:"column:value" json:"value"`
+	Threshold  float64      `gorm:"column:threshold" json:"threshold"`
+	Message    string       `gorm:"column:message;type:varchar(400)" json:"message"`
+	CreatedAt  time.Time    `gorm:"column:created_at" json:"created_at"`
+	ReadAt     sql.NullTime `gorm:"column:read_at" json:"-"`
+	ResolvedAt sql.NullTime `gorm:"column:resolved_at" json:"-"`
+}
+
+func (Notification) TableName() string { return "notifications" }
+
 // JSONStringArray is a []string stored as JSON in a column.
 type JSONStringArray []string
 

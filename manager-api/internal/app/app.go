@@ -23,6 +23,7 @@ type Deps struct {
 	MetricSampleRepo repository.MetricSampleRepository
 	SessionRepo      repository.SessionRepository
 	APITokenRepo     repository.APITokenRepository
+	NotificationRepo repository.NotificationRepository
 	AdminRepo        repository.AdminRepository
 	SecretKey        *secrets.Key
 	JWTSecret        string
@@ -148,6 +149,11 @@ func NewWithDeps(deps Deps) *gin.Engine {
 
 	api.RegisterAPITokenRoutes(adminGroup, api.APITokenHandlerConfig{
 		Repo: deps.APITokenRepo,
+		Log:  deps.Log,
+	})
+
+	api.RegisterNotificationRoutes(adminGroup, api.NotificationHandlerConfig{
+		Repo: deps.NotificationRepo,
 		Log:  deps.Log,
 	})
 

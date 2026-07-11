@@ -24,7 +24,7 @@ import {
   MailOutlined,
   TeamOutlined,
   SettingOutlined,
-  SafetyCertificateOutlined,
+  UsergroupAddOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate } from "react-router";
@@ -34,6 +34,7 @@ import apiClient from "../apiClient";
 import GlobalSearch from "../components/GlobalSearch";
 import { useThemeMode } from "../theme/ThemeModeContext";
 import { ThemeToggle } from "../components/ThemeToggle";
+import NotificationBell from "../components/NotificationBell";
 import { BrandLogo } from "../components/BrandLogo";
 
 const { Header, Sider, Content, Footer } = Layout;
@@ -47,7 +48,7 @@ const navItems = [
   { key: "/domains", label: "Domains", icon: <GlobalOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/mail", label: "Mail", icon: <MailOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/settings", label: "Settings", icon: <SettingOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/team", label: "Team", icon: <SafetyCertificateOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "owner" },
+  { key: "/team", label: "Team", icon: <UsergroupAddOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "owner" },
 ];
 
 export default function AdminLayout() {
@@ -147,6 +148,7 @@ export default function AdminLayout() {
             onClick={() => setSearchOpen(true)}
             title="Search (Ctrl/Cmd+K)"
           />
+          <NotificationBell />
           <ThemeToggle />
           <Dropdown menu={userMenu} placement="bottomRight">
             <Button type="text" style={{ height: 40 }}>

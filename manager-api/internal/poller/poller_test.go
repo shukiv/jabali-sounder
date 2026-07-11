@@ -296,3 +296,125 @@ func TestPollRecordsMetricSample(t *testing.T) {
 		t.Fatalf("metric sample not stored correctly: %+v", rows)
 	}
 }
+
+// notifRepos returns repos including a notification repo sharing one DB.
+func notifRepos(t *testing.T) (repository.ServerRepository, repository.HeartbeatRepository, repository.MetricSampleRepository, repository.NotificationRepository) {
+	t.Helper()
+	dbPath := filepath.Join(t.TempDir(), "poll.db")
+	if err := db.Migrate("sqlite", dbPath); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	gormDB, err := db.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	return repository.NewServerRepository(gormDB), repository.NewHeartbeatRepository(gormDB),
+		repository.NewMetricSampleRepository(gormDB), repository.NewNotificationRepository(gormDB)
+}
+
+func cpuPoller(sr repository.ServerRepository, hr repository.HeartbeatRepository, mr repository.MetricSampleRepository, nr repository.NotificationRepository, cpu *float64, now *time.Time) *Poller {
+	return New(Config{
+		Servers: sr, Heartbeats: hr, MetricSamples: mr, Notifications: nr, AllowPlaintext: true,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Now: func() time.Time { return *now },
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true},
+				&remote.ServerStatusResp{CPU: &remote.CPUStatusSlice{UsagePercent: *cpu}}, nil
+		},
+	})
+}
+
+// TestCPUNotificationSustained: CPU stays >80% for >=60s -> one notification.
+func TestCPUNotificationSustained(t *testing.T) {
+	sr, hr, mr, nr := notifRepos(t)
+	seed(t, sr, models.ServerStatusActive)
+	cpu := 95.0
+	now := time.Unix(1_700_000_000, 0)
+	p := cpuPoller(sr, hr, mr, nr, &cpu, &now)
+	ctx := context.Background()
+
+	p.PollOnce(ctx) // t=0: incident starts, not yet sustained
+	if n, _ := nr.UnreadCount(ctx); n != 0 {
+		t.Fatalf("premature notification at t=0: %d", n)
+	}
+	now = now.Add(61 * time.Second)
+	p.PollOnce(ctx) // t=61s: sustained -> notify
+	if n, _ := nr.UnreadCount(ctx); n != 1 {
+		t.Fatalf("want 1 notification after 61s, got %d", n)
+	}
+}
+
+// TestCPUNotificationTransientSpike: a spike that clears before 60s never fires.
+func TestCPUNotificationTransientSpike(t *testing.T) {
+	sr, hr, mr, nr := notifRepos(t)
+	seed(t, sr, models.ServerStatusActive)
+	cpu := 95.0
+	now := time.Unix(1_700_000_000, 0)
+	p := cpuPoller(sr, hr, mr, nr, &cpu, &now)
+	ctx := context.Background()
+
+	p.PollOnce(ctx) // start
+	now = now.Add(30 * time.Second)
+	cpu = 20.0 // recovered before threshold
+	p.PollOnce(ctx)
+	if n, _ := nr.UnreadCount(ctx); n != 0 {
+		t.Fatalf("transient spike should not notify, got %d", n)
+	}
+}
+
+// TestCPUNotificationDedup: sustained high across many polls -> still one active.
+func TestCPUNotificationDedup(t *testing.T) {
+	sr, hr, mr, nr := notifRepos(t)
+	seed(t, sr, models.ServerStatusActive)
+	cpu := 95.0
+	now := time.Unix(1_700_000_000, 0)
+	p := cpuPoller(sr, hr, mr, nr, &cpu, &now)
+	ctx := context.Background()
+
+	p.PollOnce(ctx)
+	for i := 0; i < 5; i++ {
+		now = now.Add(70 * time.Second)
+		p.PollOnce(ctx)
+	}
+	rows, _ := nr.ListRecent(ctx, 50)
+	if len(rows) != 1 {
+		t.Fatalf("dedup failed: want 1 notification, got %d", len(rows))
+	}
+}
+
+// TestCPUNotificationRecoveryAndReincident: recover resolves the incident, and a
+// fresh sustained high raises a new one.
+func TestCPUNotificationRecoveryAndReincident(t *testing.T) {
+	sr, hr, mr, nr := notifRepos(t)
+	seed(t, sr, models.ServerStatusActive)
+	cpu := 95.0
+	now := time.Unix(1_700_000_000, 0)
+	p := cpuPoller(sr, hr, mr, nr, &cpu, &now)
+	ctx := context.Background()
+
+	p.PollOnce(ctx)
+	now = now.Add(61 * time.Second)
+	p.PollOnce(ctx) // incident 1
+	if exists, _ := nr.ActiveExists(ctx, "", "cpu_high"); !exists {
+		// serverID unknown here; check via list instead
+	}
+
+	now = now.Add(30 * time.Second)
+	cpu = 10.0
+	p.PollOnce(ctx) // recovery -> resolve
+	rows, _ := nr.ListRecent(ctx, 50)
+	if len(rows) != 1 || !rows[0].ResolvedAt.Valid {
+		t.Fatalf("recovery should resolve incident 1: %+v", rows)
+	}
+
+	// New sustained high -> incident 2.
+	cpu = 90.0
+	now = now.Add(30 * time.Second)
+	p.PollOnce(ctx) // start incident 2
+	now = now.Add(61 * time.Second)
+	p.PollOnce(ctx) // sustained -> notify
+	rows, _ = nr.ListRecent(ctx, 50)
+	if len(rows) != 2 {
+		t.Fatalf("want 2 notifications after re-incident, got %d", len(rows))
+	}
+}
