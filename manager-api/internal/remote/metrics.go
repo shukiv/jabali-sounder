@@ -93,3 +93,88 @@ func (c *Client) ServerStatus(ctx context.Context) (*ServerStatusResp, int, erro
 	}
 	return &result, resp.StatusCode, nil
 }
+
+// MetricSnapshot is a compact time-series sample derived from a server status.
+// Fields are pointers so "not reported" is distinct from zero.
+type MetricSnapshot struct {
+	CPUPercent  *float64
+	RAMPercent  *float64
+	DiskPercent *float64
+	Load1       *float64
+}
+
+// Snapshot extracts a compact metrics sample from a server status response.
+func (s *ServerStatusResp) Snapshot() MetricSnapshot {
+	var m MetricSnapshot
+	if s == nil {
+		return m
+	}
+	if s.CPU != nil {
+		v := s.CPU.UsagePercent
+		m.CPUPercent = &v
+	}
+	host := s.Host
+	if host == nil {
+		host = s.System
+	}
+	if host != nil {
+		if host.MemTotalKB > 0 {
+			p := float64(host.MemUsedKB) / float64(host.MemTotalKB) * 100
+			m.RAMPercent = &p
+		}
+		if used, total, ok := snapshotPrimaryDisk(host.Partitions); ok {
+			p := float64(used) / float64(total) * 100
+			m.DiskPercent = &p
+		}
+		if len(host.LoadAvg) > 0 {
+			v := host.LoadAvg[0]
+			m.Load1 = &v
+		}
+	}
+	return m
+}
+
+func snapshotPrimaryDisk(partitions []Partition) (int64, int64, bool) {
+	for _, p := range partitions {
+		if p.MountPoint == "/" {
+			return p.UsedBytes, p.TotalBytes, p.TotalBytes > 0
+		}
+	}
+	var used, total int64
+	for _, p := range partitions {
+		used += p.UsedBytes
+		total += p.TotalBytes
+	}
+	return used, total, total > 0
+}
+
+// CheckWithMetrics performs /health + /automation/status in a single pass,
+// returning both the health result and the raw status (for metrics). It replaces
+// CheckHealth in the poller so status isn't fetched twice — two same-second
+// requests to /automation/status would trip the panel's replay protection.
+func (c *Client) CheckWithMetrics(ctx context.Context) (*CheckResult, *ServerStatusResp, error) {
+	result := &CheckResult{}
+
+	h, hcode, err := c.Health(ctx)
+	if err != nil {
+		result.Reachable = false
+		result.HealthError = err.Error()
+		result.HealthCode = hcode
+		return result, nil, nil //nolint:nilerr // reachable=false is a result
+	}
+	result.Reachable = true
+	result.HealthCode = hcode
+	result.Version = h.Version
+
+	st, scode, err := c.ServerStatus(ctx)
+	if err != nil {
+		result.CredentialValid = false
+		result.StatusError = err.Error()
+		result.StatusCode = scode
+		return result, nil, nil //nolint:nilerr
+	}
+	result.CredentialValid = true
+	result.StatusCode = scode
+	result.Healthy = st.Healthy
+	return result, st, nil
+}

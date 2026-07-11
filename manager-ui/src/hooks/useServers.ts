@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
-import type { Server, ListEnvelope, CheckResult, HeartbeatHistory } from "../types";
+import type { Server, ListEnvelope, CheckResult, HeartbeatHistory, MetricHistory } from "../types";
 
 const QK = ["servers"] as const;
 
@@ -121,6 +121,19 @@ export function useServerHeartbeats(id: string | null) {
     queryFn: async () => {
       const resp = await apiClient.get<HeartbeatHistory>(
         `/admin/servers/${id}/heartbeats?limit=50`,
+      );
+      return resp.data;
+    },
+  });
+}
+
+export function useServerMetrics(id: string | null) {
+  return useQuery({
+    queryKey: ["server-metrics", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const resp = await apiClient.get<MetricHistory>(
+        `/admin/servers/${id}/metrics?limit=100`,
       );
       return resp.data;
     },

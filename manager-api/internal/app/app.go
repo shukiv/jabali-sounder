@@ -16,12 +16,13 @@ import (
 
 // Deps bundles the collaborators NewWithDeps needs.
 type Deps struct {
-	Log           *slog.Logger
-	ServerRepo    repository.ServerRepository
-	HeartbeatRepo repository.HeartbeatRepository
-	AdminRepo     repository.AdminRepository
-	SecretKey     *secrets.Key
-	JWTSecret     string
+	Log              *slog.Logger
+	ServerRepo       repository.ServerRepository
+	HeartbeatRepo    repository.HeartbeatRepository
+	MetricSampleRepo repository.MetricSampleRepository
+	AdminRepo        repository.AdminRepository
+	SecretKey        *secrets.Key
+	JWTSecret        string
 	// MaxBodyBytes caps request body size (SND-5); <=0 uses the default.
 	MaxBodyBytes int64
 	// Login throttle (SND-3); <=0 uses defaults.
@@ -85,6 +86,7 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{
 		Repo:                deps.ServerRepo,
 		Heartbeats:          deps.HeartbeatRepo,
+		MetricSamples:       deps.MetricSampleRepo,
 		SecretKey:           deps.SecretKey,
 		Log:                 deps.Log,
 		AllowPrivateTargets: deps.AllowPrivateTargets,

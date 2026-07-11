@@ -119,7 +119,7 @@ func autoMigrateSQLite(dsn string) error {
 	if err != nil {
 		return err
 	}
-	if err := gormDB.AutoMigrate(&models.Server{}, &models.Heartbeat{}, &models.Admin{}); err != nil {
+	if err := gormDB.AutoMigrate(&models.Server{}, &models.Heartbeat{}, &models.Admin{}, &models.MetricSample{}); err != nil {
 		return fmt.Errorf("sqlite automigrate: %w", err)
 	}
 	return nil

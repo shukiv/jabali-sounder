@@ -76,6 +76,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	var serverRepo repository.ServerRepository
 	var adminRepo repository.AdminRepository
 	var heartbeatRepo repository.HeartbeatRepository
+	var metricRepo repository.MetricSampleRepository
 	if cfg.Database.URL != "" {
 		if err := db.Migrate(cfg.Database.Driver, cfg.Database.URL); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -89,6 +90,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		serverRepo = repository.NewServerRepository(gormDB)
 		adminRepo = repository.NewAdminRepository(gormDB)
 		heartbeatRepo = repository.NewHeartbeatRepository(gormDB)
+		metricRepo = repository.NewMetricSampleRepository(gormDB)
 	} else {
 		log.Warn("database.url not set; running without DB — enrollment disabled")
 	}
@@ -119,6 +121,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Log:                   log,
 		ServerRepo:            serverRepo,
 		HeartbeatRepo:         heartbeatRepo,
+		MetricSampleRepo:      metricRepo,
 		AdminRepo:             adminRepo,
 		SecretKey:             key,
 		JWTSecret:             jwtSecret,
@@ -165,6 +168,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		hp := poller.New(poller.Config{
 			Servers:        serverRepo,
 			Heartbeats:     heartbeatRepo,
+			MetricSamples:  metricRepo,
 			SecretKey:      key,
 			AllowPlaintext: cfg.Secrets.AllowPlaintextFallback,
 			Interval:       time.Duration(cfg.Poller.IntervalSeconds) * time.Second,

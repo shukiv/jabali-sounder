@@ -34,6 +34,7 @@ const (
 type Config struct {
 	Servers        repository.ServerRepository
 	Heartbeats     repository.HeartbeatRepository
+	MetricSamples  repository.MetricSampleRepository
 	SecretKey      *secrets.Key
 	AllowPlaintext bool
 	Interval       time.Duration
@@ -47,7 +48,8 @@ type Config struct {
 	Log          *slog.Logger
 
 	// Probe overrides the real panel health check in tests; nil uses the client.
-	Probe func(ctx context.Context, s models.Server) (*remote.CheckResult, error)
+	// It returns both the health result and the raw status (for metrics).
+	Probe func(ctx context.Context, s models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error)
 	// CertProbe overrides the real TLS cert probe in tests; nil uses the client.
 	CertProbe func(baseURL string) (time.Time, error)
 }
@@ -127,10 +129,13 @@ func (p *Poller) prune(ctx context.Context) {
 	n, err := p.cfg.Heartbeats.PruneOlderThan(ctx, cutoff)
 	if err != nil {
 		p.cfg.Log.Warn("poller: prune heartbeats failed", "error", err)
-		return
-	}
-	if n > 0 {
+	} else if n > 0 {
 		p.cfg.Log.Info("poller: pruned old heartbeats", "deleted", n, "older_than_days", p.cfg.RetentionDays)
+	}
+	if p.cfg.MetricSamples != nil {
+		if _, err := p.cfg.MetricSamples.PruneOlderThan(ctx, cutoff); err != nil {
+			p.cfg.Log.Warn("poller: prune metric samples failed", "error", err)
+		}
 	}
 }
 
@@ -142,6 +147,7 @@ func (p *Poller) pollServer(ctx context.Context, s models.Server) {
 		version = s.Version
 		details any
 		message string
+		metrics *remote.ServerStatusResp
 	)
 
 	secret, err := secrets.OpenSecret(p.cfg.SecretKey, s.TokenSecretEnc, p.cfg.AllowPlaintext)
@@ -153,7 +159,8 @@ func (p *Poller) pollServer(ctx context.Context, s models.Server) {
 		details = map[string]any{"error": "decrypt_failed"}
 		message = "stored token secret cannot be decrypted"
 	default:
-		result, perr := p.probe(ctx, s, secret)
+		result, st, perr := p.probe(ctx, s, secret)
+		metrics = st
 		if perr != nil {
 			p.cfg.Log.Warn("poller: probe failed", "server", s.Name, "error", perr)
 			status, cred = models.ServerStatusUnreachable, models.CredentialUnknown
@@ -174,6 +181,28 @@ func (p *Poller) pollServer(ctx context.Context, s models.Server) {
 	p.record(ctx, s, healthy, version, details)
 	p.maybeAlert(ctx, s, status, cred, message)
 	p.checkCert(ctx, s)
+	p.recordMetrics(ctx, s, metrics)
+}
+
+// recordMetrics stores a compact resource-usage sample when the panel reported
+// status this poll (roadmap M1: trends).
+func (p *Poller) recordMetrics(ctx context.Context, s models.Server, st *remote.ServerStatusResp) {
+	if p.cfg.MetricSamples == nil || st == nil {
+		return
+	}
+	snap := st.Snapshot()
+	m := &models.MetricSample{
+		ID:          ids.NewULID(),
+		ServerID:    s.ID,
+		CPUPercent:  snap.CPUPercent,
+		RAMPercent:  snap.RAMPercent,
+		DiskPercent: snap.DiskPercent,
+		Load1:       snap.Load1,
+		SampledAt:   time.Now().UTC(),
+	}
+	if err := p.cfg.MetricSamples.Record(ctx, m); err != nil {
+		p.cfg.Log.Warn("poller: record metric sample failed", "server", s.Name, "error", err)
+	}
 }
 
 // checkCert samples the panel's TLS certificate expiry (best-effort), stores it,
@@ -273,15 +302,15 @@ func healthMessage(status models.ServerStatus, cred models.CredentialStatus) str
 	return "healthy"
 }
 
-// probe runs the actual health check (or the test override).
-func (p *Poller) probe(ctx context.Context, s models.Server, secret string) (*remote.CheckResult, error) {
+// probe runs the actual health check + metrics fetch (or the test override).
+func (p *Poller) probe(ctx context.Context, s models.Server, secret string) (*remote.CheckResult, *remote.ServerStatusResp, error) {
 	if p.cfg.Probe != nil {
 		return p.cfg.Probe(ctx, s)
 	}
 	client := remote.NewClient(s.BaseURL, s.TokenID, secret, s.InsecureSkipVerify)
 	cctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
-	return client.CheckHealth(cctx)
+	return client.CheckWithMetrics(cctx)
 }
 
 func (p *Poller) record(ctx context.Context, s models.Server, healthy bool, version string, details any) {

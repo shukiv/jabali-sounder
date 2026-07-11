@@ -9,7 +9,7 @@ Status legend: 🔭 planned · 🚧 in progress · ✅ done
 
 ---
 
-## M1 — Observe → Monitor 🚧
+## M1 — Observe → Monitor ✅
 
 **Goal:** turn Sounder from a passive viewer into an active monitor. Best
 value-to-effort, and the foundation everything else builds on.
@@ -24,8 +24,10 @@ value-to-effort, and the foundation everything else builds on.
   Mattermost-compatible). Config: `[alert] webhook_url` / env
   `JABALI_SOUNDER_ALERT_WEBHOOK_URL`. Follow-ups: threshold alerts (disk/cert),
   more channels, and UI configuration.
-- **Historical metrics + trends.** Persist the live monitor time series and show
-  sparklines / growth (disk, load) instead of only a snapshot.
+- ✅ **Historical metrics + trends.** The poller samples CPU/RAM/disk/load per
+  interval into a metric_samples table (with retention); the History drawer
+  shows inline sparklines. One /automation/status fetch per poll powers both
+  health and metrics (no replay collision).
 - ✅ **TLS cert-expiry tracking.** The poller samples each panel's TLS cert
   expiry (best-effort, works with self-signed), stores it, shows it in the
   History drawer, and alerts once when it crosses the warning window

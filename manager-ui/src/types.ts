@@ -183,3 +183,18 @@ export interface HeartbeatHistory {
   total: number;
   uptime: { healthy: number; total: number; ratio: number };
 }
+
+export interface MetricSample {
+  id: string;
+  server_id: string;
+  cpu_percent?: number;
+  ram_percent?: number;
+  disk_percent?: number;
+  load1?: number;
+  sampled_at: string;
+}
+
+export interface MetricHistory {
+  data: MetricSample[];
+  total: number;
+}

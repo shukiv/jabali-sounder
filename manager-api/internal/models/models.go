@@ -62,6 +62,20 @@ type Heartbeat struct {
 
 func (Heartbeat) TableName() string { return "heartbeats" }
 
+// MetricSample is a compact time-series sample of a managed server's
+// resource usage, captured by the health poller (roadmap M1: trends).
+type MetricSample struct {
+	ID          string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	ServerID    string    `gorm:"column:server_id;type:char(26);not null;index" json:"server_id"`
+	CPUPercent  *float64  `gorm:"column:cpu_percent" json:"cpu_percent,omitempty"`
+	RAMPercent  *float64  `gorm:"column:ram_percent" json:"ram_percent,omitempty"`
+	DiskPercent *float64  `gorm:"column:disk_percent" json:"disk_percent,omitempty"`
+	Load1       *float64  `gorm:"column:load1" json:"load1,omitempty"`
+	SampledAt   time.Time `gorm:"column:sampled_at;index" json:"sampled_at"`
+}
+
+func (MetricSample) TableName() string { return "metric_samples" }
+
 // Admin is a manager-side administrator who can log in and manage servers.
 type Admin struct {
 	ID           string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`

@@ -17,7 +17,7 @@ import (
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 )
 
-func testRepos(t *testing.T) (repository.ServerRepository, repository.HeartbeatRepository) {
+func testRepos(t *testing.T) (repository.ServerRepository, repository.HeartbeatRepository, repository.MetricSampleRepository) {
 	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "poll.db")
 	if err := db.Migrate("sqlite", dbPath); err != nil {
@@ -27,7 +27,7 @@ func testRepos(t *testing.T) (repository.ServerRepository, repository.HeartbeatR
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	return repository.NewServerRepository(gormDB), repository.NewHeartbeatRepository(gormDB)
+	return repository.NewServerRepository(gormDB), repository.NewHeartbeatRepository(gormDB), repository.NewMetricSampleRepository(gormDB)
 }
 
 func seed(t *testing.T, repo repository.ServerRepository, status models.ServerStatus) *models.Server {
@@ -48,7 +48,7 @@ func seed(t *testing.T, repo repository.ServerRepository, status models.ServerSt
 	return s
 }
 
-func newPoller(sr repository.ServerRepository, hr repository.HeartbeatRepository, probe func(context.Context, models.Server) (*remote.CheckResult, error)) *Poller {
+func newPoller(sr repository.ServerRepository, hr repository.HeartbeatRepository, probe func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error)) *Poller {
 	return New(Config{
 		Servers:        sr,
 		Heartbeats:     hr,
@@ -61,11 +61,11 @@ func newPoller(sr repository.ServerRepository, hr repository.HeartbeatRepository
 // TestPollUpdatesStatusAndRecordsHeartbeat: a healthy probe flips status to
 // active/valid and records a healthy heartbeat.
 func TestPollUpdatesStatusAndRecordsHeartbeat(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	s := seed(t, sr, models.ServerStatusUnreachable)
 
-	p := newPoller(sr, hr, func(context.Context, models.Server) (*remote.CheckResult, error) {
-		return &remote.CheckResult{Reachable: true, CredentialValid: true, Version: "v9"}, nil
+	p := newPoller(sr, hr, func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+		return &remote.CheckResult{Reachable: true, CredentialValid: true, Version: "v9"}, nil, nil
 	})
 	p.PollOnce(context.Background())
 
@@ -85,11 +85,11 @@ func TestPollUpdatesStatusAndRecordsHeartbeat(t *testing.T) {
 // TestPollMarksUnreachable: an unreachable result persists unreachable/unknown
 // and an unhealthy heartbeat.
 func TestPollMarksUnreachable(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	s := seed(t, sr, models.ServerStatusActive)
 
-	p := newPoller(sr, hr, func(context.Context, models.Server) (*remote.CheckResult, error) {
-		return &remote.CheckResult{Reachable: false}, nil
+	p := newPoller(sr, hr, func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+		return &remote.CheckResult{Reachable: false}, nil, nil
 	})
 	p.PollOnce(context.Background())
 
@@ -105,13 +105,13 @@ func TestPollMarksUnreachable(t *testing.T) {
 
 // TestPollSkipsDisabled: a disabled server is not probed and records nothing.
 func TestPollSkipsDisabled(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	s := seed(t, sr, models.ServerStatusDisabled)
 
 	var probed bool
-	p := newPoller(sr, hr, func(context.Context, models.Server) (*remote.CheckResult, error) {
+	p := newPoller(sr, hr, func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
 		probed = true
-		return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil, nil
 	})
 	p.PollOnce(context.Background())
 
@@ -125,7 +125,7 @@ func TestPollSkipsDisabled(t *testing.T) {
 
 // TestPruneRetention drops heartbeats older than the retention window.
 func TestPruneRetention(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	s := seed(t, sr, models.ServerStatusActive)
 
 	old := &models.Heartbeat{ID: ids.NewULID(), ServerID: s.ID, CheckedAt: time.Now().Add(-48 * time.Hour)}
@@ -159,7 +159,7 @@ func (f *fakeNotifier) Notify(_ context.Context, ev alert.Event) error {
 
 // TestAlertOnDownTransition: a healthy server going unreachable fires one "down".
 func TestAlertOnDownTransition(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	s := seed(t, sr, models.ServerStatusActive)
 	// seed() sets credential unknown; make it valid so prior is "healthy".
 	_ = sr.UpdateStatus(context.Background(), s.ID, models.ServerStatusActive, models.CredentialValid)
@@ -168,8 +168,8 @@ func TestAlertOnDownTransition(t *testing.T) {
 	p := New(Config{
 		Servers: sr, Heartbeats: hr, AllowPlaintext: true, Notifier: fn,
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
-			return &remote.CheckResult{Reachable: false}, nil
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: false}, nil, nil
 		},
 	})
 	p.PollOnce(context.Background())
@@ -181,15 +181,15 @@ func TestAlertOnDownTransition(t *testing.T) {
 
 // TestAlertOnRecovery: a known-bad server becoming healthy fires one "recovered".
 func TestAlertOnRecovery(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	s := seed(t, sr, models.ServerStatusUnreachable) // priorKnownBad
 
 	fn := &fakeNotifier{}
 	p := New(Config{
 		Servers: sr, Heartbeats: hr, AllowPlaintext: true, Notifier: fn,
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
-			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil, nil
 		},
 	})
 	p.PollOnce(context.Background())
@@ -202,7 +202,7 @@ func TestAlertOnRecovery(t *testing.T) {
 
 // TestNoAlertWhenStable: healthy staying healthy fires nothing.
 func TestNoAlertWhenStable(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	s := seed(t, sr, models.ServerStatusActive)
 	_ = sr.UpdateStatus(context.Background(), s.ID, models.ServerStatusActive, models.CredentialValid)
 
@@ -210,8 +210,8 @@ func TestNoAlertWhenStable(t *testing.T) {
 	p := New(Config{
 		Servers: sr, Heartbeats: hr, AllowPlaintext: true, Notifier: fn,
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
-			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil, nil
 		},
 	})
 	p.PollOnce(context.Background())
@@ -223,15 +223,15 @@ func TestNoAlertWhenStable(t *testing.T) {
 
 // TestPollStoresCertExpiry: the poller samples and stores the panel cert expiry.
 func TestPollStoresCertExpiry(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	s := seed(t, sr, models.ServerStatusActive)
 	exp := time.Now().Add(90 * 24 * time.Hour)
 
 	p := New(Config{
 		Servers: sr, Heartbeats: hr, AllowPlaintext: true,
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
-			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil, nil
 		},
 		CertProbe: func(string) (time.Time, error) { return exp, nil },
 	})
@@ -245,7 +245,7 @@ func TestPollStoresCertExpiry(t *testing.T) {
 
 // TestCertExpiringAlert: a cert within the warning window fires one cert alert.
 func TestCertExpiringAlert(t *testing.T) {
-	sr, hr := testRepos(t)
+	sr, hr, _ := testRepos(t)
 	seed(t, sr, models.ServerStatusActive)
 	soon := time.Now().Add(3 * 24 * time.Hour) // within default 14d
 
@@ -253,8 +253,8 @@ func TestCertExpiringAlert(t *testing.T) {
 	p := New(Config{
 		Servers: sr, Heartbeats: hr, AllowPlaintext: true, Notifier: fn,
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
-			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil, nil
 		},
 		CertProbe: func(string) (time.Time, error) { return soon, nil },
 	})
@@ -268,5 +268,31 @@ func TestCertExpiringAlert(t *testing.T) {
 	}
 	if certAlerts != 1 {
 		t.Fatalf("want 1 cert-expiring alert, got %d (%+v)", certAlerts, fn.events)
+	}
+}
+
+// TestPollRecordsMetricSample: a reachable poll stores a resource-usage sample.
+func TestPollRecordsMetricSample(t *testing.T) {
+	sr, hr, mr := testRepos(t)
+	s := seed(t, sr, models.ServerStatusActive)
+
+	cpu := 42.0
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, MetricSamples: mr, AllowPlaintext: true,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true},
+				&remote.ServerStatusResp{CPU: &remote.CPUStatusSlice{UsagePercent: cpu}},
+				nil
+		},
+	})
+	p.PollOnce(context.Background())
+
+	rows, err := mr.Recent(context.Background(), s.ID, 10)
+	if err != nil {
+		t.Fatalf("recent: %v", err)
+	}
+	if len(rows) != 1 || rows[0].CPUPercent == nil || *rows[0].CPUPercent != cpu {
+		t.Fatalf("metric sample not stored correctly: %+v", rows)
 	}
 }

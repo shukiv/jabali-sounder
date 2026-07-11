@@ -25,10 +25,11 @@ import (
 
 // ServerHandlerConfig wires the server enrollment endpoints.
 type ServerHandlerConfig struct {
-	Repo       repository.ServerRepository
-	Heartbeats repository.HeartbeatRepository
-	SecretKey  *secrets.Key
-	Log        *slog.Logger
+	Repo          repository.ServerRepository
+	Heartbeats    repository.HeartbeatRepository
+	MetricSamples repository.MetricSampleRepository
+	SecretKey     *secrets.Key
+	Log           *slog.Logger
 	// AllowPrivateTargets disables the SSRF guard (SND-4).
 	AllowPrivateTargets bool
 	// AllowPlaintext permits the dev hex-plaintext token fallback (SND-6).
@@ -55,6 +56,7 @@ func RegisterServerRoutes(g *gin.RouterGroup, cfg ServerHandlerConfig) {
 	servers.POST("/:id/enable", h.enable)
 	servers.POST("/:id/check", h.checkHealth)
 	servers.GET("/:id/heartbeats", h.heartbeats)
+	servers.GET("/:id/metrics", h.metrics)
 }
 
 type serverHandler struct{ cfg ServerHandlerConfig }
@@ -514,6 +516,42 @@ func (h *serverHandler) heartbeats(c *gin.Context) {
 			"ratio":   ratio,
 		},
 	})
+}
+
+// metrics returns recent resource-usage samples for a server (roadmap M1:
+// trends). Samples are captured by the background poller.
+func (h *serverHandler) metrics(c *gin.Context) {
+	id := c.Param("id")
+	if _, err := h.cfg.Repo.FindByID(c.Request.Context(), id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+			return
+		}
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+
+	limit := 100
+	if n, err := strconv.Atoi(c.DefaultQuery("limit", "100")); err == nil {
+		limit = n
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	if h.cfg.MetricSamples == nil {
+		c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
+		return
+	}
+	rows, err := h.cfg.MetricSamples.Recent(c.Request.Context(), id, limit)
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": rows, "total": len(rows)})
 }
 
 // checkHealth probes the server's /health + /automation/status on demand.
