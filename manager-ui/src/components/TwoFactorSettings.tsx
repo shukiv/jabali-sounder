@@ -3,6 +3,7 @@ import { Card, Button, Modal, Form, Input, Typography, Tag, Alert, App, Space } 
 import { SafetyCertificateOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
+import { QRCodeSVG } from "qrcode.react";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -23,6 +24,7 @@ export default function TwoFactorSettings() {
   const enabled = !!me?.two_factor_enabled;
 
   const [enrollSecret, setEnrollSecret] = useState<string | null>(null);
+  const [otpauthUrl, setOtpauthUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [disableOpen, setDisableOpen] = useState(false);
   const [enrollForm] = Form.useForm();
@@ -33,8 +35,9 @@ export default function TwoFactorSettings() {
   const startEnroll = async () => {
     setBusy(true);
     try {
-      const resp = await apiClient.post<{ secret: string }>("/auth/2fa/setup");
+      const resp = await apiClient.post<{ secret: string; otpauth_url: string }>("/auth/2fa/setup");
       setEnrollSecret(resp.data.secret);
+      setOtpauthUrl(resp.data.otpauth_url);
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     } finally {
@@ -54,6 +57,7 @@ export default function TwoFactorSettings() {
       await apiClient.post("/auth/2fa/activate", { code: values.code });
       message.success("Two-factor authentication enabled");
       setEnrollSecret(null);
+      setOtpauthUrl(null);
       enrollForm.resetFields();
       refetchMe();
     } catch (err) {
@@ -104,8 +108,13 @@ export default function TwoFactorSettings() {
           <Alert
             type="info"
             showIcon
-            message="Add this secret to your authenticator app, then enter a code to confirm."
+            message="Scan the QR with your authenticator app (or enter the secret manually), then enter a code to confirm."
           />
+          {otpauthUrl ? (
+            <div style={{ background: "#fff", padding: 12, width: "fit-content", borderRadius: 6 }}>
+              <QRCodeSVG value={otpauthUrl} size={160} />
+            </div>
+          ) : null}
           <Text>Secret key (manual entry):</Text>
           <Text code copyable style={{ fontSize: 16 }}>
             {enrollSecret}

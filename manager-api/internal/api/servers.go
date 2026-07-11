@@ -629,6 +629,15 @@ func (h *serverHandler) checkHealth(c *gin.Context) {
 		_ = h.cfg.Repo.Update(c.Request.Context(), s)
 	}
 
+	// Best-effort: refresh the panel's write capabilities so the UI shows only
+	// supported actions (M2). Non-fatal on failure.
+	if result.Reachable && result.CredentialValid {
+		if caps, _, cerr := client.Capabilities(ctx); cerr == nil && len(caps.Actions) > 0 {
+			s.Capabilities = models.JSONStringArray(caps.Actions)
+			_ = h.cfg.Repo.Update(c.Request.Context(), s)
+		}
+	}
+
 	c.JSON(http.StatusOK, result)
 }
 

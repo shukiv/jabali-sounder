@@ -99,6 +99,8 @@ export default function Servers() {
   const [envFilter, setEnvFilter] = useState<string | undefined>(undefined);
   const [form] = Form.useForm();
   const canWrite = roleAtLeast("operator");
+  const supports = (srv: Server, kw: string) =>
+    !srv.capabilities?.length || srv.capabilities.some((c) => c.toLowerCase().includes(kw));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const actionMut = useServerAction();
   const [restartServer, setRestartServer] = useState<Server | null>(null);
@@ -381,32 +383,32 @@ export default function Servers() {
                         icon: <PoweroffOutlined />,
                         onClick: () => handleDisable(record.id, record.name),
                       },
-                  {
-                    key: "restart-service",
-                    label: "Restart service",
-                    icon: <ReloadOutlined />,
-                    onClick: () => setRestartServer(record),
-                  },
-                  {
-                    key: "purge-cache",
-                    label: "Purge cache",
-                    icon: <ReloadOutlined />,
-                    onClick: () => runAction(record.id, "purge-cache", { scope: "all" }, "Cache purged"),
-                    confirm: {
-                      title: `Purge all cache on "${record.name}"?`,
-                      okText: "Purge",
-                    },
-                  },
-                  {
-                    key: "backup",
-                    label: "Trigger backup",
-                    icon: <ReloadOutlined />,
-                    onClick: () => runAction(record.id, "backup", {}, "Backup started"),
-                    confirm: {
-                      title: `Start a backup on "${record.name}"?`,
-                      okText: "Start",
-                    },
-                  },
+                  ...(supports(record, "restart") || supports(record, "service")
+                    ? [{
+                        key: "restart-service",
+                        label: "Restart service",
+                        icon: <ReloadOutlined />,
+                        onClick: () => setRestartServer(record),
+                      }]
+                    : []),
+                  ...(supports(record, "cache")
+                    ? [{
+                        key: "purge-cache",
+                        label: "Purge cache",
+                        icon: <ReloadOutlined />,
+                        onClick: () => runAction(record.id, "purge-cache", { scope: "all" }, "Cache purged"),
+                        confirm: { title: `Purge all cache on "${record.name}"?`, okText: "Purge" },
+                      }]
+                    : []),
+                  ...(supports(record, "backup")
+                    ? [{
+                        key: "backup",
+                        label: "Trigger backup",
+                        icon: <ReloadOutlined />,
+                        onClick: () => runAction(record.id, "backup", {}, "Backup started"),
+                        confirm: { title: `Start a backup on "${record.name}"?`, okText: "Start" },
+                      }]
+                    : []),
                   {
                     key: "delete",
                     label: "Delete",

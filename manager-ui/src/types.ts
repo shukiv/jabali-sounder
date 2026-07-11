@@ -8,6 +8,7 @@ export interface Server {
   environment?: string;
   insecure_skip_verify: boolean;
   version: string;
+  capabilities?: string[];
   cert_expires_at?: string;
   status: "active" | "disabled" | "unreachable";
   credential_status: "valid" | "invalid" | "unknown";
