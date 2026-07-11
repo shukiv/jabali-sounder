@@ -92,8 +92,10 @@ jobs:
           CGO_LDFLAGS: ${{ matrix.cgo_ldflags }}
         run: |
           mkdir -p bin
-          go build -tags "${{ matrix.tags }}" -ldflags "${{ matrix.ldflags }}" \
+          go build -trimpath -tags "${{ matrix.tags }},nomsgpack" \
+            -ldflags "-s -w ${{ matrix.ldflags }}" \
             -o "bin/${{ matrix.asset }}" ./manager-api/cmd/desktop
+          echo "desktop raw size: $(stat -c%s "bin/${{ matrix.asset }}" 2>/dev/null || stat -f%z "bin/${{ matrix.asset }}") bytes"
           ls -la bin/
 
       # Linux + Windows: the raw binary is the deliverable.
@@ -199,7 +201,9 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p out
-          go build -tags embedui -o out/jabali-sounder-server-linux-amd64 ./manager-api/cmd/server
+          go build -trimpath -tags "embedui,nomsgpack" -ldflags "-s -w" \
+            -o out/jabali-sounder-server-linux-amd64 ./manager-api/cmd/server
+          echo "server raw size: $(stat -c%s out/jabali-sounder-server-linux-amd64) bytes"
           ls -la out/
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
