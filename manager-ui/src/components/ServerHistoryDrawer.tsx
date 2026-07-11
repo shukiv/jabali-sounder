@@ -9,9 +9,19 @@ interface Props {
 
 // ServerHistoryDrawer shows a server's recent health-check history (recorded by
 // the background poller) plus an uptime summary over the returned window (M1).
+function certInfo(iso?: string): { text: string; color: string } | null {
+  if (!iso) return null;
+  const days = Math.floor((new Date(iso).getTime() - Date.now()) / 86400000);
+  const date = new Date(iso).toLocaleDateString();
+  if (days < 0) return { text: `expired (${date})`, color: "#cf1322" };
+  const color = days < 7 ? "#cf1322" : days < 14 ? "#d48806" : "#3f8600";
+  return { text: `${date} · ${days}d left`, color };
+}
+
 export default function ServerHistoryDrawer({ server, onClose }: Props) {
   const { data, isLoading } = useServerHeartbeats(server?.id ?? null);
   const uptimePct = data ? Math.round(data.uptime.ratio * 1000) / 10 : 0;
+  const cert = certInfo(server?.cert_expires_at);
 
   return (
     <Drawer
@@ -47,6 +57,14 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
               />
             </Col>
           </Row>
+          {cert ? (
+            <div style={{ marginBottom: 12 }}>
+              <span style={{ color: "#888", fontSize: 12 }}>TLS certificate: </span>
+              <Tag color={cert.color === "#cf1322" ? "error" : cert.color === "#d48806" ? "warning" : "success"}>
+                {cert.text}
+              </Tag>
+            </div>
+          ) : null}
           <List
             size="small"
             dataSource={data.data}

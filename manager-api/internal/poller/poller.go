@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -26,6 +27,7 @@ const (
 	pollConcurrency  = 8
 	defaultRetention = 14 // days
 	pruneInterval    = time.Hour
+	defaultCertWarn  = 14 // days
 )
 
 // Config wires the poller's collaborators.
@@ -40,10 +42,14 @@ type Config struct {
 	// Notifier receives an alert when a server crosses the healthy boundary.
 	// nil disables alerting.
 	Notifier alert.Notifier
-	Log      *slog.Logger
+	// CertWarnDays is the TLS-expiry alert threshold. 0 -> default.
+	CertWarnDays int
+	Log          *slog.Logger
 
 	// Probe overrides the real panel health check in tests; nil uses the client.
 	Probe func(ctx context.Context, s models.Server) (*remote.CheckResult, error)
+	// CertProbe overrides the real TLS cert probe in tests; nil uses the client.
+	CertProbe func(baseURL string) (time.Time, error)
 }
 
 // Poller periodically checks every non-disabled server and records the outcome.
@@ -56,6 +62,9 @@ func New(cfg Config) *Poller {
 	}
 	if cfg.RetentionDays == 0 {
 		cfg.RetentionDays = defaultRetention
+	}
+	if cfg.CertWarnDays <= 0 {
+		cfg.CertWarnDays = defaultCertWarn
 	}
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
@@ -164,6 +173,55 @@ func (p *Poller) pollServer(ctx context.Context, s models.Server) {
 	_ = p.cfg.Servers.UpdateStatus(ctx, s.ID, status, cred)
 	p.record(ctx, s, healthy, version, details)
 	p.maybeAlert(ctx, s, status, cred, message)
+	p.checkCert(ctx, s)
+}
+
+// checkCert samples the panel's TLS certificate expiry (best-effort), stores it,
+// and alerts once when it first crosses the warning threshold (M1).
+func (p *Poller) checkCert(ctx context.Context, s models.Server) {
+	exp, err := p.certExpiry(s.BaseURL)
+	if err != nil {
+		p.cfg.Log.Debug("poller: cert probe failed", "server", s.Name, "error", err)
+		return
+	}
+	_ = p.cfg.Servers.UpdateCertExpiry(ctx, s.ID, &exp)
+
+	if p.cfg.Notifier == nil {
+		return
+	}
+	now := time.Now()
+	warn := time.Duration(p.cfg.CertWarnDays) * 24 * time.Hour
+	newWithin := exp.Sub(now) < warn // includes already-expired
+	priorWithin := s.CertExpiresAt != nil && s.CertExpiresAt.Sub(now) < warn
+	if !newWithin || priorWithin {
+		return // not newly within the threshold
+	}
+	days := int(exp.Sub(now).Hours() / 24)
+	msg := "expires in " + strconv.Itoa(days) + " days"
+	if days < 0 {
+		msg = "has expired"
+	}
+	ev := alert.Event{
+		Kind:       alert.KindCertExpiring,
+		ServerID:   s.ID,
+		ServerName: s.Name,
+		BaseURL:    s.BaseURL,
+		Status:     string(s.Status),
+		Message:    msg,
+		At:         now.UTC(),
+	}
+	if aerr := p.cfg.Notifier.Notify(ctx, ev); aerr != nil {
+		p.cfg.Log.Warn("poller: cert alert delivery failed", "server", s.Name, "error", aerr)
+		return
+	}
+	p.cfg.Log.Info("poller: cert alert sent", "server", s.Name, "days", days)
+}
+
+func (p *Poller) certExpiry(baseURL string) (time.Time, error) {
+	if p.cfg.CertProbe != nil {
+		return p.cfg.CertProbe(baseURL)
+	}
+	return remote.PeerCertNotAfter(baseURL)
 }
 
 // maybeAlert fires a notification when a server crosses the healthy boundary:

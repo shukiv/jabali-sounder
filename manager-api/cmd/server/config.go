@@ -44,6 +44,8 @@ type pollerConfig struct {
 	IntervalSeconds int `toml:"interval_seconds"`
 	// RetentionDays bounds heartbeat history. 0 -> default; negative -> disabled.
 	RetentionDays int `toml:"retention_days"`
+	// CertWarnDays is the TLS-expiry alert threshold in days. 0 -> default.
+	CertWarnDays int `toml:"cert_warn_days"`
 }
 
 type authConfig struct {
@@ -92,6 +94,7 @@ func Defaults() config {
 			Enabled:         true,
 			IntervalSeconds: 60,
 			RetentionDays:   14,
+			CertWarnDays:    14,
 		},
 		Log: logConfig{
 			Level:  "info",

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -21,6 +22,8 @@ type ServerRepository interface {
 	List(ctx context.Context) ([]models.Server, error)
 	Update(ctx context.Context, s *models.Server) error
 	UpdateStatus(ctx context.Context, id string, status models.ServerStatus, credStatus models.CredentialStatus) error
+	// UpdateCertExpiry stores the managed panel TLS cert expiry (poller).
+	UpdateCertExpiry(ctx context.Context, id string, expiresAt *time.Time) error
 	// Delete hard-removes a server row (heartbeats cascade on MariaDB).
 	Delete(ctx context.Context, id string) error
 }
@@ -87,6 +90,15 @@ func (r *serverRepo) UpdateStatus(ctx context.Context, id string, status models.
 	}
 	if res.RowsAffected == 0 {
 		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *serverRepo) UpdateCertExpiry(ctx context.Context, id string, expiresAt *time.Time) error {
+	if err := r.db.WithContext(ctx).Model(&models.Server{}).
+		Where("id = ?", id).
+		Update("cert_expires_at", expiresAt).Error; err != nil {
+		return fmt.Errorf("server update cert expiry: %w", err)
 	}
 	return nil
 }

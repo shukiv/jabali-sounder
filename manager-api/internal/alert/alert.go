@@ -16,8 +16,9 @@ import (
 
 // Kind classifies an alert.
 const (
-	KindDown      = "down"
-	KindRecovered = "recovered"
+	KindDown         = "down"
+	KindRecovered    = "recovered"
+	KindCertExpiring = "cert_expiring"
 )
 
 // Event is a fleet health notification.
@@ -88,8 +89,12 @@ func (w *WebhookNotifier) Notify(ctx context.Context, ev Event) error {
 }
 
 func humanText(ev Event) string {
-	if ev.Kind == KindRecovered {
+	switch ev.Kind {
+	case KindRecovered:
 		return fmt.Sprintf("✅ %s recovered (status=%s, credentials=%s)", ev.ServerName, ev.Status, ev.CredentialStatus)
+	case KindCertExpiring:
+		return fmt.Sprintf("⚠️ %s TLS certificate: %s", ev.ServerName, ev.Message)
+	default:
+		return fmt.Sprintf("🔴 %s is unhealthy: %s (status=%s, credentials=%s)", ev.ServerName, ev.Message, ev.Status, ev.CredentialStatus)
 	}
-	return fmt.Sprintf("🔴 %s is unhealthy: %s (status=%s, credentials=%s)", ev.ServerName, ev.Message, ev.Status, ev.CredentialStatus)
 }

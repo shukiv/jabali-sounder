@@ -26,9 +26,10 @@ value-to-effort, and the foundation everything else builds on.
   more channels, and UI configuration.
 - **Historical metrics + trends.** Persist the live monitor time series and show
   sparklines / growth (disk, load) instead of only a snapshot.
-- **TLS cert-expiry tracking.** Surface each panel's certificate expiry and flag
-  soon-to-expire. (Directly relevant to the self-signed / `insecure_skip_verify`
-  issues seen in the field.)
+- ✅ **TLS cert-expiry tracking.** The poller samples each panel's TLS cert
+  expiry (best-effort, works with self-signed), stores it, shows it in the
+  History drawer, and alerts once when it crosses the warning window
+  (`[poller] cert_warn_days`, default 14).
 
 **Acceptance:** dashboard reflects current fleet state without a manual Check;
 at least one alert channel fires on a threshold breach; disk/load history is

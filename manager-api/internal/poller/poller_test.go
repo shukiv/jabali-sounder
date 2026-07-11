@@ -220,3 +220,53 @@ func TestNoAlertWhenStable(t *testing.T) {
 		t.Fatalf("want no alerts when stable, got %+v", fn.events)
 	}
 }
+
+// TestPollStoresCertExpiry: the poller samples and stores the panel cert expiry.
+func TestPollStoresCertExpiry(t *testing.T) {
+	sr, hr := testRepos(t)
+	s := seed(t, sr, models.ServerStatusActive)
+	exp := time.Now().Add(90 * 24 * time.Hour)
+
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, AllowPlaintext: true,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		},
+		CertProbe: func(string) (time.Time, error) { return exp, nil },
+	})
+	p.PollOnce(context.Background())
+
+	got, _ := sr.FindByID(context.Background(), s.ID)
+	if got.CertExpiresAt == nil || got.CertExpiresAt.Unix() != exp.Unix() {
+		t.Fatalf("cert expiry not stored: %v", got.CertExpiresAt)
+	}
+}
+
+// TestCertExpiringAlert: a cert within the warning window fires one cert alert.
+func TestCertExpiringAlert(t *testing.T) {
+	sr, hr := testRepos(t)
+	seed(t, sr, models.ServerStatusActive)
+	soon := time.Now().Add(3 * 24 * time.Hour) // within default 14d
+
+	fn := &fakeNotifier{}
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, AllowPlaintext: true, Notifier: fn,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		},
+		CertProbe: func(string) (time.Time, error) { return soon, nil },
+	})
+	p.PollOnce(context.Background())
+
+	var certAlerts int
+	for _, e := range fn.events {
+		if e.Kind == alert.KindCertExpiring {
+			certAlerts++
+		}
+	}
+	if certAlerts != 1 {
+		t.Fatalf("want 1 cert-expiring alert, got %d (%+v)", certAlerts, fn.events)
+	}
+}

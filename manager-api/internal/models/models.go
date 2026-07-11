@@ -42,6 +42,7 @@ type Server struct {
 	CredentialStatus   CredentialStatus `gorm:"column:credential_status;type:varchar(32);not null" json:"credential_status"`
 	LastHeartbeatAt    sql.NullTime     `gorm:"column:last_heartbeat_at" json:"-"`
 	LastCheckedAt      sql.NullTime     `gorm:"column:last_checked_at" json:"-"`
+	CertExpiresAt      *time.Time       `gorm:"column:cert_expires_at" json:"cert_expires_at,omitempty"`
 	CreatedAt          time.Time        `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt          time.Time        `gorm:"column:updated_at" json:"updated_at"`
 	DisabledAt         sql.NullTime     `gorm:"column:disabled_at" json:"-"`

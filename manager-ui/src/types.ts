@@ -7,6 +7,7 @@ export interface Server {
   tags: string[];
   insecure_skip_verify: boolean;
   version: string;
+  cert_expires_at?: string;
   status: "active" | "disabled" | "unreachable";
   credential_status: "valid" | "invalid" | "unknown";
   created_at: string;

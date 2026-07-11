@@ -170,6 +170,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			Interval:       time.Duration(cfg.Poller.IntervalSeconds) * time.Second,
 			RetentionDays:  cfg.Poller.RetentionDays,
 			Notifier:       notifier,
+			CertWarnDays:   cfg.Poller.CertWarnDays,
 			Log:            log,
 		})
 		go hp.Run(pollCtx)
