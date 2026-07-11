@@ -39,13 +39,18 @@ viewable; cert expiry is shown per server.
 
 ---
 
-## M2 — Act (remediation) 🔭
+## M2 — Act (remediation) 🚧
 
 **Goal:** the capability jump from read-only to acting on panels.
 
-- **Write / remediation actions** — restart a service, disable a user, suspend a
-  domain, clear cache, trigger a backup — via panel write-automation endpoints.
-- **Bulk operations** — select N servers → check / disable / tag / act at once.
+- ✅ **Write / remediation actions** (jabali2 JAB-140 shipped the endpoints).
+  Remote write client (restart-service / user disable-enable / domain
+  suspend-unsuspend / cache purge / backup + operations + capabilities), write
+  scopes in enrollment, Sounder action endpoints (operator+, audited), and
+  server-row actions (restart service, purge cache, backup) with confirm.
+  Follow-ups: user/domain actions from the Users/Domains pages, async
+  operation-status polling UI, capability-driven hiding.
+- ⬜ **Bulk operations** — select N servers → check / disable / tag / act at once.
 
 **Dependencies:** jabali2 must expose write-automation endpoints (tracked as
 jabali2-side issues), plus new **write scopes**, a **confirm-before-act** UX, and

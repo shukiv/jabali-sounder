@@ -10,4 +10,11 @@ const (
 	ScopeReadMail         = "read:mail"
 	ScopeReadStatus       = "read:status"
 	ScopeReadMetrics      = "read:metrics"
+
+	ScopeWriteAll      = "write:*"
+	ScopeWriteServices = "write:services"
+	ScopeWriteUsers    = "write:users"
+	ScopeWriteDomains  = "write:domains"
+	ScopeWriteCache    = "write:cache"
+	ScopeWriteBackups  = "write:backups"
 )

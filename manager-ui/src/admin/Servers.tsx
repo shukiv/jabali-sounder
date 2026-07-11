@@ -12,6 +12,7 @@ import {
   Select,
   Checkbox,
   AutoComplete,
+  Modal,
 } from "antd";
 import {
   PlusOutlined,
@@ -30,6 +31,7 @@ import {
   useDisableServer,
   useEnableServer,
   useCheckHealth,
+  useServerAction,
 } from "../hooks/useServers";
 import { RowActions } from "../components/RowActions";
 import ServerHistoryDrawer from "../components/ServerHistoryDrawer";
@@ -44,6 +46,12 @@ const scopeOptions = [
   { label: "read:mail", value: "read:mail" },
   { label: "read:status", value: "read:status" },
   { label: "read:metrics", value: "read:metrics" },
+  { label: "write:* (all write access)", value: "write:*" },
+  { label: "write:services (restart)", value: "write:services" },
+  { label: "write:users (disable/enable)", value: "write:users" },
+  { label: "write:domains (suspend)", value: "write:domains" },
+  { label: "write:cache (purge)", value: "write:cache" },
+  { label: "write:backups (trigger)", value: "write:backups" },
 ];
 
 function statusTag(status: string) {
@@ -90,6 +98,36 @@ export default function Servers() {
   const [envFilter, setEnvFilter] = useState<string | undefined>(undefined);
   const [form] = Form.useForm();
   const canWrite = roleAtLeast("operator");
+  const actionMut = useServerAction();
+  const [restartServer, setRestartServer] = useState<Server | null>(null);
+  const [restartForm] = Form.useForm();
+
+  const runAction = async (
+    id: string,
+    action: string,
+    body: Record<string, unknown>,
+    okMsg: string,
+  ) => {
+    try {
+      const res = await actionMut.mutateAsync({ id, action, body });
+      message.success(res?.operation_id ? `${okMsg} (op ${res.operation_id})` : okMsg);
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
+  };
+
+  const submitRestart = async () => {
+    if (!restartServer) return;
+    let values;
+    try {
+      values = await restartForm.validateFields();
+    } catch {
+      return;
+    }
+    await runAction(restartServer.id, "restart-service", { name: values.name }, `Restarted ${values.name}`);
+    setRestartServer(null);
+    restartForm.resetFields();
+  };
 
   const tagOptions = useMemo(
     () => Array.from(new Set((servers || []).flatMap((server) => server.tags || [])))
@@ -308,6 +346,32 @@ export default function Servers() {
                         onClick: () => handleDisable(record.id, record.name),
                       },
                   {
+                    key: "restart-service",
+                    label: "Restart service",
+                    icon: <ReloadOutlined />,
+                    onClick: () => setRestartServer(record),
+                  },
+                  {
+                    key: "purge-cache",
+                    label: "Purge cache",
+                    icon: <ReloadOutlined />,
+                    onClick: () => runAction(record.id, "purge-cache", { scope: "all" }, "Cache purged"),
+                    confirm: {
+                      title: `Purge all cache on "${record.name}"?`,
+                      okText: "Purge",
+                    },
+                  },
+                  {
+                    key: "backup",
+                    label: "Trigger backup",
+                    icon: <ReloadOutlined />,
+                    onClick: () => runAction(record.id, "backup", {}, "Backup started"),
+                    confirm: {
+                      title: `Start a backup on "${record.name}"?`,
+                      okText: "Start",
+                    },
+                  },
+                  {
                     key: "delete",
                     label: "Delete",
                     icon: <DeleteOutlined />,
@@ -496,6 +560,23 @@ export default function Servers() {
         server={historyServer}
         onClose={() => setHistoryServer(null)}
       />
+      <Modal
+        title={restartServer ? `Restart a service on ${restartServer.name}` : "Restart service"}
+        open={!!restartServer}
+        onOk={submitRestart}
+        confirmLoading={actionMut.isPending}
+        onCancel={() => {
+          setRestartServer(null);
+          restartForm.resetFields();
+        }}
+        okText="Restart"
+      >
+        <Form form={restartForm} layout="vertical">
+          <Form.Item name="name" label="Service name" rules={[{ required: true, message: "Enter a service name" }]}>
+            <Input placeholder="nginx" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

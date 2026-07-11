@@ -59,6 +59,7 @@ func RegisterServerRoutes(g *gin.RouterGroup, cfg ServerHandlerConfig) {
 	servers.POST("/:id/check", h.checkHealth)
 	servers.GET("/:id/heartbeats", h.heartbeats)
 	servers.GET("/:id/metrics", h.metrics)
+	h.registerActionRoutes(servers, op)
 }
 
 type serverHandler struct{ cfg ServerHandlerConfig }

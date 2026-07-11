@@ -141,3 +141,12 @@ export function useServerMetrics(id: string | null) {
     },
   });
 }
+
+export function useServerAction() {
+  return useMutation({
+    mutationFn: async (input: { id: string; action: string; body?: Record<string, unknown> }) => {
+      const resp = await apiClient.post(`/admin/servers/${input.id}/actions/${input.action}`, input.body ?? {});
+      return resp.data;
+    },
+  });
+}
