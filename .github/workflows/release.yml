@@ -266,7 +266,9 @@ jobs:
             code="$(curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" \
               -X POST "$API/releases/${rid}/assets?name=${n}" \
               -F "attachment=@${f};type=application/octet-stream")"
-            if [ "$code" != "201" ]; then
-              echo "::warning::upload of ${n} returned HTTP ${code} (may already exist)"
+            if [ "$code" = "413" ]; then
+              echo "::warning::${n} exceeds Codeberg's attachment size limit — skipped (available on the GitHub release)"
+            elif [ "$code" != "201" ]; then
+              echo "::warning::upload of ${n} returned HTTP ${code}"
             fi
           done
