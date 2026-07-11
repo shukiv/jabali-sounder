@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,9 +25,10 @@ import (
 
 // ServerHandlerConfig wires the server enrollment endpoints.
 type ServerHandlerConfig struct {
-	Repo      repository.ServerRepository
-	SecretKey *secrets.Key
-	Log       *slog.Logger
+	Repo       repository.ServerRepository
+	Heartbeats repository.HeartbeatRepository
+	SecretKey  *secrets.Key
+	Log        *slog.Logger
 	// AllowPrivateTargets disables the SSRF guard (SND-4).
 	AllowPrivateTargets bool
 	// AllowPlaintext permits the dev hex-plaintext token fallback (SND-6).
@@ -52,6 +54,7 @@ func RegisterServerRoutes(g *gin.RouterGroup, cfg ServerHandlerConfig) {
 	servers.POST("/:id/disable", h.disable)
 	servers.POST("/:id/enable", h.enable)
 	servers.POST("/:id/check", h.checkHealth)
+	servers.GET("/:id/heartbeats", h.heartbeats)
 }
 
 type serverHandler struct{ cfg ServerHandlerConfig }
@@ -457,6 +460,60 @@ func (h *serverHandler) setStatus(c *gin.Context, status models.ServerStatus) {
 	}
 	auditServerMutation(h.cfg.Log, c, action, s.ID, s.Name)
 	c.JSON(http.StatusOK, s)
+}
+
+// heartbeats returns recent health-check history for a server plus an uptime
+// summary over the returned window (roadmap M1: status history).
+func (h *serverHandler) heartbeats(c *gin.Context) {
+	id := c.Param("id")
+	if _, err := h.cfg.Repo.FindByID(c.Request.Context(), id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+			return
+		}
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+
+	limit := 50
+	if n, err := strconv.Atoi(c.DefaultQuery("limit", "50")); err == nil {
+		limit = n
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	if h.cfg.Heartbeats == nil {
+		c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0, "uptime": gin.H{"healthy": 0, "total": 0, "ratio": 0}})
+		return
+	}
+	rows, err := h.cfg.Heartbeats.Recent(c.Request.Context(), id, limit)
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	healthy := 0
+	for _, hb := range rows {
+		if hb.Healthy {
+			healthy++
+		}
+	}
+	ratio := 0.0
+	if len(rows) > 0 {
+		ratio = float64(healthy) / float64(len(rows))
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"data":  rows,
+		"total": len(rows),
+		"uptime": gin.H{
+			"healthy": healthy,
+			"total":   len(rows),
+			"ratio":   ratio,
+		},
+	})
 }
 
 // checkHealth probes the server's /health + /automation/status on demand.

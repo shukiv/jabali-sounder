@@ -168,3 +168,17 @@ export interface MailSnapshotEntry {
   autoresponders: MailAutoresponder[];
   error?: string;
 }
+
+export interface Heartbeat {
+  id: string;
+  server_id: string;
+  healthy: boolean;
+  version: string;
+  checked_at: string;
+}
+
+export interface HeartbeatHistory {
+  data: Heartbeat[];
+  total: number;
+  uptime: { healthy: number; total: number; ratio: number };
+}

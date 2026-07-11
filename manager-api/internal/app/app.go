@@ -84,6 +84,7 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{
 		Repo:                deps.ServerRepo,
+		Heartbeats:          deps.HeartbeatRepo,
 		SecretKey:           deps.SecretKey,
 		Log:                 deps.Log,
 		AllowPrivateTargets: deps.AllowPrivateTargets,

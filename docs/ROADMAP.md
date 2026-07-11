@@ -17,7 +17,8 @@ value-to-effort, and the foundation everything else builds on.
 - ✅ **Background health poller + status history.** Probes every non-disabled
   server on a configurable interval, updates status/credential state, and records
   a heartbeat per poll (with retention). Runs on both the server and desktop
-  builds. Status is now current without a manual *Check*.
+  builds. Status is now current without a manual *Check*. Per-server history
+  (uptime + recent checks) is viewable from the Servers table.
 - **Alerting.** On top of the poller: thresholds (disk > 90%, credential
   invalid, server unreachable, cert expiring) delivered via webhook / email /
   Slack. The single biggest "why run this daily" feature.

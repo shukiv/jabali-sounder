@@ -19,6 +19,7 @@ import {
   EditOutlined,
   PoweroffOutlined,
   PlayCircleOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import {
   useServers,
@@ -30,6 +31,7 @@ import {
   useCheckHealth,
 } from "../hooks/useServers";
 import { RowActions } from "../components/RowActions";
+import ServerHistoryDrawer from "../components/ServerHistoryDrawer";
 import type { Server } from "../types";
 
 const scopeOptions = [
@@ -81,6 +83,7 @@ export default function Servers() {
   const { message } = App.useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<Server | null>(null);
+  const [historyServer, setHistoryServer] = useState<Server | null>(null);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [form] = Form.useForm();
 
@@ -269,6 +272,12 @@ export default function Servers() {
               icon: <EditOutlined />,
               onClick: () => openEdit(record),
             },
+            {
+              key: "history",
+              label: "History",
+              icon: <HistoryOutlined />,
+              onClick: () => setHistoryServer(record),
+            },
             record.status === "disabled"
               ? {
                   key: "enable",
@@ -440,6 +449,10 @@ export default function Servers() {
           </Form.Item>
         </Form>
       </Drawer>
+      <ServerHistoryDrawer
+        server={historyServer}
+        onClose={() => setHistoryServer(null)}
+      />
     </div>
   );
 }

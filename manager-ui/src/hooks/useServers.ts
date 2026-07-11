@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
-import type { Server, ListEnvelope, CheckResult } from "../types";
+import type { Server, ListEnvelope, CheckResult, HeartbeatHistory } from "../types";
 
 const QK = ["servers"] as const;
 
@@ -111,5 +111,18 @@ export function useCheckHealth() {
       return resp.data;
     },
     onSuccess: () => invalidateServerViews(qc),
+  });
+}
+
+export function useServerHeartbeats(id: string | null) {
+  return useQuery({
+    queryKey: ["server-heartbeats", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const resp = await apiClient.get<HeartbeatHistory>(
+        `/admin/servers/${id}/heartbeats?limit=50`,
+      );
+      return resp.data;
+    },
   });
 }
