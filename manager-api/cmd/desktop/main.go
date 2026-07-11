@@ -26,6 +26,7 @@ import (
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/api"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/poller"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
@@ -265,7 +266,7 @@ func resetPassword(args []string) error {
 		fmt.Fprintf(os.Stderr, "Password updated for admin %q\n", username)
 		return nil
 	case errors.Is(err, repository.ErrNotFound):
-		admin, aerr := api.NewAdmin(username, pw)
+		admin, aerr := api.NewAdmin(username, pw, models.RoleOwner)
 		if aerr != nil {
 			return fmt.Errorf("create admin: %w", aerr)
 		}

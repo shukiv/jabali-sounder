@@ -9,6 +9,7 @@ import Mail from "./admin/Mail";
 import Domains from "./admin/Domains";
 import Users from "./admin/Users";
 import Settings from "./admin/Settings";
+import Team from "./admin/Team";
 import Login from "./admin/Login";
 import { useAuth } from "./hooks/useAuth";
 import { useThemeMode } from "./theme/ThemeModeContext";
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="domains" element={<Domains />} />
             <Route path="users" element={<Users />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="team" element={<Team />} />
             <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

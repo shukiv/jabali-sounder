@@ -120,6 +120,11 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		AllowPlaintext: deps.AllowPlaintextSecrets,
 	})
 
+	api.RegisterAdminRoutes(adminGroup, api.AdminHandlerConfig{
+		AdminRepo: deps.AdminRepo,
+		Log:       deps.Log,
+	})
+
 	api.RegisterSettingsRoutes(adminGroup, api.SettingsHandlerConfig{
 		Repo:                deps.ServerRepo,
 		SecretKey:           deps.SecretKey,

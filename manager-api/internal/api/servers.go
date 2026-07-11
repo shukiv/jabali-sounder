@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/ids"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/remote"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
@@ -46,14 +47,15 @@ func RegisterServerRoutes(g *gin.RouterGroup, cfg ServerHandlerConfig) {
 		cfg.Log = slog.Default()
 	}
 	h := &serverHandler{cfg: cfg}
+	op := middleware.RequireRole(models.RoleOperator)
 	servers := g.Group("/admin/servers")
 	servers.GET("", h.list)
-	servers.POST("", h.create)
+	servers.POST("", op, h.create)
 	servers.GET("/:id", h.detail)
-	servers.PATCH("/:id", h.update)
-	servers.DELETE("/:id", h.remove)
-	servers.POST("/:id/disable", h.disable)
-	servers.POST("/:id/enable", h.enable)
+	servers.PATCH("/:id", op, h.update)
+	servers.DELETE("/:id", op, h.remove)
+	servers.POST("/:id/disable", op, h.disable)
+	servers.POST("/:id/enable", op, h.enable)
 	servers.POST("/:id/check", h.checkHealth)
 	servers.GET("/:id/heartbeats", h.heartbeats)
 	servers.GET("/:id/metrics", h.metrics)

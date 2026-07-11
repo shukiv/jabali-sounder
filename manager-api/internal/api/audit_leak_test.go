@@ -46,6 +46,7 @@ func TestPrivilegedMutationIsAudited(t *testing.T) {
 	log := slog.New(slog.NewJSONHandler(&buf, nil))
 
 	r := gin.New()
+	r.Use(asRole("operator", "01OP"))
 	RegisterServerRoutes(r.Group("/api/v1"), ServerHandlerConfig{Repo: repo, AllowPlaintext: true, Log: log})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/servers/"+srv.ID+"/disable", nil)

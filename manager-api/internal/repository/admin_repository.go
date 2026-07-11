@@ -24,6 +24,10 @@ type AdminRepository interface {
 	// race on the unauthenticated first-run setup endpoint.
 	CreateFirst(ctx context.Context, a *models.Admin) error
 	Update(ctx context.Context, a *models.Admin) error
+	List(ctx context.Context) ([]models.Admin, error)
+	FindByID(ctx context.Context, id string) (*models.Admin, error)
+	Delete(ctx context.Context, id string) error
+	CountByRole(ctx context.Context, role models.Role) (int64, error)
 }
 
 type adminRepo struct{ db *gorm.DB }
@@ -84,4 +88,38 @@ func (r *adminRepo) Update(ctx context.Context, a *models.Admin) error {
 		return fmt.Errorf("admin update: %w", err)
 	}
 	return nil
+}
+
+func (r *adminRepo) List(ctx context.Context) ([]models.Admin, error) {
+	var rows []models.Admin
+	if err := r.db.WithContext(ctx).Order("username ASC").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("admin list: %w", err)
+	}
+	return rows, nil
+}
+
+func (r *adminRepo) FindByID(ctx context.Context, id string) (*models.Admin, error) {
+	var a models.Admin
+	if err := r.db.WithContext(ctx).First(&a, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("admin find by id: %w", err)
+	}
+	return &a, nil
+}
+
+func (r *adminRepo) Delete(ctx context.Context, id string) error {
+	if err := r.db.WithContext(ctx).Delete(&models.Admin{}, "id = ?", id).Error; err != nil {
+		return fmt.Errorf("admin delete: %w", err)
+	}
+	return nil
+}
+
+func (r *adminRepo) CountByRole(ctx context.Context, role models.Role) (int64, error) {
+	var n int64
+	if err := r.db.WithContext(ctx).Model(&models.Admin{}).Where("role = ?", role).Count(&n).Error; err != nil {
+		return 0, fmt.Errorf("admin count by role: %w", err)
+	}
+	return n, nil
 }

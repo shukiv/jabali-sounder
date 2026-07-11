@@ -14,6 +14,7 @@ import (
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 )
 
@@ -29,7 +30,7 @@ func newAuthTestRouter(t *testing.T, maxFailures int) *gin.Engine {
 		t.Fatalf("open: %v", err)
 	}
 	repo := repository.NewAdminRepository(gormDB)
-	admin, err := NewAdmin("admin", "correct-horse-battery")
+	admin, err := NewAdmin("admin", "correct-horse-battery", models.RoleOwner)
 	if err != nil {
 		t.Fatalf("new admin: %v", err)
 	}

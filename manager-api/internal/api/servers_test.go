@@ -53,6 +53,7 @@ func patchServer(t *testing.T, repo repository.ServerRepository, id, body string
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.Use(asRole("operator", "01OP"))
 	// SecretKey nil + AllowPlaintext -> encryptSecret uses the hex fallback, so
 	// the test needs no key material and still exercises the persistence path.
 	RegisterServerRoutes(r.Group("/api/v1"), ServerHandlerConfig{Repo: repo, AllowPlaintext: true})
@@ -157,6 +158,7 @@ func doServerAction(t *testing.T, repo repository.ServerRepository, method, path
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.Use(asRole("operator", "01OP"))
 	RegisterServerRoutes(r.Group("/api/v1"), ServerHandlerConfig{Repo: repo, AllowPlaintext: true})
 	req := httptest.NewRequest(method, path, nil)
 	w := httptest.NewRecorder()

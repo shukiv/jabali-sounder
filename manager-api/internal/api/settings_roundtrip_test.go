@@ -37,6 +37,7 @@ func TestSettingsRoundTripPreservesInsecureSkipVerify(t *testing.T) {
 	}
 
 	r := gin.New()
+	r.Use(asRole("operator", "01OP"))
 	RegisterSettingsRoutes(r.Group("/api/v1"), SettingsHandlerConfig{
 		Repo: repo, AllowPrivateTargets: true, AllowPlaintext: true,
 	})

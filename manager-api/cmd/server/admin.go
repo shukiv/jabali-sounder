@@ -10,6 +10,7 @@ import (
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/api"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 )
 
@@ -70,7 +71,7 @@ func newAdminSetPasswordCmd() *cobra.Command {
 				}
 				fmt.Println("Admin password updated.")
 			} else {
-				admin, err := api.NewAdmin(username, password)
+				admin, err := api.NewAdmin(username, password, models.RoleOwner)
 				if err != nil {
 					return fmt.Errorf("create admin: %w", err)
 				}

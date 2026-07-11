@@ -24,10 +24,11 @@ import {
   MailOutlined,
   TeamOutlined,
   SettingOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
-import { useAuth } from "../hooks/useAuth";
+import { useAuth, roleAtLeast } from "../hooks/useAuth";
 import { useThemeMode } from "../theme/ThemeModeContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { BrandLogo } from "../components/BrandLogo";
@@ -43,6 +44,7 @@ const navItems = [
   { key: "/domains", label: "Domains", icon: <GlobalOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/mail", label: "Mail", icon: <MailOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/settings", label: "Settings", icon: <SettingOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/team", label: "Team", icon: <SafetyCertificateOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "owner" },
 ];
 
 export default function AdminLayout() {
@@ -64,7 +66,9 @@ export default function AdminLayout() {
       theme={mode}
       selectedKeys={[location.pathname]}
       style={{ border: "none", background: siderBg }}
-      items={navItems.map((n) => ({
+      items={navItems
+        .filter((n) => !n.minRole || roleAtLeast(n.minRole as "owner"))
+        .map((n) => ({
         key: n.key,
         icon: n.icon,
         label: n.label,

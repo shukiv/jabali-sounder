@@ -198,3 +198,10 @@ export interface MetricHistory {
   data: MetricSample[];
   total: number;
 }
+
+export interface Admin {
+  id: string;
+  username: string;
+  role: "viewer" | "operator" | "owner";
+  created_at: string;
+}

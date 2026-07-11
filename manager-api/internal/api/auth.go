@@ -85,7 +85,11 @@ func (h *authHandler) login(c *gin.Context) {
 		return
 	}
 
-	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, h.cfg.JWTTTL)
+	role := admin.Role
+	if !role.Valid() {
+		role = models.RoleOwner
+	}
+	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, role, h.cfg.JWTTTL)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
@@ -97,6 +101,7 @@ func (h *authHandler) login(c *gin.Context) {
 		"admin": gin.H{
 			"id":       admin.ID,
 			"username": admin.Username,
+			"role":     role,
 		},
 	})
 }
@@ -105,6 +110,7 @@ func (h *authHandler) me(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"id":       middleware.AdminID(c),
 		"username": middleware.AdminUsername(c),
+		"role":     middleware.AdminRole(c),
 	})
 }
 
@@ -188,7 +194,7 @@ func (h *authHandler) setup(c *gin.Context) {
 		return
 	}
 
-	admin, err := NewAdmin(req.Username, req.Password)
+	admin, err := NewAdmin(req.Username, req.Password, models.RoleOwner)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
@@ -202,7 +208,7 @@ func (h *authHandler) setup(c *gin.Context) {
 		return
 	}
 
-	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, h.cfg.JWTTTL)
+	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, models.RoleOwner, h.cfg.JWTTTL)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
@@ -213,6 +219,7 @@ func (h *authHandler) setup(c *gin.Context) {
 		"admin": gin.H{
 			"id":       admin.ID,
 			"username": admin.Username,
+			"role":     models.RoleOwner,
 		},
 	})
 }
@@ -229,7 +236,7 @@ func HashPassword(password string) (string, error) {
 
 // NewAdmin creates an Admin model with a bcrypt-hashed password.
 // Used by the CLI admin set-password command.
-func NewAdmin(username, password string) (*models.Admin, error) {
+func NewAdmin(username, password string, role models.Role) (*models.Admin, error) {
 	hash, err := HashPassword(password)
 	if err != nil {
 		return nil, err
@@ -238,5 +245,6 @@ func NewAdmin(username, password string) (*models.Admin, error) {
 		ID:           ids.NewULID(),
 		Username:     username,
 		PasswordHash: hash,
+		Role:         role,
 	}, nil
 }

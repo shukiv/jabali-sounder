@@ -10,12 +10,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 )
+
+// Claims is the Sounder JWT payload: standard claims plus the operator role.
+type Claims struct {
+	Role string `json:"role"`
+	jwt.RegisteredClaims
+}
 
 // Context keys for storing admin identity.
 const (
 	ctxAdminID   = "admin_id"
 	ctxAdminUser = "admin_username"
+	ctxAdminRole = "admin_role"
 )
 
 // AuthMiddleware verifies a JWT Bearer token and sets the admin identity
@@ -29,7 +38,7 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		}
 		tokenStr := raw[len("Bearer "):]
 
-		claims := &jwt.RegisteredClaims{}
+		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, errors.New("unexpected signing method")
@@ -41,9 +50,10 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 			return
 		}
 
-		// claims.Subject = admin ID; claims.ID = username (stored in ID field).
+		// claims.Subject = admin ID; claims.ID = username; Role = permission level.
 		c.Set(ctxAdminID, claims.Subject)
 		c.Set(ctxAdminUser, claims.ID)
+		c.Set(ctxAdminRole, claims.Role)
 		c.Next()
 	}
 }
@@ -62,15 +72,37 @@ func AdminUsername(c *gin.Context) string {
 	return s
 }
 
+// AdminRole returns the authenticated admin's role from the context, or "".
+func AdminRole(c *gin.Context) string {
+	v, _ := c.Get(ctxAdminRole)
+	s, _ := v.(string)
+	return s
+}
+
+// RequireRole aborts with 403 unless the authenticated admin's role is at least
+// min. Must run after AuthMiddleware (M3: RBAC).
+func RequireRole(min models.Role) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !models.Role(AdminRole(c)).AtLeast(min) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+		c.Next()
+	}
+}
+
 // MintToken creates a signed JWT for the given admin.
-func MintToken(secret, adminID, username string, ttl time.Duration) (string, time.Time, error) {
+func MintToken(secret, adminID, username string, role models.Role, ttl time.Duration) (string, time.Time, error) {
 	expiresAt := time.Now().Add(ttl)
-	claims := &jwt.RegisteredClaims{
-		Subject:   adminID,
-		ID:        username,
-		ExpiresAt: jwt.NewNumericDate(expiresAt),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Issuer:    "jabali-sounder",
+	claims := &Claims{
+		Role: string(role),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   adminID,
+			ID:        username,
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "jabali-sounder",
+		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString([]byte(secret))

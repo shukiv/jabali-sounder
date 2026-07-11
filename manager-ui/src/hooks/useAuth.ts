@@ -4,6 +4,20 @@ import apiClient from "../apiClient";
 export interface AuthState {
   token: string | null;
   username: string | null;
+  role: string | null;
+}
+
+const ROLE_RANK: Record<string, number> = { viewer: 1, operator: 2, owner: 3 };
+
+// currentRole returns the signed-in operator's role, read from persisted auth.
+export function currentRole(): string {
+  return loadAuth().role ?? "";
+}
+
+// roleAtLeast reports whether the current role meets a minimum (viewer <
+// operator < owner).
+export function roleAtLeast(min: "viewer" | "operator" | "owner"): boolean {
+  return (ROLE_RANK[currentRole()] ?? 0) >= ROLE_RANK[min];
 }
 
 const STORAGE_KEY = "jabali-sounder-auth";
@@ -13,12 +27,16 @@ export function loadAuth(): AuthState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { token: parsed.token || null, username: parsed.username || null };
+      return {
+        token: parsed.token || null,
+        username: parsed.username || null,
+        role: parsed.role || null,
+      };
     }
   } catch {
     // ignore
   }
-  return { token: null, username: null };
+  return { token: null, username: null, role: null };
 }
 
 export function saveAuth(state: AuthState) {
@@ -32,8 +50,12 @@ export function saveAuth(state: AuthState) {
 export function useAuth() {
   const [auth, setAuth] = useState<AuthState>(loadAuth);
 
-  const acceptAuthResponse = useCallback((data: { token: string; admin: { username: string } }) => {
-    const newState = { token: data.token, username: data.admin.username };
+  const acceptAuthResponse = useCallback((data: { token: string; admin: { username: string; role?: string } }) => {
+    const newState = {
+      token: data.token,
+      username: data.admin.username,
+      role: data.admin.role ?? null,
+    };
     setAuth(newState);
     saveAuth(newState);
     apiClient.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
@@ -51,7 +73,7 @@ export function useAuth() {
   }, [acceptAuthResponse]);
 
   const logout = useCallback(() => {
-    const newState = { token: null, username: null };
+    const newState = { token: null, username: null, role: null };
     setAuth(newState);
     saveAuth(newState);
     delete apiClient.defaults.headers.common["Authorization"];

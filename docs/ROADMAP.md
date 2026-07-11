@@ -57,12 +57,14 @@ log.
 
 ---
 
-## M3 — Multi-operator 🔭
+## M3 — Multi-operator 🚧
 
 **Goal:** real accountability behind the audit trail — there is a single shared
 `admin` today.
 
-- **Multiple admins + RBAC** (viewer / operator / owner).
+- ✅ **Multiple admins + RBAC** (viewer / operator / owner). Role in the JWT,
+  RequireRole gate on mutating routes, owner-only Team page + admin CRUD with
+  last-owner/self guards.
 - **2FA / TOTP** on login.
 - **Session management** — list and revoke active sessions.
 

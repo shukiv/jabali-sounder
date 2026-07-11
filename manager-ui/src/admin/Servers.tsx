@@ -33,6 +33,7 @@ import {
 import { RowActions } from "../components/RowActions";
 import ServerHistoryDrawer from "../components/ServerHistoryDrawer";
 import type { Server } from "../types";
+import { roleAtLeast } from "../hooks/useAuth";
 
 const scopeOptions = [
   { label: "read:* (all read access)", value: "read:*" },
@@ -86,6 +87,7 @@ export default function Servers() {
   const [historyServer, setHistoryServer] = useState<Server | null>(null);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [form] = Form.useForm();
+  const canWrite = roleAtLeast("operator");
 
   const tagOptions = useMemo(
     () => Array.from(new Set((servers || []).flatMap((server) => server.tags || [])))
@@ -267,43 +269,47 @@ export default function Servers() {
               onClick: () => handleCheck(record.id),
             },
             {
-              key: "edit",
-              label: "Edit",
-              icon: <EditOutlined />,
-              onClick: () => openEdit(record),
-            },
-            {
               key: "history",
               label: "History",
               icon: <HistoryOutlined />,
               onClick: () => setHistoryServer(record),
             },
-            record.status === "disabled"
-              ? {
-                  key: "enable",
-                  label: "Enable",
-                  icon: <PlayCircleOutlined />,
-                  onClick: () => handleEnable(record.id, record.name),
-                }
-              : {
-                  key: "disable",
-                  label: "Disable",
-                  icon: <PoweroffOutlined />,
-                  onClick: () => handleDisable(record.id, record.name),
-                },
-            {
-              key: "delete",
-              label: "Delete",
-              icon: <DeleteOutlined />,
-              danger: true,
-              onClick: () => handleDelete(record.id, record.name),
-              confirm: {
-                title: `Delete server "${record.name}"?`,
-                description:
-                  "Permanently removes it and its heartbeat history. This cannot be undone.",
-                okText: "Delete",
-              },
-            },
+            ...(canWrite
+              ? [
+                  {
+                    key: "edit",
+                    label: "Edit",
+                    icon: <EditOutlined />,
+                    onClick: () => openEdit(record),
+                  },
+                  record.status === "disabled"
+                    ? {
+                        key: "enable",
+                        label: "Enable",
+                        icon: <PlayCircleOutlined />,
+                        onClick: () => handleEnable(record.id, record.name),
+                      }
+                    : {
+                        key: "disable",
+                        label: "Disable",
+                        icon: <PoweroffOutlined />,
+                        onClick: () => handleDisable(record.id, record.name),
+                      },
+                  {
+                    key: "delete",
+                    label: "Delete",
+                    icon: <DeleteOutlined />,
+                    danger: true,
+                    onClick: () => handleDelete(record.id, record.name),
+                    confirm: {
+                      title: `Delete server "${record.name}"?`,
+                      description:
+                        "Permanently removes it and its heartbeat history. This cannot be undone.",
+                      okText: "Delete",
+                    },
+                  },
+                ]
+              : []),
           ]}
         />
       ),
@@ -327,9 +333,11 @@ export default function Servers() {
             style={{ minWidth: 240 }}
           />
         </Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Add Server
-        </Button>
+        {canWrite ? (
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Add Server
+          </Button>
+        ) : null}
       </Space>
       <Card>
         <Table<Server>

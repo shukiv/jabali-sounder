@@ -14,6 +14,7 @@ import (
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 )
 
@@ -30,7 +31,7 @@ func newAuthTestEnv(t *testing.T) (*gin.Engine, repository.AdminRepository, stri
 	}
 	repo := repository.NewAdminRepository(gormDB)
 
-	admin, err := NewAdmin("admin", "oldpassword")
+	admin, err := NewAdmin("admin", "oldpassword", models.RoleOwner)
 	if err != nil {
 		t.Fatalf("new admin: %v", err)
 	}
@@ -45,7 +46,7 @@ func newAuthTestEnv(t *testing.T) (*gin.Engine, repository.AdminRepository, stri
 		JWTSecret: secret,
 		JWTTTL:    time.Hour,
 	})
-	token, _, err := middleware.MintToken(secret, admin.ID, admin.Username, time.Hour)
+	token, _, err := middleware.MintToken(secret, admin.ID, admin.Username, models.RoleOwner, time.Hour)
 	if err != nil {
 		t.Fatalf("mint token: %v", err)
 	}

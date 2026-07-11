@@ -76,11 +76,41 @@ type MetricSample struct {
 
 func (MetricSample) TableName() string { return "metric_samples" }
 
+// Role is a Sounder operator's permission level (M3: RBAC).
+type Role string
+
+const (
+	RoleViewer   Role = "viewer"   // read-only
+	RoleOperator Role = "operator" // read + mutate servers
+	RoleOwner    Role = "owner"    // operator + manage operators
+)
+
+// Rank orders roles for comparison; higher is more privileged.
+func (r Role) Rank() int {
+	switch r {
+	case RoleOwner:
+		return 3
+	case RoleOperator:
+		return 2
+	case RoleViewer:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// AtLeast reports whether r is at least as privileged as min.
+func (r Role) AtLeast(min Role) bool { return r.Rank() >= min.Rank() }
+
+// Valid reports whether r is a known role.
+func (r Role) Valid() bool { return r.Rank() > 0 }
+
 // Admin is a manager-side administrator who can log in and manage servers.
 type Admin struct {
 	ID           string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
 	Username     string    `gorm:"column:username;type:varchar(100);not null;uniqueIndex" json:"username"`
 	PasswordHash string    `gorm:"column:password_hash;type:varchar(255);not null" json:"-"`
+	Role         Role      `gorm:"column:role;type:varchar(20);not null;default:owner" json:"role"`
 	CreatedAt    time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"column:updated_at" json:"updated_at"`
 }

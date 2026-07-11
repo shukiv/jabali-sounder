@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/ids"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/remote"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
@@ -40,7 +41,7 @@ func RegisterSettingsRoutes(g *gin.RouterGroup, cfg SettingsHandlerConfig) {
 	h := &settingsHandler{cfg: cfg}
 	settings := g.Group("/admin/settings")
 	settings.GET("/export", h.export)
-	settings.POST("/import", h.importSettings)
+	settings.POST("/import", middleware.RequireRole(models.RoleOperator), h.importSettings)
 }
 
 type settingsHandler struct{ cfg SettingsHandlerConfig }
