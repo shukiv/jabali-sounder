@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/base64"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -41,6 +42,7 @@ func RegisterSettingsRoutes(g *gin.RouterGroup, cfg SettingsHandlerConfig) {
 	h := &settingsHandler{cfg: cfg}
 	settings := g.Group("/admin/settings")
 	settings.GET("/export", h.export)
+	settings.GET("/report.csv", h.reportCSV)
 	settings.POST("/import", middleware.RequireRole(models.RoleOperator), h.importSettings)
 }
 
@@ -118,6 +120,26 @@ func (h *settingsHandler) export(c *gin.Context) {
 
 	c.Header("Content-Disposition", `attachment; filename="jabali-sounder-settings.json"`)
 	c.JSON(http.StatusOK, out)
+}
+
+// reportCSV streams a fleet summary as CSV (roadmap M4: report formats).
+func (h *settingsHandler) reportCSV(c *gin.Context) {
+	servers, err := h.cfg.Repo.List(c.Request.Context())
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", `attachment; filename="jabali-sounder-fleet.csv"`)
+	w := csv.NewWriter(c.Writer)
+	_ = w.Write([]string{"name", "base_url", "status", "credential_status", "environment", "version", "tags"})
+	for _, s := range servers {
+		_ = w.Write([]string{
+			s.Name, s.BaseURL, string(s.Status), string(s.CredentialStatus),
+			s.Environment, s.Version, strings.Join([]string(s.Tags), " "),
+		})
+	}
+	w.Flush()
 }
 
 func (h *settingsHandler) importSettings(c *gin.Context) {

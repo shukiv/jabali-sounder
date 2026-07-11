@@ -29,6 +29,7 @@ export default function Settings() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [exporting, setExporting] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<ImportResult | null>(null);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -91,6 +92,35 @@ export default function Settings() {
     }
   };
 
+  const handleExportCSV = async () => {
+    setExportingCsv(true);
+    try {
+      const resp = await apiClient.get("/admin/settings/report.csv", { responseType: "blob" });
+      const text = await (resp.data as Blob).text();
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      const filename = `jabali-sounder-fleet-${stamp}.csv`;
+      const bridge = (window as unknown as WailsBridgeWindow).go?.main?.Bridge;
+      if (bridge?.SaveFile) {
+        const saved = await bridge.SaveFile(filename, text);
+        if (saved) message.success(`Exported to ${saved}`);
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      message.success("Fleet CSV exported");
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
   const uploadProps: UploadProps = {
     accept: "application/json,.json",
     maxCount: 1,
@@ -142,6 +172,13 @@ export default function Settings() {
               onClick={handleExport}
             >
               Export Settings
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              loading={exportingCsv}
+              onClick={handleExportCSV}
+            >
+              Fleet CSV
             </Button>
             <Upload {...uploadProps}>
               <Button icon={<UploadOutlined />} loading={importing}>

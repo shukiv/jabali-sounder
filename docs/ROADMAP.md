@@ -100,9 +100,9 @@ acting user.
 - ✅ **Sounder read-only API tokens** — external tooling authenticates with
   `Authorization: Bearer snd_…` for viewer (read-only) access; mint/list/revoke
   in Settings (operator+), sha256-hashed, optional expiry, shown once.
-- ✅ **Scheduled reports** — periodic fleet-summary report (counts by status/
-  environment/version) delivered to a webhook (`[report] webhook_url`,
-  `interval_hours`).
+- ✅ **Scheduled reports** — periodic fleet-summary to a webhook (`[report]
+  webhook_url` / `interval_hours`), plus an on-demand fleet CSV export from
+  Settings.
 
 **Acceptance:** servers can be grouped and filtered; out-of-date panels are
 obvious; a single search spans all inventories; a token-authenticated read API
