@@ -7,6 +7,9 @@ import apiClient from "../apiClient";
 import TwoFactorSettings from "../components/TwoFactorSettings";
 import SessionsSettings from "../components/SessionsSettings";
 import ApiTokensSettings from "../components/ApiTokensSettings";
+import AlertRulesSettings from "../components/AlertRulesSettings";
+import AlertChannelsSettings from "../components/AlertChannelsSettings";
+import MaintenanceSettings from "../components/MaintenanceSettings";
 import { roleAtLeast } from "../hooks/useAuth";
 
 const { Title, Text, Paragraph } = Typography;
@@ -263,6 +266,10 @@ export default function Settings() {
       <SessionsSettings />
 
       {roleAtLeast("operator") ? <ApiTokensSettings /> : null}
+
+      <AlertRulesSettings />
+      {roleAtLeast("operator") ? <AlertChannelsSettings /> : null}
+      {roleAtLeast("operator") ? <MaintenanceSettings /> : null}
     </div>
   );
 }
