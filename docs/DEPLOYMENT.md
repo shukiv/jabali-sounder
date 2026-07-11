@@ -1,172 +1,121 @@
-# Deployment
+# Deployment & reconciliation runbook
 
-Jabali Sounder can be deployed as a standalone VM service or as part of a
-container stack. The current test deployment is a standalone VM-style install
-on `10.0.3.14`.
+This runbook reconciles a host that has drifted into an ambiguous state — more
+than one Sounder service/layout, a binary replaced under a running process, or
+uncertainty about which release is actually serving (SND-33). Run it on the
+host; the code changes referenced here ship in the current build, but the host
+steps must be performed by an operator with verified access.
 
-## Build Artifacts
+## 0. Verify host identity first (do NOT bypass)
 
-Backend binary:
+If SSH host-key verification fails (changed fingerprint), STOP. Confirm the new
+fingerprint through a trusted out-of-band channel (console, provider dashboard,
+a colleague who provisioned the host) before connecting. Never pass
+`-o StrictHostKeyChecking=no` or delete `known_hosts` to "get in" — a changed
+key can mean a man-in-the-middle.
 
-```bash
-make build
-```
-
-Output:
-
-```text
-./bin/jabali-sounder
-```
-
-Frontend bundle:
+## 1. Inventory every Sounder unit
 
 ```bash
-make ui-build
+systemctl list-unit-files | grep -i sounder
+systemctl list-units --all | grep -i sounder
 ```
 
-Output:
-
-```text
-manager-ui/dist/
-```
-
-## Filesystem Layout
-
-Recommended new-install layout:
-
-```text
-/opt/jabali-sounder/bin/jabali-sounder
-/opt/jabali-sounder/manager-ui/dist/
-/etc/jabali-sounder/config.toml
-/etc/jabali-sounder/secrets.key
-```
-
-Current test-server compatibility layout:
-
-```text
-/opt/jabali-manager/bin/jabali-sounder
-/opt/jabali-manager/manager-ui/dist/
-/etc/jabali-manager/config.toml
-/etc/jabali-manager/secrets.key
-```
-
-## systemd Unit
-
-Recommended new-install unit:
-
-```ini
-[Unit]
-Description=Jabali Sounder - central control plane
-After=network.target mariadb.service redis-server.service
-Wants=mariadb.service redis-server.service
-
-[Service]
-Type=simple
-ExecStart=/opt/jabali-sounder/bin/jabali-sounder serve
-Environment=JABALI_SOUNDER_CONFIG=/etc/jabali-sounder/config.toml
-WorkingDirectory=/opt/jabali-sounder
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Reload and start:
+For each unit found, inspect what it actually runs and reads:
 
 ```bash
-systemctl daemon-reload
-systemctl enable --now jabali-sounder.service
+systemctl cat <unit>            # ExecStart + EnvironmentFile / config path
+systemctl status <unit>         # active? which PID?
 ```
 
-## nginx
+## 2. Designate exactly one active service
 
-Example nginx shape:
-
-```nginx
-server {
-    listen 8485;
-    server_name _;
-
-    root /opt/jabali-sounder/manager-ui/dist;
-    index index.html;
-
-    location /api/v1/ {
-        proxy_pass http://127.0.0.1:8484/api/v1/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /health {
-        proxy_pass http://127.0.0.1:8484/health;
-    }
-
-    location / {
-        try_files $uri /index.html;
-    }
-}
-```
-
-## Deployment Steps
-
-1. Build backend and frontend:
-
-   ```bash
-   make build
-   make ui-build
-   ```
-
-2. Back up current deployment:
-
-   ```bash
-   stamp=$(date -u +%Y%m%dT%H%M%SZ)
-   mkdir -p /opt/jabali-sounder/backups/$stamp
-   cp -a /opt/jabali-sounder/bin /opt/jabali-sounder/backups/$stamp/bin
-   cp -a /opt/jabali-sounder/manager-ui/dist /opt/jabali-sounder/backups/$stamp/dist
-   ```
-
-3. Copy artifacts:
-
-   ```bash
-   install -m 775 ./bin/jabali-sounder /opt/jabali-sounder/bin/jabali-sounder
-   rsync -az --delete manager-ui/dist/ /opt/jabali-sounder/manager-ui/dist/
-   ```
-
-4. Restart:
-
-   ```bash
-   systemctl restart jabali-sounder.service
-   systemctl is-active jabali-sounder.service
-   curl -fsS http://127.0.0.1:8484/health
-   ```
-
-## Current Test Server Deployment
-
-The currently running test server uses:
-
-```text
-Host: 10.0.3.14
-UI:   http://10.0.3.14:8485/
-API:  127.0.0.1:8484
-Unit: jabali-manager.service
-Exec: /opt/jabali-manager/bin/jabali-sounder serve
-```
-
-Deploy there with the compatibility paths:
+Pick the intended unit (newer executable + config layout). Disable and mask the
+obsolete ones so they can never be mistaken for the deployment or started by a
+stray `systemctl start`:
 
 ```bash
-make build
-make ui-build
-
-stamp=$(date -u +%Y%m%dT%H%M%SZ)
-ssh root@10.0.3.14 "set -e; mkdir -p /opt/jabali-manager/backups/$stamp; cp -a /opt/jabali-manager/bin /opt/jabali-manager/backups/$stamp/bin; cp -a /opt/jabali-manager/manager-ui/dist /opt/jabali-manager/backups/$stamp/dist"
-
-rsync -az --delete manager-ui/dist/ root@10.0.3.14:/opt/jabali-manager/manager-ui/dist/
-scp -q bin/jabali-sounder root@10.0.3.14:/tmp/jabali-sounder.new
-
-ssh root@10.0.3.14 "set -e; systemctl stop jabali-manager.service; install -m 775 /tmp/jabali-sounder.new /opt/jabali-manager/bin/jabali-sounder; rm -f /tmp/jabali-sounder.new; systemctl start jabali-manager.service; sleep 1; systemctl is-active jabali-manager.service; curl -fsS http://127.0.0.1:8484/health"
+sudo systemctl disable --now <legacy-unit>
+sudo systemctl mask <legacy-unit>      # blocks accidental start
 ```
 
-Do not deploy to managed Panel servers for normal Sounder changes. Managed
-servers only need Jabali Panel automation endpoints and automation tokens.
+## 3. Confirm the active config has a database URL
+
+The active unit's config (TOML or `EnvironmentFile`) must set a populated
+database URL, e.g. `JABALI_SOUNDER_DATABASE_URL` or `[database].url`. An empty
+URL runs with enrollment disabled and no persistence:
+
+```bash
+sudo systemctl cat <active-unit> | grep -iE 'EnvironmentFile|ExecStart'
+# then check the referenced file actually exists and has a non-empty DB URL
+```
+
+## 4. Ensure the running binary is the installed release (not "deleted")
+
+A process shows `(deleted)` when the on-disk binary was replaced without a
+restart — the kernel keeps the old inode, so the service runs stale code:
+
+```bash
+pid=$(systemctl show -p MainPID --value <active-unit>)
+sudo ls -l /proc/"$pid"/exe          # must NOT end in "(deleted)"
+```
+
+If it says `(deleted)`, restart the service so it loads the new binary:
+
+```bash
+sudo systemctl restart <active-unit>
+```
+
+Always restart after swapping a binary. `scripts/update-server.sh` does this
+automatically; a manual `cp` over the binary does not.
+
+## 5. Verify which release is serving
+
+The build identity is now stamped into the binary and surfaced three ways —
+all three must agree with the release you intend to test:
+
+```bash
+jabali-sounder-server version                 # CLI
+curl -fsS http://127.0.0.1:<port>/health      # {"status":"ok","version":"vX.Y.Z","commit":"…"}
+# authenticated, richer detail (current + latest + update_available):
+#   GET /api/v1/version   (Settings -> About & updates in the UI)
+```
+
+If `/health` still reports `dev`, the running binary was built without version
+stamping — rebuild with the release workflow or `make build` (which injects
+`-ldflags -X`), redeploy, and restart.
+
+## 6. Reset the admin password against the ACTIVE database
+
+Recovery commands must use the same config/DB as the active service, or they
+silently edit the wrong database:
+
+```bash
+# Point at the SAME config/env the active unit uses.
+sudo JABALI_SOUNDER_DATABASE_URL='<same-url-as-active-unit>' \
+  jabali-sounder-server admin set-password <username>
+# (desktop build: jabali-sounder-desktop reset-password <username>)
+```
+
+Never record the password, DB credentials, or other secrets anywhere.
+
+## 7. Final health check
+
+```bash
+curl -fsS http://127.0.0.1:<port>/health          # ok + expected version
+curl -fsSI https://<public-host>/                 # proxied UI reachable (200)
+```
+
+Then confirm in the UI: **Settings → About & updates** shows the expected
+version, and a password change returns the backend's actionable message (e.g.
+"current password incorrect", "new password must be at least 8 characters")
+rather than a bare HTTP 422 — a generic status there means a stale frontend is
+still deployed; rebuild + redeploy the UI/binary.
+
+## Notes
+
+- The actionable password-change errors and the version endpoints are already in
+  the current source; a generic 422 or a `dev` version indicates a stale
+  deployment, not a code bug — the fix is deploying the current build.
+- Keep one rollback copy of the previous binary (`update-server.sh` writes
+  `<binary>.bak`).

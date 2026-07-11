@@ -21,6 +21,7 @@ import (
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/report"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/version"
 )
 
 const (
@@ -48,7 +49,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	cfg := sharedCfg
 	log := sharedLog
 
+	bv := version.Current()
 	log.Info("starting jabali-sounder",
+		"version", bv.Version,
+		"commit", bv.Commit,
+		"built", bv.Date,
 		"addr", cfg.Server.Addr,
 		"env", cfg.Server.Env,
 	)
