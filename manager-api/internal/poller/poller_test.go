@@ -724,7 +724,7 @@ func TestTokenExpiryReminder(t *testing.T) {
 	_, sr, hr, nr, _, _, tr := m7Repos(t)
 	ctx := context.Background()
 	exp := time.Now().Add(3 * 24 * time.Hour)
-	if _, _, err := tr.Mint(ctx, "ci", "owner", &exp, nil, nil); err != nil {
+	if _, _, err := tr.Mint(ctx, "ci", "owner", &exp, nil, nil, 0); err != nil {
 		t.Fatalf("mint: %v", err)
 	}
 	p := New(Config{

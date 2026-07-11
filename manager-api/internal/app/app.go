@@ -104,26 +104,28 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		}
 		return deps.SessionRepo.Active(ctx, sid)
 	}
-	apiTokenCheck := func(ctx context.Context, token, clientIP string) (string, string, []string, bool) {
+	apiTokenCheck := func(ctx context.Context, token, clientIP string) (string, string, []string, int, bool) {
 		if deps.APITokenRepo == nil {
-			return "", "", nil, false
+			return "", "", nil, 0, false
 		}
 		tk := deps.APITokenRepo.Validate(ctx, token)
 		if tk == nil {
-			return "", "", nil, false
+			return "", "", nil, 0, false
 		}
 		// Enforce the per-token source-IP allowlist (SND-31).
 		if !repository.TokenIPAllowed(tk.AllowedIPs, clientIP) {
 			deps.Log.Warn("api token used from disallowed IP", "token_id", tk.ID, "source_ip", clientIP)
-			return "", "", nil, false
+			return "", "", nil, 0, false
 		}
-		return tk.ID, tk.Name, tk.Scopes, true
+		return tk.ID, tk.Name, tk.Scopes, tk.RateLimitPerMin, true
 	}
 	adminGroup := v1.Group("")
 	adminGroup.Use(middleware.AuthMiddleware(deps.JWTSecret, sessionCheck, apiTokenCheck))
 	// Restrict scoped API tokens to their granted read areas (SND-31). No-op for
 	// JWT/session requests.
 	adminGroup.Use(middleware.TokenScopeGuard())
+	// Per-token request rate limit (SND-31). No-op for JWT/session requests.
+	adminGroup.Use(middleware.NewTokenRateLimiter(nil).Middleware())
 
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{

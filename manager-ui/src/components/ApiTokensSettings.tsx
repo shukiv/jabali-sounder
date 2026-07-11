@@ -29,6 +29,7 @@ interface ApiToken {
   expires_at?: string;
   scopes?: string[];
   allowed_ips?: string[];
+  rate_limit_per_min?: number;
 }
 
 const SCOPE_OPTIONS = [
@@ -72,6 +73,7 @@ export default function ApiTokensSettings() {
           .split(",")
           .map((x: string) => x.trim())
           .filter(Boolean),
+        rate_limit_per_min: values.rate_limit_per_min || 0,
       });
       setMinted(resp.data.token);
       setOpen(false);
@@ -137,6 +139,12 @@ export default function ApiTokensSettings() {
       dataIndex: "allowed_ips",
       key: "allowed_ips",
       render: (ips?: string[]) => (ips && ips.length ? ips.join(", ") : <Text type="secondary">any</Text>),
+    },
+    {
+      title: "Rate/min",
+      dataIndex: "rate_limit_per_min",
+      key: "rate_limit_per_min",
+      render: (n?: number) => (n && n > 0 ? n : <Text type="secondary">∞</Text>),
     },
     {
       title: "Actions",
@@ -227,6 +235,9 @@ export default function ApiTokensSettings() {
           </Form.Item>
           <Form.Item name="allowed_ips" label="Source IP allowlist (comma-separated IP/CIDR, blank = any)">
             <Input placeholder="203.0.113.7, 10.0.0.0/8" />
+          </Form.Item>
+          <Form.Item name="rate_limit_per_min" label="Rate limit (requests/min, blank = unlimited)">
+            <InputNumber min={1} max={100000} style={{ width: "100%" }} />
           </Form.Item>
         </Form>
       </Modal>

@@ -39,7 +39,7 @@ func m7apiDB(t *testing.T) (*gin.Engine, repository.APITokenRepository, reposito
 func TestAPITokenRotate(t *testing.T) {
 	r, tr, _ := m7apiDB(t)
 	ctx := context.Background()
-	old, tok, err := tr.Mint(ctx, "ci", "01OP", nil, nil, nil)
+	old, tok, err := tr.Mint(ctx, "ci", "01OP", nil, nil, nil, 0)
 	if err != nil {
 		t.Fatalf("mint: %v", err)
 	}

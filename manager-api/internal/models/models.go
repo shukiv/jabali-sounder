@@ -153,6 +153,8 @@ type APIToken struct {
 	Scopes JSONStringArray `gorm:"column:scopes;type:text;serializer:json" json:"scopes"`
 	// AllowedIPs is an optional IP/CIDR allowlist; empty allows any source.
 	AllowedIPs JSONStringArray `gorm:"column:allowed_ips;type:text;serializer:json" json:"allowed_ips"`
+	// RateLimitPerMin caps requests per minute for this token (SND-31). 0 = off.
+	RateLimitPerMin int `gorm:"column:rate_limit_per_min;not null;default:0" json:"rate_limit_per_min"`
 }
 
 func (APIToken) TableName() string { return "api_tokens" }

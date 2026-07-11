@@ -25,7 +25,7 @@ const tokenPrefix = "snd_"
 // APITokenRepository stores read-only API tokens (M4).
 type APITokenRepository interface {
 	// Mint creates a token and returns the one-time plaintext plus the record.
-	Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time, scopes, allowedIPs []string) (string, *models.APIToken, error)
+	Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time, scopes, allowedIPs []string, rateLimitPerMin int) (string, *models.APIToken, error)
 	List(ctx context.Context) ([]models.APIToken, error)
 	Revoke(ctx context.Context, id string) error
 	// Rotate issues a new secret for an existing token (same id/name/expiry),
@@ -50,7 +50,7 @@ func FormatToken(id, secret string) string { return tokenPrefix + id + "_" + sec
 // HasTokenPrefix reports whether s looks like a Sounder API token.
 func HasTokenPrefix(s string) bool { return strings.HasPrefix(s, tokenPrefix) }
 
-func (r *apiTokenRepo) Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time, scopes, allowedIPs []string) (string, *models.APIToken, error) {
+func (r *apiTokenRepo) Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time, scopes, allowedIPs []string, rateLimitPerMin int) (string, *models.APIToken, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", nil, fmt.Errorf("api token secret: %w", err)
@@ -58,13 +58,14 @@ func (r *apiTokenRepo) Mint(ctx context.Context, name, createdBy string, expires
 	secret := hex.EncodeToString(buf)
 	sum := sha256.Sum256([]byte(secret))
 	tok := &models.APIToken{
-		ID:         ids.NewULID(),
-		Name:       name,
-		SecretHash: hex.EncodeToString(sum[:]),
-		CreatedBy:  createdBy,
-		CreatedAt:  time.Now(),
-		Scopes:     models.JSONStringArray(scopes),
-		AllowedIPs: models.JSONStringArray(allowedIPs),
+		ID:              ids.NewULID(),
+		Name:            name,
+		SecretHash:      hex.EncodeToString(sum[:]),
+		CreatedBy:       createdBy,
+		CreatedAt:       time.Now(),
+		Scopes:          models.JSONStringArray(scopes),
+		AllowedIPs:      models.JSONStringArray(allowedIPs),
+		RateLimitPerMin: rateLimitPerMin,
 	}
 	if expiresAt != nil {
 		tok.ExpiresAt = sql.NullTime{Time: *expiresAt, Valid: true}

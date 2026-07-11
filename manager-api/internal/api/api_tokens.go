@@ -47,7 +47,7 @@ func (h *apiTokenHandler) list(c *gin.Context) {
 	}
 	out := make([]gin.H, 0, len(tokens))
 	for _, tk := range tokens {
-		item := gin.H{"id": tk.ID, "name": tk.Name, "created_at": tk.CreatedAt, "scopes": []string(tk.Scopes), "allowed_ips": []string(tk.AllowedIPs)}
+		item := gin.H{"id": tk.ID, "name": tk.Name, "created_at": tk.CreatedAt, "scopes": []string(tk.Scopes), "allowed_ips": []string(tk.AllowedIPs), "rate_limit_per_min": tk.RateLimitPerMin}
 		if tk.LastUsedAt.Valid {
 			item["last_used_at"] = tk.LastUsedAt.Time
 		}
@@ -60,10 +60,11 @@ func (h *apiTokenHandler) list(c *gin.Context) {
 }
 
 type mintTokenRequest struct {
-	Name          string   `json:"name" binding:"required"`
-	ExpiresInDays int      `json:"expires_in_days"`
-	Scopes        []string `json:"scopes"`
-	AllowedIPs    []string `json:"allowed_ips"`
+	Name            string   `json:"name" binding:"required"`
+	ExpiresInDays   int      `json:"expires_in_days"`
+	Scopes          []string `json:"scopes"`
+	AllowedIPs      []string `json:"allowed_ips"`
+	RateLimitPerMin int      `json:"rate_limit_per_min"`
 }
 
 func (h *apiTokenHandler) mint(c *gin.Context) {
@@ -92,8 +93,12 @@ func (h *apiTokenHandler) mint(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid ip/cidr: " + bad})
 		return
 	}
+	if req.RateLimitPerMin < 0 || req.RateLimitPerMin > 100000 {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "rate_limit_per_min out of range"})
+		return
+	}
 
-	plaintext, tok, err := h.cfg.Repo.Mint(c.Request.Context(), req.Name, middleware.AdminID(c), expires, scopes, req.AllowedIPs)
+	plaintext, tok, err := h.cfg.Repo.Mint(c.Request.Context(), req.Name, middleware.AdminID(c), expires, scopes, req.AllowedIPs, req.RateLimitPerMin)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
