@@ -108,8 +108,16 @@ func (h *apiTokenHandler) revoke(c *gin.Context) {
 func (h *apiTokenHandler) rotate(c *gin.Context) {
 	plaintext, tok, err := h.cfg.Repo.Rotate(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "token not found"})
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+			return
+		}
+		failInternal(c, h.cfg.Log, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": plaintext, "id": tok.ID, "name": tok.Name})
+	// Rotation issues a fresh working credential — audit it like create/revoke so
+	// the action is traceable (invalidates the previous secret immediately).
+	h.cfg.Log.Info("audit", "event", "api_token.rotate", "actor", middleware.AdminUsername(c),
+		"token_id", tok.ID, "token_name", tok.Name, "request_id", middleware.GetRequestID(c))
+	c.JSON(http.StatusOK, gin.H{"id": tok.ID, "name": tok.Name, "token": plaintext})
 }

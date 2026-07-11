@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -119,6 +120,9 @@ func (r *apiTokenRepo) Validate(ctx context.Context, presented string) *models.A
 func (r *apiTokenRepo) Rotate(ctx context.Context, id string) (string, *models.APIToken, error) {
 	var tok models.APIToken
 	if err := r.db.WithContext(ctx).First(&tok, "id = ? AND revoked_at IS NULL", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", nil, ErrNotFound
+		}
 		return "", nil, fmt.Errorf("api token rotate lookup: %w", err)
 	}
 	buf := make([]byte, 32)

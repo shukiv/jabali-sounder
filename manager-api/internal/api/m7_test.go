@@ -65,6 +65,10 @@ func TestAPITokenRotate(t *testing.T) {
 	if tr.Validate(ctx, out.Token) == nil {
 		t.Fatal("new token must validate after rotate")
 	}
+	// Rotating an unknown id is a clean 404, not a 500.
+	if w := do(r, http.MethodPost, "/api/v1/admin/api-tokens/nope/rotate", ""); w.Code != http.StatusNotFound {
+		t.Fatalf("rotate unknown id: want 404, got %d", w.Code)
+	}
 }
 
 func TestBackupsList(t *testing.T) {
