@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -16,6 +17,7 @@ type config struct {
 	Secrets  secretsConfig  `toml:"secrets"`
 	JWT      jwtConfig      `toml:"jwt"`
 	Auth     authConfig     `toml:"auth"`
+	Poller   pollerConfig   `toml:"poller"`
 }
 
 type serverConfig struct {
@@ -26,6 +28,15 @@ type serverConfig struct {
 	// AllowPrivateTargets permits enrolling panels on private/loopback/
 	// link-local IPs (SND-4). Default false blocks SSRF to internal hosts.
 	AllowPrivateTargets bool `toml:"allow_private_targets"`
+}
+
+type pollerConfig struct {
+	// Enabled turns on the background health poller (roadmap M1).
+	Enabled bool `toml:"enabled"`
+	// IntervalSeconds between full fleet passes. Non-positive -> default.
+	IntervalSeconds int `toml:"interval_seconds"`
+	// RetentionDays bounds heartbeat history. 0 -> default; negative -> disabled.
+	RetentionDays int `toml:"retention_days"`
 }
 
 type authConfig struct {
@@ -69,6 +80,11 @@ func Defaults() config {
 			LoginMaxFailures:    5,
 			LoginLockoutSeconds: 900,
 			LoginWindowSeconds:  900,
+		},
+		Poller: pollerConfig{
+			Enabled:         true,
+			IntervalSeconds: 60,
+			RetentionDays:   14,
 		},
 		Log: logConfig{
 			Level:  "info",
@@ -129,6 +145,14 @@ func loadConfig(path string) (*config, error) {
 	}
 	if v := envFirst("JABALI_SOUNDER_ALLOW_PRIVATE_TARGETS"); v != "" {
 		cfg.Server.AllowPrivateTargets = truthy(v)
+	}
+	if v := envFirst("JABALI_SOUNDER_POLL_ENABLED"); v != "" {
+		cfg.Poller.Enabled = truthy(v)
+	}
+	if v := envFirst("JABALI_SOUNDER_POLL_INTERVAL"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Poller.IntervalSeconds = n
+		}
 	}
 
 	// Normalize: strip trailing slash from URL-like fields.

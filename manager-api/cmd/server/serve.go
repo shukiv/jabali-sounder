@@ -16,6 +16,7 @@ import (
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/poller"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
 )
@@ -73,6 +74,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// ---- DB ----
 	var serverRepo repository.ServerRepository
 	var adminRepo repository.AdminRepository
+	var heartbeatRepo repository.HeartbeatRepository
 	if cfg.Database.URL != "" {
 		if err := db.Migrate(cfg.Database.Driver, cfg.Database.URL); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -85,6 +87,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		log.Info("db connected", "driver", cfg.Database.Driver)
 		serverRepo = repository.NewServerRepository(gormDB)
 		adminRepo = repository.NewAdminRepository(gormDB)
+		heartbeatRepo = repository.NewHeartbeatRepository(gormDB)
 	} else {
 		log.Warn("database.url not set; running without DB — enrollment disabled")
 	}
@@ -114,6 +117,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	deps := app.Deps{
 		Log:                   log,
 		ServerRepo:            serverRepo,
+		HeartbeatRepo:         heartbeatRepo,
 		AdminRepo:             adminRepo,
 		SecretKey:             key,
 		JWTSecret:             jwtSecret,
@@ -147,6 +151,25 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	log.Info("listening", "addr", cfg.Server.Addr)
 
+	// Background health poller (roadmap M1): keeps fleet status current and
+	// records heartbeats without an operator clicking Check.
+	pollCtx, stopPoller := context.WithCancel(context.Background())
+	defer stopPoller()
+	if cfg.Poller.Enabled && serverRepo != nil && heartbeatRepo != nil {
+		hp := poller.New(poller.Config{
+			Servers:        serverRepo,
+			Heartbeats:     heartbeatRepo,
+			SecretKey:      key,
+			AllowPlaintext: cfg.Secrets.AllowPlaintextFallback,
+			Interval:       time.Duration(cfg.Poller.IntervalSeconds) * time.Second,
+			RetentionDays:  cfg.Poller.RetentionDays,
+			Log:            log,
+		})
+		go hp.Run(pollCtx)
+	} else {
+		log.Info("health poller disabled")
+	}
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -156,6 +179,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	case <-sigCh:
 		log.Info("shutdown signal received")
 	}
+	stopPoller()
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()

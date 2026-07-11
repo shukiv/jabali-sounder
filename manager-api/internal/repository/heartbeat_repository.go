@@ -16,6 +16,8 @@ type HeartbeatRepository interface {
 	Record(ctx context.Context, hb *models.Heartbeat) error
 	Latest(ctx context.Context, serverID string) (*models.Heartbeat, error)
 	Recent(ctx context.Context, serverID string, n int) ([]models.Heartbeat, error)
+	// PruneOlderThan deletes heartbeats older than cutoff; returns rows deleted.
+	PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
 }
 
 type heartbeatRepo struct{ db *gorm.DB }
@@ -64,5 +66,10 @@ func (r *heartbeatRepo) Recent(ctx context.Context, serverID string, n int) ([]m
 	return rows, nil
 }
 
-// Ensure the time import is used.
-var _ = time.Now
+func (r *heartbeatRepo) PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
+	res := r.db.WithContext(ctx).Where("checked_at < ?", cutoff).Delete(&models.Heartbeat{})
+	if res.Error != nil {
+		return 0, fmt.Errorf("heartbeat prune: %w", res.Error)
+	}
+	return res.RowsAffected, nil
+}

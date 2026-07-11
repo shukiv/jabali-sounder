@@ -26,6 +26,7 @@ import (
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/api"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/poller"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
 )
@@ -107,10 +108,12 @@ func newDesktopHandler() (http.Handler, error) {
 	}
 
 	gin.SetMode(gin.ReleaseMode)
+	serverRepo := repository.NewServerRepository(gormDB)
+	heartbeatRepo := repository.NewHeartbeatRepository(gormDB)
 	apiEngine := app.NewWithDeps(app.Deps{
 		Log:           slog.Default(),
-		ServerRepo:    repository.NewServerRepository(gormDB),
-		HeartbeatRepo: repository.NewHeartbeatRepository(gormDB),
+		ServerRepo:    serverRepo,
+		HeartbeatRepo: heartbeatRepo,
 		AdminRepo:     repository.NewAdminRepository(gormDB),
 		SecretKey:     key,
 		JWTSecret:     jwtSecret,
@@ -119,6 +122,15 @@ func newDesktopHandler() (http.Handler, error) {
 		// enrollment targets (SND-4) but never the plaintext fallback (SND-6).
 		AllowPrivateTargets: true,
 	})
+
+	// Background health poller (roadmap M1): keep fleet status current + record
+	// heartbeats. Runs for the app's lifetime.
+	go poller.New(poller.Config{
+		Servers:    serverRepo,
+		Heartbeats: heartbeatRepo,
+		SecretKey:  key,
+		Log:        slog.Default(),
+	}).Run(context.Background())
 
 	distFS, err := fs.Sub(assets, "dist")
 	if err != nil {

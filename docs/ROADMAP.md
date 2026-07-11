@@ -9,15 +9,15 @@ Status legend: 🔭 planned · 🚧 in progress · ✅ done
 
 ---
 
-## M1 — Observe → Monitor 🔭
+## M1 — Observe → Monitor 🚧
 
 **Goal:** turn Sounder from a passive viewer into an active monitor. Best
 value-to-effort, and the foundation everything else builds on.
 
-- **Background health poller + status history.** Probe every enrolled server on
-  an interval and record transitions (`active`↔`unreachable`,
-  `valid`↔`invalid`) into the existing `heartbeats` table. Today status only
-  changes when an operator clicks *Check*.
+- ✅ **Background health poller + status history.** Probes every non-disabled
+  server on a configurable interval, updates status/credential state, and records
+  a heartbeat per poll (with retention). Runs on both the server and desktop
+  builds. Status is now current without a manual *Check*.
 - **Alerting.** On top of the poller: thresholds (disk > 90%, credential
   invalid, server unreachable, cert expiring) delivered via webhook / email /
   Slack. The single biggest "why run this daily" feature.
