@@ -25,6 +25,7 @@ import {
   TeamOutlined,
   SettingOutlined,
   AuditOutlined,
+  DatabaseOutlined,
   UsergroupAddOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
@@ -49,6 +50,7 @@ const navItems = [
   { key: "/users", label: "Users", icon: <TeamOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/domains", label: "Domains", icon: <GlobalOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/mail", label: "Mail", icon: <MailOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/backups", label: "Backups", icon: <DatabaseOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/audit", label: "Audit", icon: <AuditOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "operator" },
   { key: "/settings", label: "Settings", icon: <SettingOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
   { key: "/team", label: "Team", icon: <UsergroupAddOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "owner" },

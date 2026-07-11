@@ -54,6 +54,15 @@ type pollerConfig struct {
 	RetentionDays int `toml:"retention_days"`
 	// CertWarnDays is the TLS-expiry alert threshold in days. 0 -> default.
 	CertWarnDays int `toml:"cert_warn_days"`
+	// BackupStaleDays flags servers with no recent successful backup (SND-27).
+	BackupStaleDays int `toml:"backup_stale_days"`
+	// Remediation enables auto-restart after repeated failures (SND-29). Off by
+	// default — an automated write action, opt-in only.
+	Remediation bool `toml:"remediation"`
+	// RemediationFailures is the consecutive-failure threshold. 0 -> default 3.
+	RemediationFailures int `toml:"remediation_failures"`
+	// RemediationService is the panel service to restart. "" -> default.
+	RemediationService string `toml:"remediation_service"`
 }
 
 type authConfig struct {

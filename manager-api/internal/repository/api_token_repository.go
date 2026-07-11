@@ -26,6 +26,11 @@ type APITokenRepository interface {
 	Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time) (string, *models.APIToken, error)
 	List(ctx context.Context) ([]models.APIToken, error)
 	Revoke(ctx context.Context, id string) error
+	// Rotate issues a new secret for an existing token (same id/name/expiry),
+	// invalidating the old secret; returns the new one-time plaintext.
+	Rotate(ctx context.Context, id string) (string, *models.APIToken, error)
+	// ListExpiring returns non-revoked tokens whose expiry falls in (now, before].
+	ListExpiring(ctx context.Context, now, before time.Time) ([]models.APIToken, error)
 	// Validate parses+verifies a presented token; returns the record or nil.
 	Validate(ctx context.Context, presented string) *models.APIToken
 }
@@ -109,4 +114,34 @@ func (r *apiTokenRepo) Validate(ctx context.Context, presented string) *models.A
 	}
 	_ = r.db.WithContext(ctx).Model(&models.APIToken{}).Where("id = ?", id).Update("last_used_at", time.Now()).Error
 	return &tok
+}
+
+func (r *apiTokenRepo) Rotate(ctx context.Context, id string) (string, *models.APIToken, error) {
+	var tok models.APIToken
+	if err := r.db.WithContext(ctx).First(&tok, "id = ? AND revoked_at IS NULL", id).Error; err != nil {
+		return "", nil, fmt.Errorf("api token rotate lookup: %w", err)
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", nil, fmt.Errorf("api token secret: %w", err)
+	}
+	secret := hex.EncodeToString(buf)
+	sum := sha256.Sum256([]byte(secret))
+	if err := r.db.WithContext(ctx).Model(&models.APIToken{}).Where("id = ?", id).
+		Updates(map[string]any{"secret_hash": hex.EncodeToString(sum[:]), "last_used_at": nil}).Error; err != nil {
+		return "", nil, fmt.Errorf("api token rotate update: %w", err)
+	}
+	tok.SecretHash = hex.EncodeToString(sum[:])
+	tok.LastUsedAt = sql.NullTime{}
+	return FormatToken(id, secret), &tok, nil
+}
+
+func (r *apiTokenRepo) ListExpiring(ctx context.Context, now, before time.Time) ([]models.APIToken, error) {
+	var rows []models.APIToken
+	if err := r.db.WithContext(ctx).
+		Where("revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at > ? AND expires_at <= ?", now, before).
+		Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("api token list expiring: %w", err)
+	}
+	return rows, nil
 }

@@ -39,3 +39,21 @@ secret = ""
 # TLS verification for outbound calls to managed panels is configured
 # per-server (the "Allow self-signed TLS certificate" toggle at enrollment),
 # not globally here. See docs/API.md — POST /api/v1/admin/servers.
+
+[poller]
+# Background health poller (roadmap M1). Keeps fleet status current + records
+# heartbeats/metrics, drives alerting, backup tracking, and remediation.
+enabled = true
+interval_seconds = 60
+retention_days = 14
+cert_warn_days = 14
+# Flag servers with no successful backup in this many days (SND-27). <0 disables.
+backup_stale_days = 7
+
+# Automatic remediation (SND-29) — OFF by default. When enabled, the poller
+# restarts a server's web service after N consecutive failed checks, once per
+# outage, skipping servers under an active maintenance window, and records an
+# audit entry. This is an automated WRITE action; enable only deliberately.
+remediation = false
+remediation_failures = 3
+remediation_service = "web"

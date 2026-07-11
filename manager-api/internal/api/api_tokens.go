@@ -33,6 +33,7 @@ func RegisterAPITokenRoutes(g *gin.RouterGroup, cfg APITokenHandlerConfig) {
 	t.GET("", h.list)
 	t.POST("", h.mint)
 	t.DELETE("/:id", h.revoke)
+	t.POST("/:id/rotate", h.rotate)
 }
 
 type apiTokenHandler struct{ cfg APITokenHandlerConfig }
@@ -102,4 +103,13 @@ func (h *apiTokenHandler) revoke(c *gin.Context) {
 	h.cfg.Log.Info("audit", "event", "api_token.revoke", "actor", middleware.AdminUsername(c),
 		"token_id", c.Param("id"), "request_id", middleware.GetRequestID(c))
 	c.JSON(http.StatusOK, gin.H{"id": c.Param("id"), "revoked": true})
+}
+
+func (h *apiTokenHandler) rotate(c *gin.Context) {
+	plaintext, tok, err := h.cfg.Repo.Rotate(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "token not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"token": plaintext, "id": tok.ID, "name": tok.Name})
 }

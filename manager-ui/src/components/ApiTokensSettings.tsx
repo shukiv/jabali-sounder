@@ -11,6 +11,7 @@ import {
   Alert,
   App,
   Popconfirm,
+  Space,
 } from "antd";
 import { KeyOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -74,6 +75,17 @@ export default function ApiTokensSettings() {
     }
   };
 
+  const rotate = async (id: string) => {
+    try {
+      const resp = await apiClient.post<{ token: string }>(`/admin/api-tokens/${id}/rotate`);
+      setMinted(resp.data.token);
+      message.success("Token rotated — copy the new value now");
+      qc.invalidateQueries({ queryKey: ["api-tokens"] });
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
+  };
+
   const columns = [
     { title: "Name", dataIndex: "name", key: "name" },
     {
@@ -98,16 +110,25 @@ export default function ApiTokensSettings() {
       title: "Actions",
       key: "actions",
       render: (_: unknown, r: ApiToken) => (
-        <Popconfirm
-          title={`Revoke "${r.name}"?`}
-          okText="Revoke"
-          okButtonProps={{ danger: true }}
-          onConfirm={() => revoke(r.id)}
-        >
-          <Button danger size="small">
-            Revoke
-          </Button>
-        </Popconfirm>
+        <Space size={4}>
+          <Popconfirm
+            title={`Rotate "${r.name}"? The current token stops working immediately.`}
+            okText="Rotate"
+            onConfirm={() => rotate(r.id)}
+          >
+            <Button size="small">Rotate</Button>
+          </Popconfirm>
+          <Popconfirm
+            title={`Revoke "${r.name}"?`}
+            okText="Revoke"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => revoke(r.id)}
+          >
+            <Button danger size="small">
+              Revoke
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ];

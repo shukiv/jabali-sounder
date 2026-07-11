@@ -269,6 +269,31 @@ type AuditLog struct {
 
 func (AuditLog) TableName() string { return "audit_logs" }
 
+// Backup run statuses.
+const (
+	BackupPending   = "pending"
+	BackupRunning   = "running"
+	BackupSucceeded = "succeeded"
+	BackupFailed    = "failed"
+)
+
+// BackupRun records a backup operation Sounder triggered on a panel and tracks
+// it to completion by polling the panel's operation status (SND-27). Panels
+// expose no backup listing, so Sounder is the source of truth for backup history.
+type BackupRun struct {
+	ID          string       `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	ServerID    string       `gorm:"column:server_id;type:char(26);index" json:"server_id"`
+	ServerName  string       `gorm:"column:server_name;type:varchar(200)" json:"server_name"`
+	OperationID string       `gorm:"column:operation_id;type:varchar(120)" json:"operation_id"`
+	Status      string       `gorm:"column:status;type:varchar(20);not null;index" json:"status"`
+	Message     string       `gorm:"column:message;type:varchar(400)" json:"message"`
+	TriggeredBy string       `gorm:"column:triggered_by;type:varchar(120)" json:"triggered_by"`
+	StartedAt   time.Time    `gorm:"column:started_at" json:"started_at"`
+	FinishedAt  sql.NullTime `gorm:"column:finished_at" json:"-"`
+}
+
+func (BackupRun) TableName() string { return "backup_runs" }
+
 // JSONStringArray is a []string stored as JSON in a column.
 type JSONStringArray []string
 

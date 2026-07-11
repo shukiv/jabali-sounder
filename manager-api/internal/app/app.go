@@ -30,6 +30,7 @@ type Deps struct {
 	MaintenanceRepo  repository.MaintenanceRepository
 	MutedRepo        repository.MutedAlertRepository
 	AuditRepo        repository.AuditRepository
+	BackupRepo       repository.BackupRepository
 	AdminRepo        repository.AdminRepository
 	SecretKey        *secrets.Key
 	JWTSecret        string
@@ -117,6 +118,7 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{
 		Audit:               deps.AuditRepo,
+		Backups:             deps.BackupRepo,
 		Repo:                deps.ServerRepo,
 		Heartbeats:          deps.HeartbeatRepo,
 		MetricSamples:       deps.MetricSampleRepo,
@@ -185,6 +187,11 @@ func NewWithDeps(deps Deps) *gin.Engine {
 
 	api.RegisterAuditRoutes(adminGroup, api.AuditHandlerConfig{
 		Repo: deps.AuditRepo,
+		Log:  deps.Log,
+	})
+
+	api.RegisterBackupRoutes(adminGroup, api.BackupHandlerConfig{
+		Repo: deps.BackupRepo,
 		Log:  deps.Log,
 	})
 

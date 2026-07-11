@@ -5,10 +5,15 @@ import (
 	"encoding/hex"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"gorm.io/gorm"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/alert"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
@@ -560,5 +565,176 @@ func TestEscalation(t *testing.T) {
 	p.escalate(ctx)
 	if len(fn.events) != 1 {
 		t.Fatalf("re-escalated: %d events", len(fn.events))
+	}
+}
+
+// m7Repos returns a fuller repo set for M7 features over one sqlite DB.
+func m7Repos(t *testing.T) (*gorm.DB, repository.ServerRepository, repository.HeartbeatRepository, repository.NotificationRepository, repository.BackupRepository, repository.AuditRepository, repository.APITokenRepository) {
+	t.Helper()
+	dbPath := filepath.Join(t.TempDir(), "m7.db")
+	if err := db.Migrate("sqlite", dbPath); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	g, err := db.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	return g, repository.NewServerRepository(g), repository.NewHeartbeatRepository(g),
+		repository.NewNotificationRepository(g), repository.NewBackupRepository(g),
+		repository.NewAuditRepository(g), repository.NewAPITokenRepository(g)
+}
+
+// seedPanel makes a server whose BaseURL points at a permissive httptest panel.
+func seedPanel(t *testing.T, repo repository.ServerRepository, baseURL string, status models.ServerStatus) *models.Server {
+	t.Helper()
+	s := &models.Server{
+		ID:               ids.NewULID(),
+		Name:             "panel",
+		BaseURL:          baseURL,
+		TokenID:          "TID",
+		TokenSecretEnc:   []byte(hex.EncodeToString([]byte("secret"))), // AllowPlaintext hex fallback
+		Scopes:           models.JSONStringArray{"read:*"},
+		Status:           status,
+		CredentialStatus: models.CredentialValid,
+	}
+	if err := repo.Create(context.Background(), s); err != nil {
+		t.Fatalf("seed panel: %v", err)
+	}
+	return s
+}
+
+// TestAutoRestartRemediation: after N consecutive failed checks the poller
+// restarts the service exactly once, audited, respecting the streak reset.
+func TestAutoRestartRemediation(t *testing.T) {
+	var restarts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/services/") && strings.HasSuffix(r.URL.Path, "/restart") {
+			atomic.AddInt32(&restarts, 1)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+
+	_, sr, hr, nr, _, ar, _ := m7Repos(t)
+	seedPanel(t, sr, srv.URL, models.ServerStatusActive)
+	ctx := context.Background()
+
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, Notifications: nr, Audit: ar,
+		AllowPlaintext: true, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Remediation: true, RemediationFailures: 2, RemediationService: "web",
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: false, CredentialValid: false}, nil, nil
+		},
+	})
+	p.PollOnce(ctx) // streak 1 -> no action
+	if atomic.LoadInt32(&restarts) != 0 {
+		t.Fatalf("premature restart")
+	}
+	p.PollOnce(ctx) // streak 2 -> restart once
+	p.PollOnce(ctx) // still failing -> must NOT restart again
+	if got := atomic.LoadInt32(&restarts); got != 1 {
+		t.Fatalf("want exactly 1 restart, got %d", got)
+	}
+	logs, _ := ar.List(ctx, repository.AuditFilter{})
+	if len(logs) != 1 || logs[0].Event != "server.remediation.restart" {
+		t.Fatalf("remediation not audited: %+v", logs)
+	}
+}
+
+// TestRemediationDisabledByDefault: without Remediation the poller never acts.
+func TestRemediationDisabledByDefault(t *testing.T) {
+	var restarts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&restarts, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	_, sr, hr, nr, _, _, _ := m7Repos(t)
+	seedPanel(t, sr, srv.URL, models.ServerStatusActive)
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, Notifications: nr, AllowPlaintext: true,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: false}, nil, nil
+		},
+	})
+	for i := 0; i < 5; i++ {
+		p.PollOnce(context.Background())
+	}
+	if atomic.LoadInt32(&restarts) != 0 {
+		t.Fatalf("remediation ran while disabled: %d", restarts)
+	}
+}
+
+// TestBackupWatcherResolvesToTerminal: a pending run polls to succeeded.
+func TestBackupWatcherReachesTerminal(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/operations/") {
+			_, _ = w.Write([]byte(`{"status":"succeeded","message":"done"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	_, sr, hr, nr, br, _, _ := m7Repos(t)
+	s := seedPanel(t, sr, srv.URL, models.ServerStatusActive)
+	ctx := context.Background()
+	_ = br.Create(ctx, &models.BackupRun{
+		ID: ids.NewULID(), ServerID: s.ID, ServerName: s.Name, OperationID: "op-1",
+		Status: models.BackupPending, StartedAt: time.Now(),
+	})
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, Notifications: nr, Backups: br, AllowPlaintext: true,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Now: func() time.Time { return time.Unix(1_700_000_000, 0) },
+	})
+	p.watchBackups(ctx)
+	runs, _ := br.ListRecent(ctx, 10)
+	if len(runs) != 1 || runs[0].Status != models.BackupSucceeded || !runs[0].FinishedAt.Valid {
+		t.Fatalf("backup not marked succeeded: %+v", runs)
+	}
+}
+
+// TestBackupStaleNotification: a server with no successful backup is flagged.
+func TestBackupStaleNotification(t *testing.T) {
+	_, sr, hr, nr, br, _, _ := m7Repos(t)
+	seedPanel(t, sr, "http://127.0.0.1:1", models.ServerStatusActive)
+	ctx := context.Background()
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, Notifications: nr, Backups: br, AllowPlaintext: true,
+		BackupStaleDays: 7, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Now: func() time.Time { return time.Unix(1_700_000_000, 0) },
+	})
+	p.checkBackupStale(ctx)
+	if n, _ := nr.UnreadCount(ctx); n != 1 {
+		t.Fatalf("want 1 stale-backup notification, got %d", n)
+	}
+	// Idempotent: a second pass does not duplicate.
+	p.checkBackupStale(ctx)
+	if n, _ := nr.UnreadCount(ctx); n != 1 {
+		t.Fatalf("stale-backup deduped failed: %d", n)
+	}
+}
+
+// TestTokenExpiryReminder: a token nearing expiry raises one reminder.
+func TestTokenExpiryReminder(t *testing.T) {
+	_, sr, hr, nr, _, _, tr := m7Repos(t)
+	ctx := context.Background()
+	exp := time.Now().Add(3 * 24 * time.Hour)
+	if _, _, err := tr.Mint(ctx, "ci", "owner", &exp); err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, Notifications: nr, APITokens: tr, AllowPlaintext: true,
+		TokenExpiryDays: 7, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	p.checkTokenExpiry(ctx)
+	p.checkTokenExpiry(ctx) // dedup
+	rows, _ := nr.ListRecent(ctx, 10)
+	if len(rows) != 1 || rows[0].Kind != "token_expiring" {
+		t.Fatalf("want 1 token_expiring notification, got %+v", rows)
 	}
 }

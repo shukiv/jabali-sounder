@@ -91,6 +91,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	var maintenanceRepo repository.MaintenanceRepository
 	var mutedRepo repository.MutedAlertRepository
 	var auditRepo repository.AuditRepository
+	var backupRepo repository.BackupRepository
 	if cfg.Database.URL != "" {
 		if err := db.Migrate(cfg.Database.Driver, cfg.Database.URL); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -113,6 +114,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		maintenanceRepo = repository.NewMaintenanceRepository(gormDB)
 		mutedRepo = repository.NewMutedAlertRepository(gormDB)
 		auditRepo = repository.NewAuditRepository(gormDB)
+		backupRepo = repository.NewBackupRepository(gormDB)
 		if err := alertRuleRepo.EnsureDefaults(context.Background(), time.Now().UTC()); err != nil {
 			log.Warn("seed default alert rules failed", "error", err)
 		}
@@ -155,6 +157,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		MaintenanceRepo:       maintenanceRepo,
 		MutedRepo:             mutedRepo,
 		AuditRepo:             auditRepo,
+		BackupRepo:            backupRepo,
 		AdminRepo:             adminRepo,
 		SecretKey:             key,
 		JWTSecret:             jwtSecret,
@@ -199,22 +202,28 @@ func runServe(cmd *cobra.Command, args []string) error {
 			log.Info("health alerts enabled", "channel", "webhook")
 		}
 		hp := poller.New(poller.Config{
-			Servers:        serverRepo,
-			Heartbeats:     heartbeatRepo,
-			MetricSamples:  metricRepo,
-			Sessions:       sessionRepo,
-			Notifications:  notifRepo,
-			AlertRules:     alertRuleRepo,
-			Channels:       alertChannelRepo,
-			Maintenance:    maintenanceRepo,
-			Muted:          mutedRepo,
-			SecretKey:      key,
-			AllowPlaintext: cfg.Secrets.AllowPlaintextFallback,
-			Interval:       time.Duration(cfg.Poller.IntervalSeconds) * time.Second,
-			RetentionDays:  cfg.Poller.RetentionDays,
-			Notifier:       notifier,
-			CertWarnDays:   cfg.Poller.CertWarnDays,
-			Log:            log,
+			Servers:             serverRepo,
+			Heartbeats:          heartbeatRepo,
+			MetricSamples:       metricRepo,
+			Sessions:            sessionRepo,
+			Notifications:       notifRepo,
+			Backups:             backupRepo,
+			Audit:               auditRepo,
+			BackupStaleDays:     cfg.Poller.BackupStaleDays,
+			Remediation:         cfg.Poller.Remediation,
+			RemediationFailures: cfg.Poller.RemediationFailures,
+			RemediationService:  cfg.Poller.RemediationService,
+			AlertRules:          alertRuleRepo,
+			Channels:            alertChannelRepo,
+			Maintenance:         maintenanceRepo,
+			Muted:               mutedRepo,
+			SecretKey:           key,
+			AllowPlaintext:      cfg.Secrets.AllowPlaintextFallback,
+			Interval:            time.Duration(cfg.Poller.IntervalSeconds) * time.Second,
+			RetentionDays:       cfg.Poller.RetentionDays,
+			Notifier:            notifier,
+			CertWarnDays:        cfg.Poller.CertWarnDays,
+			Log:                 log,
 		})
 		go hp.Run(pollCtx)
 	} else {

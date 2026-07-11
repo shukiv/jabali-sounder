@@ -10,6 +10,7 @@ import Domains from "./admin/Domains";
 import Users from "./admin/Users";
 import Settings from "./admin/Settings";
 import Audit from "./admin/Audit";
+import Backups from "./admin/Backups";
 import Team from "./admin/Team";
 import Login from "./admin/Login";
 import { useAuth } from "./hooks/useAuth";
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="team" element={<Team />} />
             <Route path="audit" element={<Audit />} />
+            <Route path="backups" element={<Backups />} />
             <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

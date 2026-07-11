@@ -158,22 +158,26 @@ restarted what, when"; a server's 7-day uptime is visible — all shipped.
 
 ---
 
-## M7 — Fleet ops 🔭
+## M7 — Fleet ops ✅
 
 **Goal:** operational depth that matters as the managed fleet grows.
 
-- 🔭 **Backup management view** (SND-27). Track backups across panels (age, size,
-  last-success), alert on stale/missing, trigger + poll status on top of the M2
-  backup action.
-- 🔭 **Token rotation + credential re-key** (SND-28). One-click rotate a panel's
-  automation token, rotate Sounder API tokens, expiry reminders.
-- 🔭 **Scheduled remediation / runbooks** (SND-29). Gated + audited automation:
-  scheduled backups, auto-restart after N failed checks, respecting maintenance
-  windows.
+- ✅ **Backup management view** (SND-27). Backup runs triggered from Sounder are
+  recorded and tracked to completion by the poller (panels expose no listing);
+  a Backups page shows per-run status/history, and servers with no recent
+  successful backup raise a notification. (Panels don't report backup size.)
+- ✅ **Token rotation + expiry reminders** (SND-28). One-click rotate a Sounder
+  API token (new secret, same id — old stops working immediately); the poller
+  reminds before a token expires. Panel credential re-key is the existing server
+  update (token_id/token_secret).
+- ✅ **Auto-restart remediation** (SND-29). Opt-in, off by default: the poller
+  restarts a server's web service after N consecutive failed checks, once per
+  outage, skipping maintenance windows, audited as `system:remediation`.
+  Config-gated (`[poller] remediation`).
 
-**Acceptance:** stale backups alert; a panel token can be rotated without
-re-enrollment; a runbook auto-restarts a flapping service under an operator's
-standing approval.
+**Acceptance:** stale backups alert; a Sounder token rotates without
+re-enrollment; a flapping service auto-restarts under an operator's standing
+(config) approval — all shipped.
 
 ---
 

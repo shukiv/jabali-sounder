@@ -8,6 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/ids"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/remote"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
@@ -159,6 +161,24 @@ func (h *serverHandler) actBackup(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), actionTimeout)
 	defer cancel()
 	res, err := client.CreateBackup(ctx, req.Targets)
+	// Record the backup run so it can be tracked to completion and surfaced in
+	// the Backups view (SND-27). Best-effort; never blocks the response.
+	if err == nil && res != nil && h.cfg.Backups != nil {
+		status := models.BackupPending
+		if res.Status != "" {
+			status = res.Status
+		}
+		_ = h.cfg.Backups.Create(c.Request.Context(), &models.BackupRun{
+			ID:          ids.NewULID(),
+			ServerID:    s.ID,
+			ServerName:  s.Name,
+			OperationID: res.OperationID,
+			Status:      status,
+			Message:     res.Message,
+			TriggeredBy: middleware.AdminUsername(c),
+			StartedAt:   time.Now().UTC(),
+		})
+	}
 	h.respondAction(c, s, "backup", res, err)
 }
 

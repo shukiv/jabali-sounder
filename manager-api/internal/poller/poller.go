@@ -25,15 +25,18 @@ import (
 )
 
 const (
-	defaultInterval      = 60 * time.Second
-	probeTimeout         = 15 * time.Second
-	pollConcurrency      = 8
-	defaultRetention     = 14 // days
-	pruneInterval        = time.Hour
-	defaultCertWarn      = 14 // days
-	cpuThreshold         = 80.0
-	cpuHighDuration      = 60 * time.Second
-	escalateAfterDefault = 15 * time.Minute
+	defaultInterval        = 60 * time.Second
+	probeTimeout           = 15 * time.Second
+	pollConcurrency        = 8
+	defaultRetention       = 14 // days
+	pruneInterval          = time.Hour
+	defaultCertWarn        = 14 // days
+	cpuThreshold           = 80.0
+	cpuHighDuration        = 60 * time.Second
+	escalateAfterDefault   = 15 * time.Minute
+	backupStaleDefault     = 7 // days
+	remediationFailDefault = 3
+	tokenExpiryDefault     = 7 // days
 )
 
 // Config wires the poller's collaborators.
@@ -71,6 +74,22 @@ type Config struct {
 	Muted repository.MutedAlertRepository
 	// EscalateAfter re-notifies unacked incidents (SND-21). 0 -> default.
 	EscalateAfter time.Duration
+	// Backups tracks backup runs to completion + staleness (SND-27). nil disables.
+	Backups repository.BackupRepository
+	// APITokens drives expiry reminders (SND-28). nil disables them.
+	APITokens repository.APITokenRepository
+	// TokenExpiryDays is the reminder lead time. 0 -> default 7.
+	TokenExpiryDays int
+	// BackupStaleDays flags servers whose last successful backup is older than
+	// this (or never). 0 -> default; negative -> disabled.
+	BackupStaleDays int
+	// Audit records automated remediation actions (SND-29). nil -> not audited.
+	Audit repository.AuditRepository
+	// Remediation enables automatic restart of a server's web service after
+	// RemediationFailures consecutive failed checks (SND-29). Off by default.
+	Remediation         bool
+	RemediationFailures int    // 0 -> default 3
+	RemediationService  string // service name to restart; "" -> default
 	// Now overrides the clock in tests; nil uses time.Now.
 	Now func() time.Time
 }
@@ -80,6 +99,9 @@ type Poller struct {
 	cfg         Config
 	breachMu    sync.Mutex
 	breachSince map[string]time.Time // key: serverID|metric
+	failMu      sync.Mutex
+	failStreak  map[string]int  // consecutive failed checks per server (SND-29)
+	restarted   map[string]bool // remediation already attempted this outage
 }
 
 // New returns a Poller, applying defaults for interval and logger.
@@ -102,7 +124,24 @@ func New(cfg Config) *Poller {
 	if cfg.EscalateAfter <= 0 {
 		cfg.EscalateAfter = escalateAfterDefault
 	}
-	return &Poller{cfg: cfg, breachSince: map[string]time.Time{}}
+	if cfg.BackupStaleDays == 0 {
+		cfg.BackupStaleDays = backupStaleDefault
+	}
+	if cfg.RemediationFailures <= 0 {
+		cfg.RemediationFailures = remediationFailDefault
+	}
+	if cfg.RemediationService == "" {
+		cfg.RemediationService = "web"
+	}
+	if cfg.TokenExpiryDays <= 0 {
+		cfg.TokenExpiryDays = tokenExpiryDefault
+	}
+	return &Poller{
+		cfg:         cfg,
+		breachSince: map[string]time.Time{},
+		failStreak:  map[string]int{},
+		restarted:   map[string]bool{},
+	}
 }
 
 // Run polls immediately, then every interval, until ctx is cancelled.
@@ -148,6 +187,7 @@ func (p *Poller) PollOnce(ctx context.Context) {
 	}
 	_ = g.Wait()
 	p.escalate(ctx)
+	p.watchBackups(ctx)
 }
 
 // prune drops heartbeat history older than the retention window so the poller
@@ -183,6 +223,202 @@ func (p *Poller) prune(ctx context.Context) {
 		if _, err := p.cfg.Maintenance.PruneExpired(ctx, cutoff); err != nil {
 			p.cfg.Log.Warn("poller: prune maintenance windows failed", "error", err)
 		}
+	}
+	if p.cfg.Backups != nil {
+		if _, err := p.cfg.Backups.PruneOlderThan(ctx, cutoff); err != nil {
+			p.cfg.Log.Warn("poller: prune backup runs failed", "error", err)
+		}
+	}
+	p.checkBackupStale(ctx)
+	p.checkTokenExpiry(ctx)
+}
+
+// checkTokenExpiry raises a one-time reminder for each API token entering its
+// expiry window (SND-28). Deduped per token via the notification's server_id.
+func (p *Poller) checkTokenExpiry(ctx context.Context) {
+	if p.cfg.APITokens == nil || p.cfg.Notifications == nil {
+		return
+	}
+	now := p.cfg.Now()
+	before := now.Add(time.Duration(p.cfg.TokenExpiryDays) * 24 * time.Hour)
+	toks, err := p.cfg.APITokens.ListExpiring(ctx, now, before)
+	if err != nil {
+		p.cfg.Log.Warn("poller: list expiring tokens failed", "error", err)
+		return
+	}
+	for _, t := range toks {
+		if exists, _ := p.cfg.Notifications.ActiveExists(ctx, t.ID, "token_expiring"); exists {
+			continue
+		}
+		days := int(t.ExpiresAt.Time.Sub(now).Hours() / 24)
+		_ = p.cfg.Notifications.Create(ctx, &models.Notification{
+			ID: ids.NewULID(), Kind: "token_expiring", ServerID: t.ID, ServerName: t.Name,
+			Metric: "api_token", Severity: models.SeverityWarning,
+			Message:   fmt.Sprintf("API token %q expires in %d days", t.Name, days),
+			CreatedAt: now.UTC(),
+		})
+	}
+}
+
+// clientFor decrypts a server's token and returns a remote client.
+func (p *Poller) clientFor(s models.Server) (*remote.Client, error) {
+	secret, err := secrets.OpenSecret(p.cfg.SecretKey, s.TokenSecretEnc, p.cfg.AllowPlaintext)
+	if err != nil {
+		return nil, err
+	}
+	return remote.NewClient(s.BaseURL, s.TokenID, secret, s.InsecureSkipVerify), nil
+}
+
+// backupTerminal maps a panel operation status to a terminal BackupRun status,
+// or "" if the operation is still in progress.
+func backupTerminal(status string) string {
+	switch strings.ToLower(status) {
+	case "succeeded", "success", "completed", "done", "ok":
+		return models.BackupSucceeded
+	case "failed", "error", "errored", "cancelled", "canceled":
+		return models.BackupFailed
+	default:
+		return ""
+	}
+}
+
+// watchBackups polls the panel operation status for each non-terminal backup run
+// and records the outcome; a fresh success resolves any stale-backup incident.
+func (p *Poller) watchBackups(ctx context.Context) {
+	if p.cfg.Backups == nil {
+		return
+	}
+	runs, err := p.cfg.Backups.NonTerminal(ctx)
+	if err != nil {
+		p.cfg.Log.Warn("poller: list non-terminal backups failed", "error", err)
+		return
+	}
+	for _, run := range runs {
+		if run.OperationID == "" {
+			continue // nothing to poll against
+		}
+		s, err := p.cfg.Servers.FindByID(ctx, run.ServerID)
+		if err != nil {
+			continue
+		}
+		client, err := p.clientFor(*s)
+		if err != nil {
+			continue
+		}
+		cctx, cancel := context.WithTimeout(ctx, probeTimeout)
+		op, _, err := client.OperationStatus(cctx, run.OperationID)
+		cancel()
+		if err != nil || op == nil {
+			continue // transient; try again next pass
+		}
+		terminal := backupTerminal(op.Status)
+		if terminal == "" {
+			_ = p.cfg.Backups.UpdateStatus(ctx, run.ID, models.BackupRunning, op.Message, nil)
+			continue
+		}
+		now := p.cfg.Now().UTC()
+		_ = p.cfg.Backups.UpdateStatus(ctx, run.ID, terminal, op.Message, &now)
+		if terminal == models.BackupSucceeded && p.cfg.Notifications != nil {
+			_ = p.cfg.Notifications.ResolveActive(ctx, run.ServerID, "backup_stale")
+		}
+	}
+}
+
+// checkBackupStale opens a notification for any server whose last successful
+// backup is older than the threshold (or never), and resolves it otherwise.
+func (p *Poller) checkBackupStale(ctx context.Context) {
+	if p.cfg.Backups == nil || p.cfg.Notifications == nil || p.cfg.BackupStaleDays < 0 {
+		return
+	}
+	servers, err := p.cfg.Servers.List(ctx)
+	if err != nil {
+		return
+	}
+	now := p.cfg.Now()
+	maxAge := time.Duration(p.cfg.BackupStaleDays) * 24 * time.Hour
+	for _, s := range servers {
+		if s.Status == models.ServerStatusDisabled {
+			continue
+		}
+		last, err := p.cfg.Backups.LatestSuccess(ctx, s.ID)
+		if err != nil {
+			continue
+		}
+		stale := last == nil || now.Sub(last.StartedAt) > maxAge
+		if !stale {
+			_ = p.cfg.Notifications.ResolveActive(ctx, s.ID, "backup_stale")
+			continue
+		}
+		if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, "backup_stale"); exists {
+			continue
+		}
+		if p.suppressed(ctx, s, now) {
+			continue
+		}
+		msg := fmt.Sprintf("no successful backup in over %d days", p.cfg.BackupStaleDays)
+		if last == nil {
+			msg = "no successful backup on record"
+		}
+		_ = p.cfg.Notifications.Create(ctx, &models.Notification{
+			ID: ids.NewULID(), Kind: "backup_stale", ServerID: s.ID, ServerName: s.Name,
+			Metric: "backup", Severity: models.SeverityWarning, Message: msg, CreatedAt: now.UTC(),
+		})
+	}
+}
+
+// maybeRemediate restarts a server's web service after N consecutive failed
+// checks, once per outage, gated by config + maintenance windows and audited
+// (SND-29). A healthy check resets the streak.
+func (p *Poller) maybeRemediate(ctx context.Context, s models.Server, healthy bool, secret string) {
+	if !p.cfg.Remediation {
+		return
+	}
+	p.failMu.Lock()
+	if healthy {
+		delete(p.failStreak, s.ID)
+		delete(p.restarted, s.ID)
+		p.failMu.Unlock()
+		return
+	}
+	p.failStreak[s.ID]++
+	streak := p.failStreak[s.ID]
+	already := p.restarted[s.ID]
+	p.failMu.Unlock()
+
+	if streak < p.cfg.RemediationFailures || already || secret == "" {
+		return
+	}
+	if p.suppressed(ctx, s, p.cfg.Now()) {
+		return // planned maintenance — do not auto-act
+	}
+
+	client := remote.NewClient(s.BaseURL, s.TokenID, secret, s.InsecureSkipVerify)
+	cctx, cancel := context.WithTimeout(ctx, probeTimeout)
+	_, err := client.RestartService(cctx, p.cfg.RemediationService)
+	cancel()
+
+	p.failMu.Lock()
+	p.restarted[s.ID] = true // one attempt per outage regardless of outcome
+	p.failMu.Unlock()
+
+	if err != nil {
+		p.cfg.Log.Warn("poller: auto-restart failed", "server", s.Name, "error", err)
+		return
+	}
+	p.cfg.Log.Info("poller: auto-restarted service", "server", s.Name, "service", p.cfg.RemediationService, "after_failures", streak)
+	if p.cfg.Audit != nil {
+		_ = p.cfg.Audit.Create(ctx, &models.AuditLog{
+			ID: ids.NewULID(), Event: "server.remediation.restart", Actor: "system:remediation",
+			ServerID: s.ID, ServerName: s.Name, CreatedAt: p.cfg.Now().UTC(),
+		})
+	}
+	if p.cfg.Notifications != nil {
+		_ = p.cfg.Notifications.Create(ctx, &models.Notification{
+			ID: ids.NewULID(), Kind: "auto_restart", ServerID: s.ID, ServerName: s.Name,
+			Metric: "remediation", Severity: models.SeverityWarning,
+			Message:   fmt.Sprintf("auto-restarted %q after %d failed checks", p.cfg.RemediationService, streak),
+			CreatedAt: p.cfg.Now().UTC(),
+		})
 	}
 }
 
@@ -229,6 +465,7 @@ func (p *Poller) pollServer(ctx context.Context, s models.Server) {
 	p.maybeAlert(ctx, s, status, cred, message)
 	p.checkCert(ctx, s)
 	p.recordMetrics(ctx, s, metrics)
+	p.maybeRemediate(ctx, s, healthy, secret)
 }
 
 // recordMetrics stores a compact resource-usage sample when the panel reported

@@ -30,6 +30,7 @@ type ServerHandlerConfig struct {
 	Heartbeats    repository.HeartbeatRepository
 	MetricSamples repository.MetricSampleRepository
 	Audit         repository.AuditRepository
+	Backups       repository.BackupRepository
 	SecretKey     *secrets.Key
 	Log           *slog.Logger
 	// AllowPrivateTargets disables the SSRF guard (SND-4).
