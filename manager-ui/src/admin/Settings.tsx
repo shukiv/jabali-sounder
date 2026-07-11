@@ -5,6 +5,7 @@ import type { UploadProps } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
 import TwoFactorSettings from "../components/TwoFactorSettings";
+import SessionsSettings from "../components/SessionsSettings";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -219,6 +220,8 @@ export default function Settings() {
       </Card>
 
       <TwoFactorSettings />
+
+      <SessionsSettings />
     </div>
   );
 }

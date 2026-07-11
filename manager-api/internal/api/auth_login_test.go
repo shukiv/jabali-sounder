@@ -177,3 +177,90 @@ func TestTwoFactorEnableAndLogin(t *testing.T) {
 		t.Fatalf("2fa login should succeed with token, got %d (%s)", fw.Code, fw.Body.String())
 	}
 }
+
+func newAuthTestRouterWithSessions(t *testing.T) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	dbPath := filepath.Join(t.TempDir(), "sess.db")
+	if err := db.Migrate("sqlite", dbPath); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	gormDB, err := db.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	adminRepo := repository.NewAdminRepository(gormDB)
+	admin, _ := NewAdmin("admin", "correct-horse-battery", models.RoleOwner)
+	if err := adminRepo.Create(context.Background(), admin); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	r := gin.New()
+	r.Use(middleware.RequestID())
+	RegisterAuthRoutes(r.Group("/api/v1"), AuthHandlerConfig{
+		AdminRepo:   adminRepo,
+		SessionRepo: repository.NewSessionRepository(gormDB),
+		JWTSecret:   "test-jwt-secret-not-empty-000000",
+		JWTTTL:      time.Hour,
+	})
+	return r
+}
+
+// TestSessionListAndRevoke covers M3 session management: login creates a
+// session; it's listable; revoking it makes the token stop working.
+func TestSessionListAndRevoke(t *testing.T) {
+	r := newAuthTestRouterWithSessions(t)
+
+	w := postLogin(r, "10.5.0.1", `{"username":"admin","password":"correct-horse-battery"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("login: %d (%s)", w.Code, w.Body.String())
+	}
+	var lr struct {
+		Token string `json:"token"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &lr)
+
+	// The token works.
+	if mw := getAuth(r, "/auth/me", lr.Token); mw.Code != http.StatusOK {
+		t.Fatalf("me before revoke: %d", mw.Code)
+	}
+
+	// One session, marked current.
+	lw := getAuth(r, "/auth/sessions", lr.Token)
+	var sl struct {
+		Data []struct {
+			ID        string `json:"id"`
+			IsCurrent bool   `json:"is_current"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(lw.Body.Bytes(), &sl)
+	if len(sl.Data) != 1 || !sl.Data[0].IsCurrent {
+		t.Fatalf("expected 1 current session, got %+v", sl.Data)
+	}
+
+	// Revoke it.
+	dw := deleteAuth(r, "/auth/sessions/"+sl.Data[0].ID, lr.Token)
+	if dw.Code != http.StatusOK {
+		t.Fatalf("revoke: %d (%s)", dw.Code, dw.Body.String())
+	}
+
+	// Token no longer works.
+	if mw := getAuth(r, "/auth/me", lr.Token); mw.Code != http.StatusUnauthorized {
+		t.Fatalf("me after revoke: %d, want 401", mw.Code)
+	}
+}
+
+func getAuth(r *gin.Engine, path, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1"+path, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func deleteAuth(r *gin.Engine, path, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1"+path, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}

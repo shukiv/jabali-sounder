@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -31,6 +32,7 @@ type AuthHandlerConfig struct {
 	// SecretKey seals the TOTP secret (M3: 2FA); AllowPlaintext mirrors servers.
 	SecretKey      *secrets.Key
 	AllowPlaintext bool
+	SessionRepo    repository.SessionRepository
 }
 
 // RegisterAuthRoutes mounts POST /api/v1/auth/login + GET /api/v1/auth/me.
@@ -42,17 +44,27 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 		cfg.Log = slog.Default()
 	}
 	h := &authHandler{cfg: cfg}
+	sessionCheck := func(ctx context.Context, sid string) bool {
+		if cfg.SessionRepo == nil {
+			return true
+		}
+		return cfg.SessionRepo.Active(ctx, sid)
+	}
+	authMW := middleware.AuthMiddleware(cfg.JWTSecret, sessionCheck)
 	auth := g.Group("/auth")
 	// Throttle brute force against the sole admin password (SND-3).
 	loginLimiter := middleware.NewLoginLimiter(cfg.LoginMaxFailures, cfg.LoginLockout, cfg.LoginWindow, nil, cfg.Log)
 	auth.POST("/login", loginLimiter.Middleware(), h.login)
 	auth.GET("/setup", h.setupStatus)
 	auth.POST("/setup", h.setup)
-	auth.GET("/me", middleware.AuthMiddleware(cfg.JWTSecret), h.me)
-	auth.POST("/change-password", middleware.AuthMiddleware(cfg.JWTSecret), h.changePassword)
-	auth.POST("/2fa/setup", middleware.AuthMiddleware(cfg.JWTSecret), h.setup2FA)
-	auth.POST("/2fa/activate", middleware.AuthMiddleware(cfg.JWTSecret), h.activate2FA)
-	auth.POST("/2fa/disable", middleware.AuthMiddleware(cfg.JWTSecret), h.disable2FA)
+	auth.GET("/me", authMW, h.me)
+	auth.POST("/change-password", authMW, h.changePassword)
+	auth.POST("/2fa/setup", authMW, h.setup2FA)
+	auth.POST("/2fa/activate", authMW, h.activate2FA)
+	auth.POST("/2fa/disable", authMW, h.disable2FA)
+	auth.GET("/sessions", authMW, h.listSessions)
+	auth.DELETE("/sessions/:id", authMW, h.revokeSession)
+	auth.POST("/logout", authMW, h.logout)
 }
 
 type authHandler struct{ cfg AuthHandlerConfig }
@@ -120,7 +132,7 @@ func (h *authHandler) login(c *gin.Context) {
 		h.cfg.Log.Warn("login: admin has invalid role, defaulting to viewer", "username", admin.Username)
 		role = models.RoleViewer
 	}
-	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, role, h.cfg.JWTTTL)
+	token, expiresAt, err := h.issueSession(c, admin, role)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
@@ -365,7 +377,7 @@ func (h *authHandler) setup(c *gin.Context) {
 		return
 	}
 
-	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, models.RoleOwner, h.cfg.JWTTTL)
+	token, expiresAt, err := h.issueSession(c, admin, models.RoleOwner)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
@@ -404,4 +416,92 @@ func NewAdmin(username, password string, role models.Role) (*models.Admin, error
 		PasswordHash: hash,
 		Role:         role,
 	}, nil
+}
+
+// issueSession records a server-side session (if a repo is configured) and mints
+// a JWT bound to it, so the login can later be listed and revoked (M3).
+func (h *authHandler) issueSession(c *gin.Context, admin *models.Admin, role models.Role) (string, time.Time, error) {
+	now := time.Now()
+	sessionID := ids.NewULID()
+	if h.cfg.SessionRepo != nil {
+		sess := &models.Session{
+			ID:         sessionID,
+			AdminID:    admin.ID,
+			UserAgent:  truncate(c.Request.UserAgent(), 400),
+			IP:         c.ClientIP(),
+			CreatedAt:  now,
+			LastSeenAt: now,
+			ExpiresAt:  now.Add(h.cfg.JWTTTL),
+		}
+		if err := h.cfg.SessionRepo.Create(c.Request.Context(), sess); err != nil {
+			return "", time.Time{}, err
+		}
+	}
+	return middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, role, sessionID, h.cfg.JWTTTL)
+}
+
+func truncate(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
+}
+
+func (h *authHandler) listSessions(c *gin.Context) {
+	if h.cfg.SessionRepo == nil {
+		c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
+		return
+	}
+	sessions, err := h.cfg.SessionRepo.ListActiveByAdmin(c.Request.Context(), middleware.AdminID(c))
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	current := middleware.AdminSessionID(c)
+	out := make([]gin.H, 0, len(sessions))
+	for _, sess := range sessions {
+		out = append(out, gin.H{
+			"id":           sess.ID,
+			"user_agent":   sess.UserAgent,
+			"ip":           sess.IP,
+			"created_at":   sess.CreatedAt,
+			"last_seen_at": sess.LastSeenAt,
+			"expires_at":   sess.ExpiresAt,
+			"is_current":   sess.ID == current,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": out, "total": len(out)})
+}
+
+func (h *authHandler) revokeSession(c *gin.Context) {
+	if h.cfg.SessionRepo == nil {
+		c.JSON(http.StatusOK, gin.H{"revoked": true})
+		return
+	}
+	sess, err := h.cfg.SessionRepo.FindByID(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+			return
+		}
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	// An admin can only revoke their own sessions.
+	if sess.AdminID != middleware.AdminID(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+	if err := h.cfg.SessionRepo.Revoke(c.Request.Context(), sess.ID); err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": sess.ID, "revoked": true})
+}
+
+func (h *authHandler) logout(c *gin.Context) {
+	if h.cfg.SessionRepo != nil {
+		_ = h.cfg.SessionRepo.Revoke(c.Request.Context(), middleware.AdminSessionID(c))
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

@@ -29,6 +29,7 @@ import {
 import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { useAuth, roleAtLeast } from "../hooks/useAuth";
+import apiClient from "../apiClient";
 import { useThemeMode } from "../theme/ThemeModeContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { BrandLogo } from "../components/BrandLogo";
@@ -86,7 +87,12 @@ export default function AdminLayout() {
         key: "logout",
         label: "Logout",
         icon: <LogoutOutlined />,
-        onClick: () => {
+        onClick: async () => {
+          try {
+            await apiClient.post("/auth/logout");
+          } catch {
+            // ignore — clear client-side regardless
+          }
           logout();
           window.location.reload();
         },

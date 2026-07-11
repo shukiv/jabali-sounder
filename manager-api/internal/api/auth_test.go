@@ -46,7 +46,7 @@ func newAuthTestEnv(t *testing.T) (*gin.Engine, repository.AdminRepository, stri
 		JWTSecret: secret,
 		JWTTTL:    time.Hour,
 	})
-	token, _, err := middleware.MintToken(secret, admin.ID, admin.Username, models.RoleOwner, time.Hour)
+	token, _, err := middleware.MintToken(secret, admin.ID, admin.Username, models.RoleOwner, "01SESSION", time.Hour)
 	if err != nil {
 		t.Fatalf("mint token: %v", err)
 	}

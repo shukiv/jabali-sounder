@@ -16,20 +16,34 @@ import (
 
 // Claims is the Sounder JWT payload: standard claims plus the operator role.
 type Claims struct {
-	Role string `json:"role"`
+	Role      string `json:"role"`
+	SessionID string `json:"sid"`
 	jwt.RegisteredClaims
 }
+
+// SessionCheck reports whether a session id is still active (not revoked/
+// expired). nil disables the server-side session check (stateless JWT).
+type SessionCheck func(ctx context.Context, sessionID string) bool
 
 // Context keys for storing admin identity.
 const (
 	ctxAdminID   = "admin_id"
 	ctxAdminUser = "admin_username"
 	ctxAdminRole = "admin_role"
+	ctxSession   = "session_id"
 )
 
 // AuthMiddleware verifies a JWT Bearer token and sets the admin identity
 // in the gin context. Returns 401 if missing/invalid.
-func AuthMiddleware(secret string) gin.HandlerFunc {
+func AuthMiddleware(secret string, sessions SessionCheck) gin.HandlerFunc {
+	// Fail closed: an empty secret means auth is misconfigured. Reject every
+	// request rather than serve the protected surface unauthenticated (and an
+	// attacker could otherwise forge a token by HMAC-signing with the empty key).
+	if secret == "" {
+		return func(c *gin.Context) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "server auth is misconfigured"})
+		}
+	}
 	return func(c *gin.Context) {
 		raw := c.GetHeader("Authorization")
 		if !strings.HasPrefix(raw, "Bearer ") {
@@ -50,10 +64,18 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 			return
 		}
 
+		// Server-side session check (M3): reject revoked/expired sessions even
+		// while the JWT itself is still cryptographically valid.
+		if sessions != nil && !sessions(c.Request.Context(), claims.SessionID) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "session revoked or expired"})
+			return
+		}
+
 		// claims.Subject = admin ID; claims.ID = username; Role = permission level.
 		c.Set(ctxAdminID, claims.Subject)
 		c.Set(ctxAdminUser, claims.ID)
 		c.Set(ctxAdminRole, claims.Role)
+		c.Set(ctxSession, claims.SessionID)
 		c.Next()
 	}
 }
@@ -79,6 +101,13 @@ func AdminRole(c *gin.Context) string {
 	return s
 }
 
+// AdminSessionID returns the current session id from the context, or "".
+func AdminSessionID(c *gin.Context) string {
+	v, _ := c.Get(ctxSession)
+	s, _ := v.(string)
+	return s
+}
+
 // RequireRole aborts with 403 unless the authenticated admin's role is at least
 // min. Must run after AuthMiddleware (M3: RBAC).
 func RequireRole(min models.Role) gin.HandlerFunc {
@@ -92,10 +121,11 @@ func RequireRole(min models.Role) gin.HandlerFunc {
 }
 
 // MintToken creates a signed JWT for the given admin.
-func MintToken(secret, adminID, username string, role models.Role, ttl time.Duration) (string, time.Time, error) {
+func MintToken(secret, adminID, username string, role models.Role, sessionID string, ttl time.Duration) (string, time.Time, error) {
 	expiresAt := time.Now().Add(ttl)
 	claims := &Claims{
-		Role: string(role),
+		Role:      string(role),
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   adminID,
 			ID:        username,

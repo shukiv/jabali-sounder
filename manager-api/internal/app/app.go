@@ -2,6 +2,7 @@
 package app
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -20,6 +21,7 @@ type Deps struct {
 	ServerRepo       repository.ServerRepository
 	HeartbeatRepo    repository.HeartbeatRepository
 	MetricSampleRepo repository.MetricSampleRepository
+	SessionRepo      repository.SessionRepository
 	AdminRepo        repository.AdminRepository
 	SecretKey        *secrets.Key
 	JWTSecret        string
@@ -76,13 +78,20 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		LoginWindow:      deps.LoginWindow,
 		SecretKey:        deps.SecretKey,
 		AllowPlaintext:   deps.AllowPlaintextSecrets,
+		SessionRepo:      deps.SessionRepo,
 	})
 
-	// Protected admin routes — require JWT.
-	adminGroup := v1.Group("")
-	if deps.JWTSecret != "" {
-		adminGroup.Use(middleware.AuthMiddleware(deps.JWTSecret))
+	// Protected admin routes. Mounted unconditionally — with an empty secret
+	// AuthMiddleware fails closed (rejects everything) rather than serve open.
+	// A revoked/expired session is also rejected here (M3).
+	sessionCheck := func(ctx context.Context, sid string) bool {
+		if deps.SessionRepo == nil {
+			return true
+		}
+		return deps.SessionRepo.Active(ctx, sid)
 	}
+	adminGroup := v1.Group("")
+	adminGroup.Use(middleware.AuthMiddleware(deps.JWTSecret, sessionCheck))
 
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{

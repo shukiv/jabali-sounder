@@ -119,6 +119,22 @@ type Admin struct {
 
 func (Admin) TableName() string { return "admins" }
 
+// Session is a server-side record of an issued login token, so sessions can be
+// listed and revoked (M3). The JWT carries the session id; AuthMiddleware
+// rejects revoked/expired sessions.
+type Session struct {
+	ID         string       `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	AdminID    string       `gorm:"column:admin_id;type:char(26);not null;index" json:"admin_id"`
+	UserAgent  string       `gorm:"column:user_agent;type:varchar(400)" json:"user_agent"`
+	IP         string       `gorm:"column:ip;type:varchar(64)" json:"ip"`
+	CreatedAt  time.Time    `gorm:"column:created_at" json:"created_at"`
+	LastSeenAt time.Time    `gorm:"column:last_seen_at" json:"last_seen_at"`
+	ExpiresAt  time.Time    `gorm:"column:expires_at" json:"expires_at"`
+	RevokedAt  sql.NullTime `gorm:"column:revoked_at" json:"-"`
+}
+
+func (Session) TableName() string { return "sessions" }
+
 // JSONStringArray is a []string stored as JSON in a column.
 type JSONStringArray []string
 

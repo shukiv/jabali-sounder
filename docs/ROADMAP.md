@@ -57,7 +57,7 @@ log.
 
 ---
 
-## M3 — Multi-operator 🚧
+## M3 — Multi-operator ✅
 
 **Goal:** real accountability behind the audit trail — there is a single shared
 `admin` today.
@@ -67,7 +67,9 @@ log.
   last-owner/self guards.
 - ✅ **2FA / TOTP** on login. Hand-rolled RFC-6238 (no dep); enroll/activate/
   disable in Settings, TOTP-sealed with the manager key, two-step login prompt.
-- **Session management** — list and revoke active sessions.
+- ✅ **Session management** — server-side session records (JWT carries a session
+  id); list active sessions, revoke any (revoked/expired rejected by
+  AuthMiddleware), server-side logout, expired-session pruning.
 
 **Acceptance:** more than one operator with distinct roles; a viewer cannot
 mutate; login supports TOTP; sessions can be revoked; audit events attribute the

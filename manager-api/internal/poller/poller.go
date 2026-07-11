@@ -35,6 +35,7 @@ type Config struct {
 	Servers        repository.ServerRepository
 	Heartbeats     repository.HeartbeatRepository
 	MetricSamples  repository.MetricSampleRepository
+	Sessions       repository.SessionRepository
 	SecretKey      *secrets.Key
 	AllowPlaintext bool
 	Interval       time.Duration
@@ -135,6 +136,11 @@ func (p *Poller) prune(ctx context.Context) {
 	if p.cfg.MetricSamples != nil {
 		if _, err := p.cfg.MetricSamples.PruneOlderThan(ctx, cutoff); err != nil {
 			p.cfg.Log.Warn("poller: prune metric samples failed", "error", err)
+		}
+	}
+	if p.cfg.Sessions != nil {
+		if _, err := p.cfg.Sessions.PruneExpired(ctx, time.Now()); err != nil {
+			p.cfg.Log.Warn("poller: prune sessions failed", "error", err)
 		}
 	}
 }
