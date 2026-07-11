@@ -163,12 +163,95 @@ type Notification struct {
 	Value      float64      `gorm:"column:value" json:"value"`
 	Threshold  float64      `gorm:"column:threshold" json:"threshold"`
 	Message    string       `gorm:"column:message;type:varchar(400)" json:"message"`
+	Severity   string       `gorm:"column:severity;type:varchar(20);not null;default:warning" json:"severity"`
 	CreatedAt  time.Time    `gorm:"column:created_at" json:"created_at"`
 	ReadAt     sql.NullTime `gorm:"column:read_at" json:"-"`
 	ResolvedAt sql.NullTime `gorm:"column:resolved_at" json:"-"`
+	// Incident fields (SND-21): acknowledgement, snooze, and escalation tracking.
+	AckedAt      sql.NullTime   `gorm:"column:acked_at" json:"-"`
+	AckedBy      string         `gorm:"column:acked_by;type:varchar(120)" json:"acked_by"`
+	SnoozedUntil sql.NullTime   `gorm:"column:snoozed_until" json:"-"`
+	EscalatedAt  sql.NullTime   `gorm:"column:escalated_at" json:"-"`
 }
 
 func (Notification) TableName() string { return "notifications" }
+
+// Alert severity levels, ordered by rank via SeverityRank.
+const (
+	SeverityInfo     = "info"
+	SeverityWarning  = "warning"
+	SeverityCritical = "critical"
+)
+
+// SeverityRank orders severities so a channel's min_severity can gate delivery.
+// Unknown severities rank as warning.
+func SeverityRank(s string) int {
+	switch s {
+	case SeverityInfo:
+		return 0
+	case SeverityCritical:
+		return 2
+	default:
+		return 1 // warning
+	}
+}
+
+// AlertRule is a fleet-wide threshold on a polled metric (SND-20). One rule per
+// metric; a breach sustained for DurationSeconds opens an incident.
+type AlertRule struct {
+	ID              string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	Metric          string    `gorm:"column:metric;type:varchar(40);not null;uniqueIndex" json:"metric"` // cpu|ram|disk|load1
+	Threshold       float64   `gorm:"column:threshold;not null" json:"threshold"`
+	DurationSeconds int       `gorm:"column:duration_seconds;not null" json:"duration_seconds"`
+	Severity        string    `gorm:"column:severity;type:varchar(20);not null" json:"severity"`
+	Enabled         bool      `gorm:"column:enabled;not null" json:"enabled"`
+	CreatedAt       time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt       time.Time `gorm:"column:updated_at" json:"updated_at"`
+}
+
+func (AlertRule) TableName() string { return "alert_rules" }
+
+// AlertChannel is a delivery destination for alerts (SND-20). ConfigEnc holds
+// the sealed JSON config (URLs/tokens/SMTP creds); secrets never leave the API.
+type AlertChannel struct {
+	ID          string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	Name        string    `gorm:"column:name;type:varchar(120);not null" json:"name"`
+	Type        string    `gorm:"column:type;type:varchar(20);not null" json:"type"` // webhook|ntfy|smtp|pagerduty
+	ConfigEnc   []byte    `gorm:"column:config_enc;type:blob" json:"-"`
+	MinSeverity string    `gorm:"column:min_severity;type:varchar(20);not null" json:"min_severity"`
+	Enabled     bool      `gorm:"column:enabled;not null" json:"enabled"`
+	CreatedAt   time.Time `gorm:"column:created_at" json:"created_at"`
+}
+
+func (AlertChannel) TableName() string { return "alert_channels" }
+
+// MaintenanceWindow suppresses alerts for a scope during planned work (SND-22).
+// ScopeType is global|environment|server; ScopeValue is the env name or server
+// id (empty for global).
+type MaintenanceWindow struct {
+	ID         string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	ScopeType  string    `gorm:"column:scope_type;type:varchar(20);not null" json:"scope_type"`
+	ScopeValue string    `gorm:"column:scope_value;type:varchar(200)" json:"scope_value"`
+	StartsAt   time.Time `gorm:"column:starts_at;not null" json:"starts_at"`
+	EndsAt     time.Time `gorm:"column:ends_at;not null" json:"ends_at"`
+	Reason     string    `gorm:"column:reason;type:varchar(400)" json:"reason"`
+	CreatedBy  string    `gorm:"column:created_by;type:varchar(120)" json:"created_by"`
+	CreatedAt  time.Time `gorm:"column:created_at" json:"created_at"`
+}
+
+func (MaintenanceWindow) TableName() string { return "maintenance_windows" }
+
+// MutedAlert silences a specific (server, kind) so no new incident is opened
+// until it is unmuted (SND-21).
+type MutedAlert struct {
+	ID        string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	ServerID  string    `gorm:"column:server_id;type:char(26);index:idx_muted_server_kind,unique" json:"server_id"`
+	Kind      string    `gorm:"column:kind;type:varchar(40);index:idx_muted_server_kind,unique" json:"kind"`
+	CreatedBy string    `gorm:"column:created_by;type:varchar(120)" json:"created_by"`
+	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
+}
+
+func (MutedAlert) TableName() string { return "muted_alerts" }
 
 // JSONStringArray is a []string stored as JSON in a column.
 type JSONStringArray []string

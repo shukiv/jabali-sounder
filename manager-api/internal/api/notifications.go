@@ -3,9 +3,11 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
 )
 
@@ -28,6 +30,8 @@ func RegisterNotificationRoutes(g *gin.RouterGroup, cfg NotificationHandlerConfi
 	n.GET("", h.list)
 	n.POST("/:id/read", h.markRead)
 	n.POST("/read-all", h.markAllRead)
+	n.POST("/:id/ack", h.ack)
+	n.POST("/:id/snooze", h.snooze)
 }
 
 type notificationHandler struct{ cfg NotificationHandlerConfig }
@@ -54,9 +58,13 @@ func (h *notificationHandler) list(c *gin.Context) {
 			"value":       n.Value,
 			"threshold":   n.Threshold,
 			"message":     n.Message,
+			"severity":    n.Severity,
 			"created_at":  n.CreatedAt,
 			"read":        n.ReadAt.Valid,
 			"resolved":    n.ResolvedAt.Valid,
+			"acked":       n.AckedAt.Valid,
+			"acked_by":    n.AckedBy,
+			"snoozed":     n.SnoozedUntil.Valid && n.SnoozedUntil.Time.After(n.CreatedAt),
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"data": out, "total": len(out), "unread_count": unread})
@@ -76,4 +84,34 @@ func (h *notificationHandler) markAllRead(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (h *notificationHandler) ack(c *gin.Context) {
+	if err := h.cfg.Repo.Ack(c.Request.Context(), c.Param("id"), middleware.AdminUsername(c), time.Now().UTC()); err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+type snoozeRequest struct {
+	Minutes int `json:"minutes"`
+}
+
+func (h *notificationHandler) snooze(c *gin.Context) {
+	var req snoozeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
+		return
+	}
+	if req.Minutes <= 0 || req.Minutes > 7*24*60 {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "minutes must be 1..10080"})
+		return
+	}
+	until := time.Now().UTC().Add(time.Duration(req.Minutes) * time.Minute)
+	if err := h.cfg.Repo.Snooze(c.Request.Context(), c.Param("id"), until); err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "snoozed_until": until})
 }

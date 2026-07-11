@@ -24,6 +24,10 @@ type Deps struct {
 	SessionRepo      repository.SessionRepository
 	APITokenRepo     repository.APITokenRepository
 	NotificationRepo repository.NotificationRepository
+	AlertRuleRepo    repository.AlertRuleRepository
+	AlertChannelRepo repository.AlertChannelRepository
+	MaintenanceRepo  repository.MaintenanceRepository
+	MutedRepo        repository.MutedAlertRepository
 	AdminRepo        repository.AdminRepository
 	SecretKey        *secrets.Key
 	JWTSecret        string
@@ -155,6 +159,16 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	api.RegisterNotificationRoutes(adminGroup, api.NotificationHandlerConfig{
 		Repo: deps.NotificationRepo,
 		Log:  deps.Log,
+	})
+
+	api.RegisterAlertingRoutes(adminGroup, api.AlertingHandlerConfig{
+		Rules:          deps.AlertRuleRepo,
+		Channels:       deps.AlertChannelRepo,
+		Maintenance:    deps.MaintenanceRepo,
+		Muted:          deps.MutedRepo,
+		SecretKey:      deps.SecretKey,
+		AllowPlaintext: deps.AllowPlaintextSecrets,
+		Log:            deps.Log,
 	})
 
 	api.RegisterSettingsRoutes(adminGroup, api.SettingsHandlerConfig{

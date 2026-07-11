@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,14 +25,15 @@ import (
 )
 
 const (
-	defaultInterval  = 60 * time.Second
-	probeTimeout     = 15 * time.Second
-	pollConcurrency  = 8
-	defaultRetention = 14 // days
-	pruneInterval    = time.Hour
-	defaultCertWarn  = 14 // days
-	cpuThreshold     = 80.0
-	cpuHighDuration  = 60 * time.Second
+	defaultInterval      = 60 * time.Second
+	probeTimeout         = 15 * time.Second
+	pollConcurrency      = 8
+	defaultRetention     = 14 // days
+	pruneInterval        = time.Hour
+	defaultCertWarn      = 14 // days
+	cpuThreshold         = 80.0
+	cpuHighDuration      = 60 * time.Second
+	escalateAfterDefault = 15 * time.Minute
 )
 
 // Config wires the poller's collaborators.
@@ -59,15 +61,25 @@ type Config struct {
 	CertProbe func(baseURL string) (time.Time, error)
 	// Notifications receives in-app alerts (SND-18). nil disables them.
 	Notifications repository.NotificationRepository
+	// AlertRules drives metric thresholds (SND-20). nil -> a built-in CPU rule.
+	AlertRules repository.AlertRuleRepository
+	// Channels are extra delivery destinations (SND-20). nil -> legacy webhook only.
+	Channels repository.AlertChannelRepository
+	// Maintenance suppresses alerts during planned windows (SND-22). nil -> never.
+	Maintenance repository.MaintenanceRepository
+	// Muted silences specific (server, kind) alerts (SND-21). nil -> never.
+	Muted repository.MutedAlertRepository
+	// EscalateAfter re-notifies unacked incidents (SND-21). 0 -> default.
+	EscalateAfter time.Duration
 	// Now overrides the clock in tests; nil uses time.Now.
 	Now func() time.Time
 }
 
 // Poller periodically checks every non-disabled server and records the outcome.
 type Poller struct {
-	cfg          Config
-	cpuMu        sync.Mutex
-	cpuHighSince map[string]time.Time
+	cfg         Config
+	breachMu    sync.Mutex
+	breachSince map[string]time.Time // key: serverID|metric
 }
 
 // New returns a Poller, applying defaults for interval and logger.
@@ -87,7 +99,10 @@ func New(cfg Config) *Poller {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Poller{cfg: cfg, cpuHighSince: map[string]time.Time{}}
+	if cfg.EscalateAfter <= 0 {
+		cfg.EscalateAfter = escalateAfterDefault
+	}
+	return &Poller{cfg: cfg, breachSince: map[string]time.Time{}}
 }
 
 // Run polls immediately, then every interval, until ctx is cancelled.
@@ -132,6 +147,7 @@ func (p *Poller) PollOnce(ctx context.Context) {
 		})
 	}
 	_ = g.Wait()
+	p.escalate(ctx)
 }
 
 // prune drops heartbeat history older than the retention window so the poller
@@ -161,6 +177,11 @@ func (p *Poller) prune(ctx context.Context) {
 	if p.cfg.Notifications != nil {
 		if _, err := p.cfg.Notifications.PruneOlderThan(ctx, cutoff); err != nil {
 			p.cfg.Log.Warn("poller: prune notifications failed", "error", err)
+		}
+	}
+	if p.cfg.Maintenance != nil {
+		if _, err := p.cfg.Maintenance.PruneExpired(ctx, cutoff); err != nil {
+			p.cfg.Log.Warn("poller: prune maintenance windows failed", "error", err)
 		}
 	}
 }
@@ -229,54 +250,236 @@ func (p *Poller) recordMetrics(ctx context.Context, s models.Server, st *remote.
 	if err := p.cfg.MetricSamples.Record(ctx, m); err != nil {
 		p.cfg.Log.Warn("poller: record metric sample failed", "server", s.Name, "error", err)
 	}
-	if snap.CPUPercent != nil {
-		p.evaluateCPU(ctx, s, *snap.CPUPercent, p.cfg.Now())
-	}
+	p.evaluateRules(ctx, s, snap, p.cfg.Now())
 }
 
-// evaluateCPU raises an in-app notification when a server's CPU stays above the
-// threshold continuously for at least cpuHighDuration, deduped to one active
-// incident, and resolves it on recovery (SND-18).
-func (p *Poller) evaluateCPU(ctx context.Context, s models.Server, cpu float64, now time.Time) {
+// evaluateRules checks each enabled alert rule against the latest snapshot. A
+// value over threshold sustained for the rule's duration opens one incident
+// (deduped, severity-tagged), dispatched to every channel that accepts the
+// severity; a drop back to/under threshold resolves it (SND-20/21/22).
+func (p *Poller) evaluateRules(ctx context.Context, s models.Server, snap remote.MetricSnapshot, now time.Time) {
 	if p.cfg.Notifications == nil {
 		return
 	}
-	if cpu > cpuThreshold {
-		p.cpuMu.Lock()
-		since, tracking := p.cpuHighSince[s.ID]
-		if !tracking {
-			p.cpuHighSince[s.ID] = now
-			p.cpuMu.Unlock()
-			return // incident just started; not yet sustained
+	for _, rule := range p.enabledRules(ctx) {
+		val := metricValue(snap, rule.Metric)
+		if val == nil {
+			continue // panel did not report this metric
 		}
-		p.cpuMu.Unlock()
-		if now.Sub(since) < cpuHighDuration {
-			return // high, but not yet for the required duration (transient spike)
+		kind := rule.Metric + "_high"
+		key := s.ID + "|" + rule.Metric
+
+		if *val > rule.Threshold {
+			p.breachMu.Lock()
+			since, tracking := p.breachSince[key]
+			if !tracking {
+				p.breachSince[key] = now
+				since = now
+			}
+			p.breachMu.Unlock()
+			if now.Sub(since) < time.Duration(rule.DurationSeconds)*time.Second {
+				continue // breaching, but not yet for the required duration
+			}
+			if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, kind); exists {
+				continue // one active incident per (server, metric)
+			}
+			if p.suppressed(ctx, s, now) {
+				continue // planned maintenance window
+			}
+			if muted, _ := p.isMuted(ctx, s.ID, kind); muted {
+				continue // operator silenced this alert
+			}
+			msg := breachMessage(rule.Metric, *val, rule.Threshold)
+			_ = p.cfg.Notifications.Create(ctx, &models.Notification{
+				ID:         ids.NewULID(),
+				Kind:       kind,
+				ServerID:   s.ID,
+				ServerName: s.Name,
+				Metric:     rule.Metric,
+				Value:      *val,
+				Threshold:  rule.Threshold,
+				Severity:   rule.Severity,
+				Message:    msg,
+				CreatedAt:  now.UTC(),
+			})
+			p.cfg.Log.Info("poller: threshold incident", "server", s.Name, "metric", rule.Metric, "value", *val)
+			p.dispatch(ctx, alert.Event{
+				Kind:       alert.KindDown,
+				ServerID:   s.ID,
+				ServerName: s.Name,
+				BaseURL:    s.BaseURL,
+				Status:     string(s.Status),
+				Message:    msg,
+				At:         now.UTC(),
+			}, rule.Severity, &s, now)
+			continue
 		}
-		if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, "cpu_high"); exists {
-			return // one active notification per incident
+
+		// Recovered: clear tracking and resolve any open incident.
+		p.breachMu.Lock()
+		_, was := p.breachSince[key]
+		delete(p.breachSince, key)
+		p.breachMu.Unlock()
+		if !was {
+			continue
 		}
-		_ = p.cfg.Notifications.Create(ctx, &models.Notification{
-			ID:         ids.NewULID(),
-			Kind:       "cpu_high",
-			ServerID:   s.ID,
-			ServerName: s.Name,
-			Metric:     "cpu",
-			Value:      cpu,
-			Threshold:  cpuThreshold,
-			Message:    fmt.Sprintf("CPU at %.0f%% for over %ds", cpu, int(cpuHighDuration.Seconds())),
-			CreatedAt:  now.UTC(),
-		})
-		p.cfg.Log.Info("poller: cpu-high notification", "server", s.Name, "cpu", cpu)
+		if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, kind); exists {
+			_ = p.cfg.Notifications.ResolveActive(ctx, s.ID, kind)
+			p.dispatch(ctx, alert.Event{
+				Kind:       alert.KindRecovered,
+				ServerID:   s.ID,
+				ServerName: s.Name,
+				BaseURL:    s.BaseURL,
+				Status:     string(s.Status),
+				Message:    recoverMessage(rule.Metric, *val),
+				At:         now.UTC(),
+			}, models.SeverityInfo, &s, now)
+		}
+	}
+}
+
+// enabledRules returns the configured rules, or a built-in CPU rule when no
+// rule repository is wired (keeps SND-18 behaviour and existing tests intact).
+func (p *Poller) enabledRules(ctx context.Context) []models.AlertRule {
+	if p.cfg.AlertRules != nil {
+		if rs, err := p.cfg.AlertRules.ListEnabled(ctx); err == nil {
+			return rs
+		} else {
+			p.cfg.Log.Warn("poller: list alert rules failed", "error", err)
+		}
+	}
+	return []models.AlertRule{{
+		Metric: "cpu", Threshold: cpuThreshold, DurationSeconds: int(cpuHighDuration.Seconds()),
+		Severity: models.SeverityCritical, Enabled: true,
+	}}
+}
+
+func metricValue(snap remote.MetricSnapshot, metric string) *float64 {
+	switch metric {
+	case "cpu":
+		return snap.CPUPercent
+	case "ram":
+		return snap.RAMPercent
+	case "disk":
+		return snap.DiskPercent
+	case "load1":
+		return snap.Load1
+	}
+	return nil
+}
+
+func breachMessage(metric string, val, thr float64) string {
+	if metric == "load1" {
+		return fmt.Sprintf("load1 at %.2f (threshold %.2f)", val, thr)
+	}
+	return fmt.Sprintf("%s at %.0f%% (threshold %.0f%%)", strings.ToUpper(metric), val, thr)
+}
+
+func recoverMessage(metric string, val float64) string {
+	if metric == "load1" {
+		return fmt.Sprintf("load1 back to %.2f", val)
+	}
+	return fmt.Sprintf("%s back to %.0f%%", strings.ToUpper(metric), val)
+}
+
+func (p *Poller) isMuted(ctx context.Context, serverID, kind string) (bool, error) {
+	if p.cfg.Muted == nil {
+		return false, nil
+	}
+	return p.cfg.Muted.IsMuted(ctx, serverID, kind)
+}
+
+// suppressed reports whether an active maintenance window covers this server.
+func (p *Poller) suppressed(ctx context.Context, s models.Server, now time.Time) bool {
+	if p.cfg.Maintenance == nil {
+		return false
+	}
+	active, err := p.cfg.Maintenance.ActiveForServer(ctx, s.ID, s.Environment, now)
+	if err != nil {
+		p.cfg.Log.Warn("poller: maintenance check failed", "server", s.Name, "error", err)
+		return false
+	}
+	return active
+}
+
+// dispatch delivers ev to the legacy webhook plus every enabled channel that
+// accepts the severity, unless a maintenance window suppresses it.
+func (p *Poller) dispatch(ctx context.Context, ev alert.Event, severity string, s *models.Server, now time.Time) {
+	if s != nil && p.suppressed(ctx, *s, now) {
+		p.cfg.Log.Debug("poller: alert suppressed by maintenance", "server", s.Name, "kind", ev.Kind)
 		return
 	}
-	// Recovered (at or below threshold): clear tracking and resolve any incident.
-	p.cpuMu.Lock()
-	_, was := p.cpuHighSince[s.ID]
-	delete(p.cpuHighSince, s.ID)
-	p.cpuMu.Unlock()
-	if was {
-		_ = p.cfg.Notifications.ResolveActive(ctx, s.ID, "cpu_high")
+	var notifiers []alert.Notifier
+	if p.cfg.Notifier != nil {
+		notifiers = append(notifiers, p.cfg.Notifier)
+	}
+	notifiers = append(notifiers, p.notifiersFor(ctx, severity)...)
+	if len(notifiers) == 0 {
+		return
+	}
+	alert.Dispatch(ctx, p.cfg.Log, notifiers, ev)
+}
+
+// notifiersFor builds notifiers for every enabled channel whose min_severity
+// admits the given severity. Channel config is sealed; it is opened here.
+func (p *Poller) notifiersFor(ctx context.Context, severity string) []alert.Notifier {
+	if p.cfg.Channels == nil {
+		return nil
+	}
+	chans, err := p.cfg.Channels.ListEnabled(ctx)
+	if err != nil {
+		p.cfg.Log.Warn("poller: list channels failed", "error", err)
+		return nil
+	}
+	want := models.SeverityRank(severity)
+	var out []alert.Notifier
+	for _, ch := range chans {
+		if models.SeverityRank(ch.MinSeverity) > want {
+			continue
+		}
+		raw, err := secrets.OpenSecret(p.cfg.SecretKey, ch.ConfigEnc, p.cfg.AllowPlaintext)
+		if err != nil {
+			p.cfg.Log.Warn("poller: open channel config failed", "channel", ch.Name, "error", err)
+			continue
+		}
+		var m map[string]string
+		if err := json.Unmarshal([]byte(raw), &m); err != nil {
+			p.cfg.Log.Warn("poller: decode channel config failed", "channel", ch.Name, "error", err)
+			continue
+		}
+		n, err := alert.BuildNotifier(ch.Type, m, p.cfg.Log)
+		if err != nil {
+			p.cfg.Log.Warn("poller: build channel failed", "channel", ch.Name, "error", err)
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
+// escalate re-notifies incidents left unacked past EscalateAfter, once (SND-21).
+func (p *Poller) escalate(ctx context.Context) {
+	if p.cfg.Notifications == nil {
+		return
+	}
+	now := p.cfg.Now()
+	before := now.Add(-p.cfg.EscalateAfter)
+	stale, err := p.cfg.Notifications.UnackedSince(ctx, before, now)
+	if err != nil {
+		p.cfg.Log.Warn("poller: escalation query failed", "error", err)
+		return
+	}
+	for _, n := range stale {
+		p.dispatch(ctx, alert.Event{
+			Kind:       alert.KindDown,
+			ServerID:   n.ServerID,
+			ServerName: n.ServerName,
+			Status:     "unacked",
+			Message:    "ESCALATION (unacknowledged): " + n.Message,
+			At:         now.UTC(),
+		}, models.SeverityCritical, nil, now)
+		_ = p.cfg.Notifications.MarkEscalated(ctx, n.ID, now)
+		p.cfg.Log.Info("poller: escalated incident", "id", n.ID, "server", n.ServerName)
 	}
 }
 
@@ -290,9 +493,6 @@ func (p *Poller) checkCert(ctx context.Context, s models.Server) {
 	}
 	_ = p.cfg.Servers.UpdateCertExpiry(ctx, s.ID, &exp)
 
-	if p.cfg.Notifier == nil {
-		return
-	}
 	now := time.Now()
 	warn := time.Duration(p.cfg.CertWarnDays) * 24 * time.Hour
 	newWithin := exp.Sub(now) < warn // includes already-expired
@@ -305,7 +505,7 @@ func (p *Poller) checkCert(ctx context.Context, s models.Server) {
 	if days < 0 {
 		msg = "has expired"
 	}
-	ev := alert.Event{
+	p.dispatch(ctx, alert.Event{
 		Kind:       alert.KindCertExpiring,
 		ServerID:   s.ID,
 		ServerName: s.Name,
@@ -313,11 +513,7 @@ func (p *Poller) checkCert(ctx context.Context, s models.Server) {
 		Status:     string(s.Status),
 		Message:    msg,
 		At:         now.UTC(),
-	}
-	if aerr := p.cfg.Notifier.Notify(ctx, ev); aerr != nil {
-		p.cfg.Log.Warn("poller: cert alert delivery failed", "server", s.Name, "error", aerr)
-		return
-	}
+	}, models.SeverityWarning, &s, now)
 	p.cfg.Log.Info("poller: cert alert sent", "server", s.Name, "days", days)
 }
 
@@ -333,7 +529,7 @@ func (p *Poller) certExpiry(baseURL string) (time.Time, error) {
 // stays quiet on transient unknown states and when no notifier is configured, so
 // it does not spam on every poll.
 func (p *Poller) maybeAlert(ctx context.Context, s models.Server, status models.ServerStatus, cred models.CredentialStatus, message string) {
-	if p.cfg.Notifier == nil {
+	if p.cfg.Notifier == nil && p.cfg.Channels == nil {
 		return
 	}
 	priorHealthy := s.Status == models.ServerStatusActive && s.CredentialStatus == models.CredentialValid
@@ -350,7 +546,12 @@ func (p *Poller) maybeAlert(ctx context.Context, s models.Server, status models.
 		return
 	}
 
-	ev := alert.Event{
+	now := time.Now()
+	severity := models.SeverityCritical
+	if kind == alert.KindRecovered {
+		severity = models.SeverityInfo
+	}
+	p.dispatch(ctx, alert.Event{
 		Kind:             kind,
 		ServerID:         s.ID,
 		ServerName:       s.Name,
@@ -358,12 +559,8 @@ func (p *Poller) maybeAlert(ctx context.Context, s models.Server, status models.
 		Status:           string(status),
 		CredentialStatus: string(cred),
 		Message:          message,
-		At:               time.Now().UTC(),
-	}
-	if err := p.cfg.Notifier.Notify(ctx, ev); err != nil {
-		p.cfg.Log.Warn("poller: alert delivery failed", "server", s.Name, "kind", kind, "error", err)
-		return
-	}
+		At:               now.UTC(),
+	}, severity, &s, now)
 	p.cfg.Log.Info("poller: alert sent", "server", s.Name, "kind", kind)
 }
 

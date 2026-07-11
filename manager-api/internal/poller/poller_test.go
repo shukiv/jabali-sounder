@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -416,5 +417,148 @@ func TestCPUNotificationRecoveryAndReincident(t *testing.T) {
 	rows, _ = nr.ListRecent(ctx, 50)
 	if len(rows) != 2 {
 		t.Fatalf("want 2 notifications after re-incident, got %d", len(rows))
+	}
+}
+
+// m5Repos returns the full repo set used by the M5 alerting engine.
+func m5Repos(t *testing.T) (repository.ServerRepository, repository.HeartbeatRepository, repository.MetricSampleRepository, repository.NotificationRepository, repository.AlertRuleRepository, repository.MaintenanceRepository, repository.MutedAlertRepository) {
+	t.Helper()
+	dbPath := filepath.Join(t.TempDir(), "poll.db")
+	if err := db.Migrate("sqlite", dbPath); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	gormDB, err := db.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	return repository.NewServerRepository(gormDB), repository.NewHeartbeatRepository(gormDB),
+		repository.NewMetricSampleRepository(gormDB), repository.NewNotificationRepository(gormDB),
+		repository.NewAlertRuleRepository(gormDB), repository.NewMaintenanceRepository(gormDB),
+		repository.NewMutedAlertRepository(gormDB)
+}
+
+// TestRuleDrivenThreshold: a lowered CPU rule with zero duration fires on the
+// first breaching poll.
+func TestRuleDrivenThreshold(t *testing.T) {
+	sr, hr, mr, nr, rr, _, _ := m5Repos(t)
+	seed(t, sr, models.ServerStatusActive)
+	ctx := context.Background()
+	if err := rr.EnsureDefaults(ctx, time.Unix(1_700_000_000, 0)); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+	if err := rr.Update(ctx, &models.AlertRule{Metric: "cpu", Threshold: 50, DurationSeconds: 0, Severity: models.SeverityWarning, Enabled: true}); err != nil {
+		t.Fatalf("update rule: %v", err)
+	}
+	cpu := 60.0
+	now := time.Unix(1_700_000_000, 0)
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, MetricSamples: mr, Notifications: nr, AlertRules: rr,
+		AllowPlaintext: true, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Now: func() time.Time { return now },
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true},
+				&remote.ServerStatusResp{CPU: &remote.CPUStatusSlice{UsagePercent: cpu}}, nil
+		},
+	})
+	p.PollOnce(ctx)
+	if n, _ := nr.UnreadCount(ctx); n != 1 {
+		t.Fatalf("zero-duration rule should fire on first poll, got %d", n)
+	}
+	rows, _ := nr.ListRecent(ctx, 10)
+	if rows[0].Severity != models.SeverityWarning {
+		t.Fatalf("severity = %q", rows[0].Severity)
+	}
+}
+
+// TestMaintenanceSuppression: an active global window blocks incident creation.
+func TestMaintenanceSuppression(t *testing.T) {
+	sr, hr, mr, nr, _, mw, _ := m5Repos(t)
+	seed(t, sr, models.ServerStatusActive)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0)
+	if err := mw.Create(ctx, &models.MaintenanceWindow{
+		ID: ids.NewULID(), ScopeType: "global",
+		StartsAt: now.Add(-time.Hour), EndsAt: now.Add(time.Hour), CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("create window: %v", err)
+	}
+	cpu := 95.0
+	cur := now
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, MetricSamples: mr, Notifications: nr, Maintenance: mw,
+		AllowPlaintext: true, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Now: func() time.Time { return cur },
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true},
+				&remote.ServerStatusResp{CPU: &remote.CPUStatusSlice{UsagePercent: cpu}}, nil
+		},
+	})
+	p.PollOnce(ctx)
+	cur = cur.Add(61 * time.Second)
+	p.PollOnce(ctx)
+	if n, _ := nr.UnreadCount(ctx); n != 0 {
+		t.Fatalf("maintenance should suppress incidents, got %d", n)
+	}
+}
+
+// TestMuteSuppression: a muted (server, kind) blocks incident creation.
+func TestMuteSuppression(t *testing.T) {
+	sr, hr, mr, nr, _, _, muted := m5Repos(t)
+	s := seed(t, sr, models.ServerStatusActive)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0)
+	if err := muted.Mute(ctx, s.ID, "cpu_high", "tester", now); err != nil {
+		t.Fatalf("mute: %v", err)
+	}
+	cpu := 95.0
+	cur := now
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, MetricSamples: mr, Notifications: nr, Muted: muted,
+		AllowPlaintext: true, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Now: func() time.Time { return cur },
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, *remote.ServerStatusResp, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true},
+				&remote.ServerStatusResp{CPU: &remote.CPUStatusSlice{UsagePercent: cpu}}, nil
+		},
+	})
+	p.PollOnce(ctx)
+	cur = cur.Add(61 * time.Second)
+	p.PollOnce(ctx)
+	if n, _ := nr.UnreadCount(ctx); n != 0 {
+		t.Fatalf("mute should suppress incidents, got %d", n)
+	}
+}
+
+// TestEscalation: an unacked incident older than EscalateAfter is re-notified
+// once and marked escalated.
+func TestEscalation(t *testing.T) {
+	sr, hr, mr, nr, _, _, _ := m5Repos(t)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0)
+	if err := nr.Create(ctx, &models.Notification{
+		ID: ids.NewULID(), Kind: "cpu_high", ServerID: "S1", ServerName: "srv",
+		Metric: "cpu", Value: 95, Threshold: 80, Severity: models.SeverityCritical,
+		Message: "CPU at 95% (threshold 80%)", CreatedAt: now.Add(-time.Hour),
+	}); err != nil {
+		t.Fatalf("seed incident: %v", err)
+	}
+	fn := &fakeNotifier{}
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, MetricSamples: mr, Notifications: nr, Notifier: fn,
+		EscalateAfter:  15 * time.Minute,
+		AllowPlaintext: true, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Now: func() time.Time { return now },
+	})
+	p.escalate(ctx)
+	if len(fn.events) != 1 {
+		t.Fatalf("want 1 escalation event, got %d", len(fn.events))
+	}
+	if !strings.Contains(fn.events[0].Message, "ESCALATION") {
+		t.Fatalf("event message = %q", fn.events[0].Message)
+	}
+	// Second sweep must not re-escalate (escalated_at now set).
+	p.escalate(ctx)
+	if len(fn.events) != 1 {
+		t.Fatalf("re-escalated: %d events", len(fn.events))
 	}
 }

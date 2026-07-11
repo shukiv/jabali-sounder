@@ -81,6 +81,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	var sessionRepo repository.SessionRepository
 	var apiTokenRepo repository.APITokenRepository
 	var notifRepo repository.NotificationRepository
+	var alertRuleRepo repository.AlertRuleRepository
+	var alertChannelRepo repository.AlertChannelRepository
+	var maintenanceRepo repository.MaintenanceRepository
+	var mutedRepo repository.MutedAlertRepository
 	if cfg.Database.URL != "" {
 		if err := db.Migrate(cfg.Database.Driver, cfg.Database.URL); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -98,6 +102,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 		sessionRepo = repository.NewSessionRepository(gormDB)
 		apiTokenRepo = repository.NewAPITokenRepository(gormDB)
 		notifRepo = repository.NewNotificationRepository(gormDB)
+		alertRuleRepo = repository.NewAlertRuleRepository(gormDB)
+		alertChannelRepo = repository.NewAlertChannelRepository(gormDB)
+		maintenanceRepo = repository.NewMaintenanceRepository(gormDB)
+		mutedRepo = repository.NewMutedAlertRepository(gormDB)
+		if err := alertRuleRepo.EnsureDefaults(context.Background(), time.Now().UTC()); err != nil {
+			log.Warn("seed default alert rules failed", "error", err)
+		}
 	} else {
 		log.Warn("database.url not set; running without DB — enrollment disabled")
 	}
@@ -132,6 +143,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 		SessionRepo:           sessionRepo,
 		APITokenRepo:          apiTokenRepo,
 		NotificationRepo:      notifRepo,
+		AlertRuleRepo:         alertRuleRepo,
+		AlertChannelRepo:      alertChannelRepo,
+		MaintenanceRepo:       maintenanceRepo,
+		MutedRepo:             mutedRepo,
 		AdminRepo:             adminRepo,
 		SecretKey:             key,
 		JWTSecret:             jwtSecret,
@@ -181,6 +196,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 			MetricSamples:  metricRepo,
 			Sessions:       sessionRepo,
 			Notifications:  notifRepo,
+			AlertRules:     alertRuleRepo,
+			Channels:       alertChannelRepo,
+			Maintenance:    maintenanceRepo,
+			Muted:          mutedRepo,
 			SecretKey:      key,
 			AllowPlaintext: cfg.Secrets.AllowPlaintextFallback,
 			Interval:       time.Duration(cfg.Poller.IntervalSeconds) * time.Second,

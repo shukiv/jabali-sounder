@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/wailsapp/wails/v2"
@@ -115,6 +116,13 @@ func newDesktopHandler() (http.Handler, error) {
 	sessionRepo := repository.NewSessionRepository(gormDB)
 	apiTokenRepo := repository.NewAPITokenRepository(gormDB)
 	notifRepo := repository.NewNotificationRepository(gormDB)
+	alertRuleRepo := repository.NewAlertRuleRepository(gormDB)
+	alertChannelRepo := repository.NewAlertChannelRepository(gormDB)
+	maintenanceRepo := repository.NewMaintenanceRepository(gormDB)
+	mutedRepo := repository.NewMutedAlertRepository(gormDB)
+	if err := alertRuleRepo.EnsureDefaults(context.Background(), time.Now().UTC()); err != nil {
+		slog.Warn("seed default alert rules failed", "error", err)
+	}
 	apiEngine := app.NewWithDeps(app.Deps{
 		Log:              slog.Default(),
 		ServerRepo:       serverRepo,
@@ -123,6 +131,10 @@ func newDesktopHandler() (http.Handler, error) {
 		SessionRepo:      sessionRepo,
 		APITokenRepo:     apiTokenRepo,
 		NotificationRepo: notifRepo,
+		AlertRuleRepo:    alertRuleRepo,
+		AlertChannelRepo: alertChannelRepo,
+		MaintenanceRepo:  maintenanceRepo,
+		MutedRepo:        mutedRepo,
 		AdminRepo:        repository.NewAdminRepository(gormDB),
 		SecretKey:        key,
 		JWTSecret:        jwtSecret,
@@ -140,6 +152,10 @@ func newDesktopHandler() (http.Handler, error) {
 		MetricSamples: metricRepo,
 		Sessions:      sessionRepo,
 		Notifications: notifRepo,
+		AlertRules:    alertRuleRepo,
+		Channels:      alertChannelRepo,
+		Maintenance:   maintenanceRepo,
+		Muted:         mutedRepo,
 		SecretKey:     key,
 		Log:           slog.Default(),
 	}).Run(context.Background())
