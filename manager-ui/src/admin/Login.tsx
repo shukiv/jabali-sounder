@@ -14,6 +14,7 @@ export default function Login() {
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [setupAvailable, setSetupAvailable] = useState(false);
+  const [needs2FA, setNeeds2FA] = useState(false);
   const { mode } = useThemeMode();
 
   useEffect(() => {
@@ -22,16 +23,22 @@ export default function Login() {
       .catch(() => setSetupAvailable(false));
   }, []);
 
-  const handleSubmit = async (values: { username: string; password: string }) => {
+  const handleSubmit = async (values: { username: string; password: string; totp_code?: string }) => {
     setLoading(true);
     try {
       if (setupAvailable) {
         await setup(values.username, values.password);
         message.success("Admin account created");
-      } else {
-        await login(values.username, values.password);
-        message.success("Logged in");
+        window.location.reload();
+        return;
       }
+      const res = await login(values.username, values.password, values.totp_code);
+      if (res.twoFactorRequired) {
+        setNeeds2FA(true);
+        message.info("Enter the code from your authenticator app");
+        return;
+      }
+      message.success("Logged in");
       window.location.reload();
     } catch (err) {
       if (err instanceof Error) {
@@ -75,6 +82,14 @@ export default function Login() {
           >
             <Input.Password prefix={<LockOutlined />} placeholder="Password" />
           </Form.Item>
+          {needs2FA ? (
+            <Form.Item
+              name="totp_code"
+              rules={[{ required: true, message: "Enter your 6-digit code" }]}
+            >
+              <Input prefix={<LockOutlined />} placeholder="Authenticator code" inputMode="numeric" />
+            </Form.Item>
+          ) : null}
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading} block>
               {setupAvailable ? "Create Admin" : "Log in"}

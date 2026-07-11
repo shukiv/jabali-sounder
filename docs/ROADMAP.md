@@ -65,7 +65,8 @@ log.
 - ✅ **Multiple admins + RBAC** (viewer / operator / owner). Role in the JWT,
   RequireRole gate on mutating routes, owner-only Team page + admin CRUD with
   last-owner/self guards.
-- **2FA / TOTP** on login.
+- ✅ **2FA / TOTP** on login. Hand-rolled RFC-6238 (no dep); enroll/activate/
+  disable in Settings, TOTP-sealed with the manager key, two-step login prompt.
 - **Session management** — list and revoke active sessions.
 
 **Acceptance:** more than one operator with distinct roles; a viewer cannot

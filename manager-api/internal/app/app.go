@@ -74,6 +74,8 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		LoginMaxFailures: deps.LoginMaxFailures,
 		LoginLockout:     deps.LoginLockout,
 		LoginWindow:      deps.LoginWindow,
+		SecretKey:        deps.SecretKey,
+		AllowPlaintext:   deps.AllowPlaintextSecrets,
 	})
 
 	// Protected admin routes — require JWT.

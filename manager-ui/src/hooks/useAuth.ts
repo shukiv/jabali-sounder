@@ -62,10 +62,20 @@ export function useAuth() {
     return newState;
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const resp = await apiClient.post("/auth/login", { username, password });
-    return acceptAuthResponse(resp.data);
-  }, [acceptAuthResponse]);
+  const login = useCallback(
+    async (username: string, password: string, totpCode?: string) => {
+      const resp = await apiClient.post("/auth/login", {
+        username,
+        password,
+        ...(totpCode ? { totp_code: totpCode } : {}),
+      });
+      if (resp.data?.two_factor_required) {
+        return { twoFactorRequired: true as const };
+      }
+      return { twoFactorRequired: false as const, state: acceptAuthResponse(resp.data) };
+    },
+    [acceptAuthResponse],
+  );
 
   const setup = useCallback(async (username: string, password: string) => {
     const resp = await apiClient.post("/auth/setup", { username, password });

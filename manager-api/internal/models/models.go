@@ -107,12 +107,14 @@ func (r Role) Valid() bool { return r.Rank() > 0 }
 
 // Admin is a manager-side administrator who can log in and manage servers.
 type Admin struct {
-	ID           string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
-	Username     string    `gorm:"column:username;type:varchar(100);not null;uniqueIndex" json:"username"`
-	PasswordHash string    `gorm:"column:password_hash;type:varchar(255);not null" json:"-"`
-	Role         Role      `gorm:"column:role;type:varchar(20);not null;default:owner" json:"role"`
-	CreatedAt    time.Time `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"column:updated_at" json:"updated_at"`
+	ID            string    `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	Username      string    `gorm:"column:username;type:varchar(100);not null;uniqueIndex" json:"username"`
+	PasswordHash  string    `gorm:"column:password_hash;type:varchar(255);not null" json:"-"`
+	Role          Role      `gorm:"column:role;type:varchar(20);not null;default:owner" json:"role"`
+	TOTPSecretEnc []byte    `gorm:"column:totp_secret_enc;type:blob" json:"-"`
+	TOTPEnabled   bool      `gorm:"column:totp_enabled;type:tinyint(1);not null;default:0" json:"two_factor_enabled"`
+	CreatedAt     time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt     time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
 
 func (Admin) TableName() string { return "admins" }

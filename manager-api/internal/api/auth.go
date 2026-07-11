@@ -14,6 +14,8 @@ import (
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/middleware"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/repository"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/secrets"
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/totp"
 )
 
 // AuthHandlerConfig wires the auth endpoints.
@@ -26,6 +28,9 @@ type AuthHandlerConfig struct {
 	LoginMaxFailures int
 	LoginLockout     time.Duration
 	LoginWindow      time.Duration
+	// SecretKey seals the TOTP secret (M3: 2FA); AllowPlaintext mirrors servers.
+	SecretKey      *secrets.Key
+	AllowPlaintext bool
 }
 
 // RegisterAuthRoutes mounts POST /api/v1/auth/login + GET /api/v1/auth/me.
@@ -45,6 +50,9 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 	auth.POST("/setup", h.setup)
 	auth.GET("/me", middleware.AuthMiddleware(cfg.JWTSecret), h.me)
 	auth.POST("/change-password", middleware.AuthMiddleware(cfg.JWTSecret), h.changePassword)
+	auth.POST("/2fa/setup", middleware.AuthMiddleware(cfg.JWTSecret), h.setup2FA)
+	auth.POST("/2fa/activate", middleware.AuthMiddleware(cfg.JWTSecret), h.activate2FA)
+	auth.POST("/2fa/disable", middleware.AuthMiddleware(cfg.JWTSecret), h.disable2FA)
 }
 
 type authHandler struct{ cfg AuthHandlerConfig }
@@ -52,6 +60,7 @@ type authHandler struct{ cfg AuthHandlerConfig }
 type loginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	TOTPCode string `json:"totp_code"`
 }
 
 type setupRequest struct {
@@ -85,9 +94,31 @@ func (h *authHandler) login(c *gin.Context) {
 		return
 	}
 
+	// Second factor (M3: 2FA). Password is correct; require a valid TOTP code
+	// when the account has 2FA enabled. Without a code, tell the client to
+	// prompt for one (no token issued).
+	if admin.TOTPEnabled {
+		if strings.TrimSpace(req.TOTPCode) == "" {
+			c.JSON(http.StatusOK, gin.H{"two_factor_required": true})
+			return
+		}
+		secret, serr := secrets.OpenSecret(h.cfg.SecretKey, admin.TOTPSecretEnc, h.cfg.AllowPlaintext)
+		if serr != nil {
+			failInternal(c, h.cfg.Log, serr)
+			return
+		}
+		if !totp.Validate(secret, req.TOTPCode, time.Now()) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
+			return
+		}
+	}
+
+	// Fail closed: an admin with a missing/corrupt role gets the LEAST privilege
+	// (viewer), never owner. Existing admins are set to owner by migration 000008.
 	role := admin.Role
 	if !role.Valid() {
-		role = models.RoleOwner
+		h.cfg.Log.Warn("login: admin has invalid role, defaulting to viewer", "username", admin.Username)
+		role = models.RoleViewer
 	}
 	token, expiresAt, err := middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, role, h.cfg.JWTTTL)
 	if err != nil {
@@ -107,11 +138,137 @@ func (h *authHandler) login(c *gin.Context) {
 }
 
 func (h *authHandler) me(c *gin.Context) {
+	twoFactor := false
+	if a, err := h.cfg.AdminRepo.FindByUsername(c.Request.Context(), middleware.AdminUsername(c)); err == nil {
+		twoFactor = a.TOTPEnabled
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"id":       middleware.AdminID(c),
-		"username": middleware.AdminUsername(c),
-		"role":     middleware.AdminRole(c),
+		"id":                 middleware.AdminID(c),
+		"username":           middleware.AdminUsername(c),
+		"role":               middleware.AdminRole(c),
+		"two_factor_enabled": twoFactor,
 	})
+}
+
+// currentAdmin loads the authenticated admin by username (from the JWT).
+func (h *authHandler) currentAdmin(c *gin.Context) (*models.Admin, bool) {
+	a, err := h.cfg.AdminRepo.FindByUsername(c.Request.Context(), middleware.AdminUsername(c))
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_session"})
+		} else {
+			failInternal(c, h.cfg.Log, err)
+		}
+		return nil, false
+	}
+	return a, true
+}
+
+// setup2FA generates a pending TOTP secret and returns the otpauth URL for a QR
+// code. Not enabled until activate2FA confirms a valid code.
+func (h *authHandler) setup2FA(c *gin.Context) {
+	admin, ok := h.currentAdmin(c)
+	if !ok {
+		return
+	}
+	secret, err := totp.GenerateSecret()
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	enc, err := secrets.SealSecret(h.cfg.SecretKey, secret, h.cfg.AllowPlaintext)
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	admin.TOTPSecretEnc = enc
+	admin.TOTPEnabled = false
+	if err := h.cfg.AdminRepo.Update(c.Request.Context(), admin); err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"secret":      secret,
+		"otpauth_url": totp.OtpauthURL("Jabali Sounder", admin.Username, secret),
+	})
+}
+
+type codeRequest struct {
+	Code string `json:"code" binding:"required"`
+}
+
+// activate2FA enables 2FA after verifying a code against the pending secret.
+func (h *authHandler) activate2FA(c *gin.Context) {
+	var req codeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
+		return
+	}
+	admin, ok := h.currentAdmin(c)
+	if !ok {
+		return
+	}
+	if len(admin.TOTPSecretEnc) == 0 {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no_pending_2fa"})
+		return
+	}
+	secret, err := secrets.OpenSecret(h.cfg.SecretKey, admin.TOTPSecretEnc, h.cfg.AllowPlaintext)
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	if !totp.Validate(secret, req.Code, time.Now()) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_code"})
+		return
+	}
+	admin.TOTPEnabled = true
+	if err := h.cfg.AdminRepo.Update(c.Request.Context(), admin); err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"two_factor_enabled": true})
+}
+
+type disable2FARequest struct {
+	Password string `json:"password" binding:"required"`
+	Code     string `json:"code" binding:"required"`
+}
+
+// disable2FA turns off 2FA after verifying the current password AND a code.
+func (h *authHandler) disable2FA(c *gin.Context) {
+	var req disable2FARequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed_json"})
+		return
+	}
+	admin, ok := h.currentAdmin(c)
+	if !ok {
+		return
+	}
+	if !admin.TOTPEnabled {
+		c.JSON(http.StatusOK, gin.H{"two_factor_enabled": false})
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "current_password_incorrect"})
+		return
+	}
+	secret, err := secrets.OpenSecret(h.cfg.SecretKey, admin.TOTPSecretEnc, h.cfg.AllowPlaintext)
+	if err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	if !totp.Validate(secret, req.Code, time.Now()) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_code"})
+		return
+	}
+	admin.TOTPSecretEnc = nil
+	admin.TOTPEnabled = false
+	if err := h.cfg.AdminRepo.Update(c.Request.Context(), admin); err != nil {
+		failInternal(c, h.cfg.Log, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"two_factor_enabled": false})
 }
 
 type changePasswordRequest struct {
