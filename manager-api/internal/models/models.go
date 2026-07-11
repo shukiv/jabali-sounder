@@ -148,6 +148,11 @@ type APIToken struct {
 	LastUsedAt sql.NullTime `gorm:"column:last_used_at" json:"-"`
 	ExpiresAt  sql.NullTime `gorm:"column:expires_at" json:"-"`
 	RevokedAt  sql.NullTime `gorm:"column:revoked_at" json:"-"`
+	// Scopes narrow which read areas the token may access (SND-31). Empty or
+	// containing "read:*" grants all reads.
+	Scopes JSONStringArray `gorm:"column:scopes;type:text;serializer:json" json:"scopes"`
+	// AllowedIPs is an optional IP/CIDR allowlist; empty allows any source.
+	AllowedIPs JSONStringArray `gorm:"column:allowed_ips;type:text;serializer:json" json:"allowed_ips"`
 }
 
 func (APIToken) TableName() string { return "api_tokens" }

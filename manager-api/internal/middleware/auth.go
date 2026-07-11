@@ -27,14 +27,15 @@ type SessionCheck func(ctx context.Context, sessionID string) bool
 
 // APITokenCheck validates a presented API token, returning (id, name, ok). nil
 // disables API-token auth (JWT only).
-type APITokenCheck func(ctx context.Context, token string) (id, name string, ok bool)
+type APITokenCheck func(ctx context.Context, token, clientIP string) (id, name string, scopes []string, ok bool)
 
 // Context keys for storing admin identity.
 const (
-	ctxAdminID   = "admin_id"
-	ctxAdminUser = "admin_username"
-	ctxAdminRole = "admin_role"
-	ctxSession   = "session_id"
+	ctxAdminID     = "admin_id"
+	ctxAdminUser   = "admin_username"
+	ctxAdminRole   = "admin_role"
+	ctxTokenScopes = "token_scopes"
+	ctxSession     = "session_id"
 )
 
 // AuthMiddleware verifies a JWT Bearer token and sets the admin identity
@@ -59,7 +60,7 @@ func AuthMiddleware(secret string, sessions SessionCheck, apiTokens APITokenChec
 		// API token (M4): read-only credential for external tooling. Grants the
 		// viewer role and skips the JWT/session path. Only where enabled.
 		if apiTokens != nil && isAPIToken(tokenStr) {
-			id, name, ok := apiTokens(c.Request.Context(), tokenStr)
+			id, name, scopes, ok := apiTokens(c.Request.Context(), tokenStr, c.ClientIP())
 			if !ok {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 				return
@@ -67,6 +68,7 @@ func AuthMiddleware(secret string, sessions SessionCheck, apiTokens APITokenChec
 			c.Set(ctxAdminID, "apitoken:"+id)
 			c.Set(ctxAdminUser, "token:"+name)
 			c.Set(ctxAdminRole, string(models.RoleViewer))
+			c.Set(ctxTokenScopes, scopes)
 			c.Next()
 			return
 		}

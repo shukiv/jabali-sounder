@@ -9,6 +9,8 @@ import {
   DashboardOutlined,
 } from "@ant-design/icons";
 import { useDashboard, useFleetSLA } from "../hooks/useDashboard";
+import { useQuery } from "@tanstack/react-query";
+import apiClient from "../apiClient";
 import { useDomains, useUsers } from "../hooks/useInventory";
 import type { DomainRow, UserRow } from "../hooks/useInventory";
 import { StatCard } from "../components/StatCard";
@@ -31,6 +33,11 @@ function credTag(cred: string) {
 export default function Dashboard() {
   const { data: servers, isLoading, refetch, isFetching } = useDashboard();
   const { data: sla } = useFleetSLA();
+  const { data: policy } = useQuery({
+    queryKey: ["policy-summary"],
+    queryFn: async () => (await apiClient.get<{ servers_at_risk: number; total: number }>("/admin/policy")).data,
+    refetchInterval: 60000,
+  });
   const domains = useDomains();
   const users = useUsers();
   const navigate = useNavigate();
@@ -116,6 +123,17 @@ export default function Dashboard() {
             icon={<DashboardOutlined />}
             iconColor={sla?.fleet_ratio != null && sla.fleet_ratio >= 0.99 ? "#3f8600" : "#d48806"}
             to="/monitor"
+          />
+        </Col>
+      </Row>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={8}>
+          <StatCard
+            label="Policy issues"
+            value={policy ? `${policy.servers_at_risk} server${policy.servers_at_risk === 1 ? "" : "s"}` : "—"}
+            icon={<DashboardOutlined />}
+            iconColor={policy && policy.servers_at_risk > 0 ? "#cf1322" : "#3f8600"}
+            to="/policy"
           />
         </Col>
       </Row>

@@ -56,3 +56,4 @@ dist/
 # Manager secret key — NEVER commit
 *.key
 secrets.key
+.gotmp/

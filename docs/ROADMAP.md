@@ -181,20 +181,27 @@ re-enrollment; a flapping service auto-restarts under an operator's standing
 
 ---
 
-## M8 — Hardening 🔭
+## M8 — Hardening ✅
 
 **Goal:** close the security gaps a fleet-wide control plane accumulates.
 
-- 🔭 **Login rate-limit + brute-force lockout** (SND-30). `/auth/login` is
-  unbounded today; add per-IP + per-account backoff/lockout. Pairs with 2FA.
-- 🔭 **Scoped API tokens + per-token IP allowlist / rate-limit** (SND-31). `snd_`
-  tokens are viewer-all; add read-subset scopes, optional IP allowlist, per-token
-  rate limiting.
-- 🔭 **Config / policy drift detection** (SND-32). Beyond version drift: flag
-  panels with weak TLS, disabled security features, or out-of-policy settings.
+- ✅ **Login throttle — per-IP lockout + per-account backoff** (SND-30). The
+  per-IP failed-login lockout (SND-3) is joined by a per-account capped backoff
+  delay + a one-time brute-force alert (notification + audit). Per-account uses
+  backoff, not a hard lock, so an attacker can't lock out the sole admin.
+- ✅ **Scoped API tokens + IP allowlist** (SND-31). `snd_` tokens can be minted
+  with coarse read scopes (fleet/monitor/inventory/metrics/audit/backups, or
+  read:\*) enforced by a scope guard, plus an optional source IP/CIDR allowlist
+  enforced at authentication. Rotation preserves scopes/allowlist. (Per-token
+  rate-limiting deferred.)
+- ✅ **Config / policy drift detection** (SND-32). A policy evaluator flags weak
+  TLS (verification disabled), invalid credentials, unreachability, cert expiry,
+  and version drift from the fleet majority; surfaced on a Compliance page and a
+  dashboard card.
 
-**Acceptance:** repeated bad logins are throttled; a token can be scoped +
-IP-restricted; the dashboard flags a non-compliant panel.
+**Acceptance:** repeated bad logins are throttled per-IP and slowed per-account;
+a token can be scoped + IP-restricted; the dashboard flags non-compliant panels —
+all shipped.
 
 ---
 

@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ const tokenPrefix = "snd_"
 // APITokenRepository stores read-only API tokens (M4).
 type APITokenRepository interface {
 	// Mint creates a token and returns the one-time plaintext plus the record.
-	Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time) (string, *models.APIToken, error)
+	Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time, scopes, allowedIPs []string) (string, *models.APIToken, error)
 	List(ctx context.Context) ([]models.APIToken, error)
 	Revoke(ctx context.Context, id string) error
 	// Rotate issues a new secret for an existing token (same id/name/expiry),
@@ -49,7 +50,7 @@ func FormatToken(id, secret string) string { return tokenPrefix + id + "_" + sec
 // HasTokenPrefix reports whether s looks like a Sounder API token.
 func HasTokenPrefix(s string) bool { return strings.HasPrefix(s, tokenPrefix) }
 
-func (r *apiTokenRepo) Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time) (string, *models.APIToken, error) {
+func (r *apiTokenRepo) Mint(ctx context.Context, name, createdBy string, expiresAt *time.Time, scopes, allowedIPs []string) (string, *models.APIToken, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", nil, fmt.Errorf("api token secret: %w", err)
@@ -62,6 +63,8 @@ func (r *apiTokenRepo) Mint(ctx context.Context, name, createdBy string, expires
 		SecretHash: hex.EncodeToString(sum[:]),
 		CreatedBy:  createdBy,
 		CreatedAt:  time.Now(),
+		Scopes:     models.JSONStringArray(scopes),
+		AllowedIPs: models.JSONStringArray(allowedIPs),
 	}
 	if expiresAt != nil {
 		tok.ExpiresAt = sql.NullTime{Time: *expiresAt, Valid: true}
@@ -148,4 +151,42 @@ func (r *apiTokenRepo) ListExpiring(ctx context.Context, now, before time.Time) 
 		return nil, fmt.Errorf("api token list expiring: %w", err)
 	}
 	return rows, nil
+}
+
+// TokenIPAllowed reports whether ip is permitted by the allowlist. An empty
+// allowlist permits any source. Entries may be plain IPs or CIDR blocks.
+func TokenIPAllowed(allowed []string, ip string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	parsed := net.ParseIP(ip)
+	for _, entry := range allowed {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if _, cidr, err := net.ParseCIDR(entry); err == nil {
+			if parsed != nil && cidr.Contains(parsed) {
+				return true
+			}
+			continue
+		}
+		if entry == ip {
+			return true
+		}
+	}
+	return false
+}
+
+// TokenScopeGrantsAll reports whether the scope set grants unrestricted reads.
+func TokenScopeGrantsAll(scopes []string) bool {
+	if len(scopes) == 0 {
+		return true
+	}
+	for _, s := range scopes {
+		if s == "read:*" || s == "*" {
+			return true
+		}
+	}
+	return false
 }

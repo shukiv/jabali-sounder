@@ -28,16 +28,16 @@ func TestAPITokenAuth(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 	repo := repository.NewAPITokenRepository(gormDB)
-	plaintext, tok, err := repo.Mint(context.Background(), "ci", "01OWNER", nil)
+	plaintext, tok, err := repo.Mint(context.Background(), "ci", "01OWNER", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("mint: %v", err)
 	}
 
-	check := func(ctx context.Context, token string) (string, string, bool) {
+	check := func(ctx context.Context, token, _ string) (string, string, []string, bool) {
 		if tk := repo.Validate(ctx, token); tk != nil {
-			return tk.ID, tk.Name, true
+			return tk.ID, tk.Name, tk.Scopes, true
 		}
-		return "", "", false
+		return "", "", nil, false
 	}
 	r := gin.New()
 	g := r.Group("")

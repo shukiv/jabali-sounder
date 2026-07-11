@@ -92,6 +92,7 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		SecretKey:        deps.SecretKey,
 		AllowPlaintext:   deps.AllowPlaintextSecrets,
 		SessionRepo:      deps.SessionRepo,
+		Notifications:    deps.NotificationRepo,
 	})
 
 	// Protected admin routes. Mounted unconditionally — with an empty secret
@@ -103,17 +104,26 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		}
 		return deps.SessionRepo.Active(ctx, sid)
 	}
-	apiTokenCheck := func(ctx context.Context, token string) (string, string, bool) {
+	apiTokenCheck := func(ctx context.Context, token, clientIP string) (string, string, []string, bool) {
 		if deps.APITokenRepo == nil {
-			return "", "", false
+			return "", "", nil, false
 		}
-		if tk := deps.APITokenRepo.Validate(ctx, token); tk != nil {
-			return tk.ID, tk.Name, true
+		tk := deps.APITokenRepo.Validate(ctx, token)
+		if tk == nil {
+			return "", "", nil, false
 		}
-		return "", "", false
+		// Enforce the per-token source-IP allowlist (SND-31).
+		if !repository.TokenIPAllowed(tk.AllowedIPs, clientIP) {
+			deps.Log.Warn("api token used from disallowed IP", "token_id", tk.ID, "source_ip", clientIP)
+			return "", "", nil, false
+		}
+		return tk.ID, tk.Name, tk.Scopes, true
 	}
 	adminGroup := v1.Group("")
 	adminGroup.Use(middleware.AuthMiddleware(deps.JWTSecret, sessionCheck, apiTokenCheck))
+	// Restrict scoped API tokens to their granted read areas (SND-31). No-op for
+	// JWT/session requests.
+	adminGroup.Use(middleware.TokenScopeGuard())
 
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{
@@ -192,6 +202,11 @@ func NewWithDeps(deps Deps) *gin.Engine {
 
 	api.RegisterBackupRoutes(adminGroup, api.BackupHandlerConfig{
 		Repo: deps.BackupRepo,
+		Log:  deps.Log,
+	})
+
+	api.RegisterPolicyRoutes(adminGroup, api.PolicyHandlerConfig{
+		Repo: deps.ServerRepo,
 		Log:  deps.Log,
 	})
 

@@ -12,6 +12,8 @@ import {
   App,
   Popconfirm,
   Space,
+  Select,
+  Tag,
 } from "antd";
 import { KeyOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,7 +27,19 @@ interface ApiToken {
   created_at: string;
   last_used_at?: string;
   expires_at?: string;
+  scopes?: string[];
+  allowed_ips?: string[];
 }
+
+const SCOPE_OPTIONS = [
+  { value: "read:*", label: "read:* (all)" },
+  { value: "fleet", label: "fleet (servers, dashboard)" },
+  { value: "monitor", label: "monitor" },
+  { value: "inventory", label: "inventory (users, domains, mail)" },
+  { value: "metrics", label: "metrics (Prometheus)" },
+  { value: "audit", label: "audit" },
+  { value: "backups", label: "backups" },
+];
 
 // ApiTokensSettings mints/lists/revokes read-only API tokens for external
 // tooling (M4). The plaintext token is shown exactly once, at creation.
@@ -53,6 +67,11 @@ export default function ApiTokensSettings() {
       const resp = await apiClient.post<{ token: string }>("/admin/api-tokens", {
         name: values.name,
         expires_in_days: values.expires_in_days || 0,
+        scopes: values.scopes || [],
+        allowed_ips: (values.allowed_ips || "")
+          .split(",")
+          .map((x: string) => x.trim())
+          .filter(Boolean),
       });
       setMinted(resp.data.token);
       setOpen(false);
@@ -105,6 +124,19 @@ export default function ApiTokensSettings() {
       dataIndex: "expires_at",
       key: "expires_at",
       render: (t?: string) => (t ? new Date(t).toLocaleDateString() : "never"),
+    },
+    {
+      title: "Scopes",
+      dataIndex: "scopes",
+      key: "scopes",
+      render: (sc?: string[]) =>
+        !sc || sc.length === 0 ? <Tag>read:*</Tag> : sc.map((x) => <Tag key={x}>{x}</Tag>),
+    },
+    {
+      title: "Source IPs",
+      dataIndex: "allowed_ips",
+      key: "allowed_ips",
+      render: (ips?: string[]) => (ips && ips.length ? ips.join(", ") : <Text type="secondary">any</Text>),
     },
     {
       title: "Actions",
@@ -189,6 +221,12 @@ export default function ApiTokensSettings() {
           </Form.Item>
           <Form.Item name="expires_in_days" label="Expires in (days, blank = never)">
             <InputNumber min={1} max={3650} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="scopes" label="Scopes (blank = all reads)">
+            <Select mode="multiple" allowClear options={SCOPE_OPTIONS} placeholder="read:*" />
+          </Form.Item>
+          <Form.Item name="allowed_ips" label="Source IP allowlist (comma-separated IP/CIDR, blank = any)">
+            <Input placeholder="203.0.113.7, 10.0.0.0/8" />
           </Form.Item>
         </Form>
       </Modal>

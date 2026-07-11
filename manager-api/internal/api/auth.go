@@ -33,6 +33,8 @@ type AuthHandlerConfig struct {
 	SecretKey      *secrets.Key
 	AllowPlaintext bool
 	SessionRepo    repository.SessionRepository
+	// Notifications raises a per-account brute-force alert (SND-30). Optional.
+	Notifications repository.NotificationRepository
 }
 
 // RegisterAuthRoutes mounts POST /api/v1/auth/login + GET /api/v1/auth/me.
@@ -43,7 +45,7 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	h := &authHandler{cfg: cfg}
+	h := &authHandler{cfg: cfg, acctFail: middleware.NewAccountFailureTracker(0, cfg.LoginWindow, nil)}
 	sessionCheck := func(ctx context.Context, sid string) bool {
 		if cfg.SessionRepo == nil {
 			return true
@@ -67,7 +69,10 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 	auth.POST("/logout", authMW, h.logout)
 }
 
-type authHandler struct{ cfg AuthHandlerConfig }
+type authHandler struct {
+	cfg      AuthHandlerConfig
+	acctFail *middleware.AccountFailureTracker
+}
 
 type loginRequest struct {
 	Username string `json:"username" binding:"required"`
@@ -94,7 +99,7 @@ func (h *authHandler) login(c *gin.Context) {
 	admin, err := h.cfg.AdminRepo.FindByUsername(c.Request.Context(), req.Username)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
+			h.failLogin(c, req.Username)
 			return
 		}
 		failInternal(c, h.cfg.Log, err)
@@ -102,7 +107,7 @@ func (h *authHandler) login(c *gin.Context) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
+		h.failLogin(c, req.Username)
 		return
 	}
 
@@ -120,10 +125,12 @@ func (h *authHandler) login(c *gin.Context) {
 			return
 		}
 		if !totp.Validate(secret, req.TOTPCode, time.Now()) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
+			h.failLogin(c, req.Username)
 			return
 		}
 	}
+	// Credentials fully verified — clear the per-account failure counter.
+	h.acctFail.RecordSuccess(req.Username)
 
 	// Fail closed: an admin with a missing/corrupt role gets the LEAST privilege
 	// (viewer), never owner. Existing admins are set to owner by migration 000008.
@@ -326,6 +333,33 @@ func (h *authHandler) changePassword(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// failLogin records a failed attempt for the account, applies the per-account
+// backoff delay, raises a one-time brute-force alert at the threshold, and
+// returns the opaque 401 (SND-30). The message is identical to every other
+// failure so it can't enumerate usernames.
+func (h *authHandler) failLogin(c *gin.Context, username string) {
+	delay, alert := h.acctFail.RecordFailure(username)
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	if alert {
+		h.cfg.Log.Warn("audit", "event", "auth.bruteforce_suspected",
+			"username", username, "source_ip", c.ClientIP(), "request_id", middleware.GetRequestID(c))
+		if h.cfg.Notifications != nil {
+			key := "acct:" + username
+			if exists, _ := h.cfg.Notifications.ActiveExists(c.Request.Context(), key, "login_bruteforce"); !exists {
+				_ = h.cfg.Notifications.Create(c.Request.Context(), &models.Notification{
+					ID: ids.NewULID(), Kind: "login_bruteforce", ServerID: key, ServerName: username,
+					Metric: "auth", Severity: models.SeverityCritical,
+					Message:   "repeated failed logins for \"" + username + "\" from " + c.ClientIP(),
+					CreatedAt: time.Now().UTC(),
+				})
+			}
+		}
+	}
+	c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 }
 
 func (h *authHandler) setupStatus(c *gin.Context) {
