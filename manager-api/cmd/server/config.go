@@ -18,6 +18,7 @@ type config struct {
 	JWT      jwtConfig      `toml:"jwt"`
 	Auth     authConfig     `toml:"auth"`
 	Poller   pollerConfig   `toml:"poller"`
+	Alert    alertConfig    `toml:"alert"`
 }
 
 type serverConfig struct {
@@ -28,6 +29,12 @@ type serverConfig struct {
 	// AllowPrivateTargets permits enrolling panels on private/loopback/
 	// link-local IPs (SND-4). Default false blocks SSRF to internal hosts.
 	AllowPrivateTargets bool `toml:"allow_private_targets"`
+}
+
+type alertConfig struct {
+	// WebhookURL receives health alerts (JSON POST; Slack/Discord-compatible).
+	// Empty disables alerting.
+	WebhookURL string `toml:"webhook_url"`
 }
 
 type pollerConfig struct {
@@ -153,6 +160,9 @@ func loadConfig(path string) (*config, error) {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.Poller.IntervalSeconds = n
 		}
+	}
+	if v := envFirst("JABALI_SOUNDER_ALERT_WEBHOOK_URL"); v != "" {
+		cfg.Alert.WebhookURL = v
 	}
 
 	// Normalize: strip trailing slash from URL-like fields.

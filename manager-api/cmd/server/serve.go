@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/alert"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/poller"
@@ -156,6 +157,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	pollCtx, stopPoller := context.WithCancel(context.Background())
 	defer stopPoller()
 	if cfg.Poller.Enabled && serverRepo != nil && heartbeatRepo != nil {
+		var notifier alert.Notifier
+		if cfg.Alert.WebhookURL != "" {
+			notifier = alert.NewWebhook(cfg.Alert.WebhookURL, log)
+			log.Info("health alerts enabled", "channel", "webhook")
+		}
 		hp := poller.New(poller.Config{
 			Servers:        serverRepo,
 			Heartbeats:     heartbeatRepo,
@@ -163,6 +169,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			AllowPlaintext: cfg.Secrets.AllowPlaintextFallback,
 			Interval:       time.Duration(cfg.Poller.IntervalSeconds) * time.Second,
 			RetentionDays:  cfg.Poller.RetentionDays,
+			Notifier:       notifier,
 			Log:            log,
 		})
 		go hp.Run(pollCtx)

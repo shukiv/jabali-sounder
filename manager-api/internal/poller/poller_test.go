@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/alert"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/db"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/ids"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
@@ -146,5 +147,76 @@ func TestPruneRetention(t *testing.T) {
 	}
 	if len(rows) != 1 {
 		t.Fatalf("after prune want 1 heartbeat, got %d", len(rows))
+	}
+}
+
+type fakeNotifier struct{ events []alert.Event }
+
+func (f *fakeNotifier) Notify(_ context.Context, ev alert.Event) error {
+	f.events = append(f.events, ev)
+	return nil
+}
+
+// TestAlertOnDownTransition: a healthy server going unreachable fires one "down".
+func TestAlertOnDownTransition(t *testing.T) {
+	sr, hr := testRepos(t)
+	s := seed(t, sr, models.ServerStatusActive)
+	// seed() sets credential unknown; make it valid so prior is "healthy".
+	_ = sr.UpdateStatus(context.Background(), s.ID, models.ServerStatusActive, models.CredentialValid)
+
+	fn := &fakeNotifier{}
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, AllowPlaintext: true, Notifier: fn,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
+			return &remote.CheckResult{Reachable: false}, nil
+		},
+	})
+	p.PollOnce(context.Background())
+
+	if len(fn.events) != 1 || fn.events[0].Kind != alert.KindDown {
+		t.Fatalf("want 1 down alert, got %+v", fn.events)
+	}
+}
+
+// TestAlertOnRecovery: a known-bad server becoming healthy fires one "recovered".
+func TestAlertOnRecovery(t *testing.T) {
+	sr, hr := testRepos(t)
+	s := seed(t, sr, models.ServerStatusUnreachable) // priorKnownBad
+
+	fn := &fakeNotifier{}
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, AllowPlaintext: true, Notifier: fn,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		},
+	})
+	p.PollOnce(context.Background())
+	_ = s
+
+	if len(fn.events) != 1 || fn.events[0].Kind != alert.KindRecovered {
+		t.Fatalf("want 1 recovered alert, got %+v", fn.events)
+	}
+}
+
+// TestNoAlertWhenStable: healthy staying healthy fires nothing.
+func TestNoAlertWhenStable(t *testing.T) {
+	sr, hr := testRepos(t)
+	s := seed(t, sr, models.ServerStatusActive)
+	_ = sr.UpdateStatus(context.Background(), s.ID, models.ServerStatusActive, models.CredentialValid)
+
+	fn := &fakeNotifier{}
+	p := New(Config{
+		Servers: sr, Heartbeats: hr, AllowPlaintext: true, Notifier: fn,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Probe: func(context.Context, models.Server) (*remote.CheckResult, error) {
+			return &remote.CheckResult{Reachable: true, CredentialValid: true}, nil
+		},
+	})
+	p.PollOnce(context.Background())
+
+	if len(fn.events) != 0 {
+		t.Fatalf("want no alerts when stable, got %+v", fn.events)
 	}
 }

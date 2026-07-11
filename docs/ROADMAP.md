@@ -19,9 +19,11 @@ value-to-effort, and the foundation everything else builds on.
   a heartbeat per poll (with retention). Runs on both the server and desktop
   builds. Status is now current without a manual *Check*. Per-server history
   (uptime + recent checks) is viewable from the Servers table.
-- **Alerting.** On top of the poller: thresholds (disk > 90%, credential
-  invalid, server unreachable, cert expiring) delivered via webhook / email /
-  Slack. The single biggest "why run this daily" feature.
+- ✅ **Alerting.** The poller fires a notification when a server crosses the
+  healthy boundary (down / recovered) via a configured webhook (Slack/Discord/
+  Mattermost-compatible). Config: `[alert] webhook_url` / env
+  `JABALI_SOUNDER_ALERT_WEBHOOK_URL`. Follow-ups: threshold alerts (disk/cert),
+  more channels, and UI configuration.
 - **Historical metrics + trends.** Persist the live monitor time series and show
   sparklines / growth (disk, load) instead of only a snapshot.
 - **TLS cert-expiry tracking.** Surface each panel's certificate expiry and flag

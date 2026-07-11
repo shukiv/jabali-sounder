@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/alert"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/ids"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/remote"
@@ -36,7 +37,10 @@ type Config struct {
 	Interval       time.Duration
 	// RetentionDays bounds heartbeat history. 0 -> default; negative -> disabled.
 	RetentionDays int
-	Log           *slog.Logger
+	// Notifier receives an alert when a server crosses the healthy boundary.
+	// nil disables alerting.
+	Notifier alert.Notifier
+	Log      *slog.Logger
 
 	// Probe overrides the real panel health check in tests; nil uses the client.
 	Probe func(ctx context.Context, s models.Server) (*remote.CheckResult, error)
@@ -122,32 +126,93 @@ func (p *Poller) prune(ctx context.Context) {
 }
 
 func (p *Poller) pollServer(ctx context.Context, s models.Server) {
+	var (
+		status  models.ServerStatus
+		cred    models.CredentialStatus
+		healthy bool
+		version = s.Version
+		details any
+		message string
+	)
+
 	secret, err := secrets.OpenSecret(p.cfg.SecretKey, s.TokenSecretEnc, p.cfg.AllowPlaintext)
-	if err != nil {
+	switch {
+	case err != nil:
 		// Stored secret can't be decrypted here — the credential is unusable.
 		p.cfg.Log.Warn("poller: decrypt secret failed", "server", s.Name, "error", err)
-		_ = p.cfg.Servers.UpdateStatus(ctx, s.ID, s.Status, models.CredentialInvalid)
-		p.record(ctx, s, false, s.Version, map[string]any{"error": "decrypt_failed"})
-		return
+		status, cred = s.Status, models.CredentialInvalid
+		details = map[string]any{"error": "decrypt_failed"}
+		message = "stored token secret cannot be decrypted"
+	default:
+		result, perr := p.probe(ctx, s, secret)
+		if perr != nil {
+			p.cfg.Log.Warn("poller: probe failed", "server", s.Name, "error", perr)
+			status, cred = models.ServerStatusUnreachable, models.CredentialUnknown
+			details = map[string]any{"error": "probe_failed"}
+			message = "server did not respond"
+		} else {
+			status, cred = statusFromCheck(result)
+			if result != nil && result.Version != "" {
+				version = result.Version
+			}
+			healthy = result != nil && result.Reachable && result.CredentialValid
+			details = result
+			message = healthMessage(status, cred)
+		}
 	}
 
-	result, err := p.probe(ctx, s, secret)
-	if err != nil {
-		p.cfg.Log.Warn("poller: probe failed", "server", s.Name, "error", err)
-		_ = p.cfg.Servers.UpdateStatus(ctx, s.ID, models.ServerStatusUnreachable, models.CredentialUnknown)
-		p.record(ctx, s, false, s.Version, map[string]any{"error": "probe_failed"})
-		return
-	}
-
-	status, cred := statusFromCheck(result)
 	_ = p.cfg.Servers.UpdateStatus(ctx, s.ID, status, cred)
+	p.record(ctx, s, healthy, version, details)
+	p.maybeAlert(ctx, s, status, cred, message)
+}
 
-	version := s.Version
-	if result != nil && result.Version != "" {
-		version = result.Version
+// maybeAlert fires a notification when a server crosses the healthy boundary:
+// healthy -> unhealthy (down) or a known-bad state -> healthy (recovered). It
+// stays quiet on transient unknown states and when no notifier is configured, so
+// it does not spam on every poll.
+func (p *Poller) maybeAlert(ctx context.Context, s models.Server, status models.ServerStatus, cred models.CredentialStatus, message string) {
+	if p.cfg.Notifier == nil {
+		return
 	}
-	healthy := result != nil && result.Reachable && result.CredentialValid
-	p.record(ctx, s, healthy, version, result)
+	priorHealthy := s.Status == models.ServerStatusActive && s.CredentialStatus == models.CredentialValid
+	newHealthy := status == models.ServerStatusActive && cred == models.CredentialValid
+	priorKnownBad := s.Status == models.ServerStatusUnreachable || s.CredentialStatus == models.CredentialInvalid
+
+	var kind string
+	switch {
+	case priorHealthy && !newHealthy:
+		kind = alert.KindDown
+	case priorKnownBad && newHealthy:
+		kind = alert.KindRecovered
+	default:
+		return
+	}
+
+	ev := alert.Event{
+		Kind:             kind,
+		ServerID:         s.ID,
+		ServerName:       s.Name,
+		BaseURL:          s.BaseURL,
+		Status:           string(status),
+		CredentialStatus: string(cred),
+		Message:          message,
+		At:               time.Now().UTC(),
+	}
+	if err := p.cfg.Notifier.Notify(ctx, ev); err != nil {
+		p.cfg.Log.Warn("poller: alert delivery failed", "server", s.Name, "kind", kind, "error", err)
+		return
+	}
+	p.cfg.Log.Info("poller: alert sent", "server", s.Name, "kind", kind)
+}
+
+func healthMessage(status models.ServerStatus, cred models.CredentialStatus) string {
+	if status != models.ServerStatusActive {
+		return "server unreachable"
+	}
+	if cred != models.CredentialValid {
+		return "automation credential invalid"
+	}
+	return "healthy"
 }
 
 // probe runs the actual health check (or the test override).
