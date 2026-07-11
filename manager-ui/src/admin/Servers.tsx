@@ -11,6 +11,7 @@ import {
   App,
   Select,
   Checkbox,
+  AutoComplete,
 } from "antd";
 import {
   PlusOutlined,
@@ -86,6 +87,7 @@ export default function Servers() {
   const [editingServer, setEditingServer] = useState<Server | null>(null);
   const [historyServer, setHistoryServer] = useState<Server | null>(null);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [envFilter, setEnvFilter] = useState<string | undefined>(undefined);
   const [form] = Form.useForm();
   const canWrite = roleAtLeast("operator");
 
@@ -95,10 +97,17 @@ export default function Servers() {
       .map((tag) => ({ label: tag, value: tag })),
     [servers],
   );
+  const envOptions = useMemo(
+    () => Array.from(new Set((servers || []).map((s) => s.environment).filter(Boolean) as string[]))
+      .sort()
+      .map((e) => ({ label: e, value: e })),
+    [servers],
+  );
   const filteredServers = useMemo(
     () => (servers || []).filter((server) =>
-      tagFilter.every((tag) => (server.tags || []).includes(tag))),
-    [servers, tagFilter],
+      tagFilter.every((tag) => (server.tags || []).includes(tag)) &&
+      (!envFilter || server.environment === envFilter)),
+    [servers, tagFilter, envFilter],
   );
 
   const openCreate = () => {
@@ -114,6 +123,7 @@ export default function Servers() {
       panel_host: hostnameFromBaseURL(server.base_url),
       scopes: server.scopes,
       tags: server.tags,
+      environment: server.environment,
       insecure_skip_verify: server.insecure_skip_verify,
       token_id: server.token_id,
     });
@@ -137,6 +147,7 @@ export default function Servers() {
           base_url: baseURL,
           scopes: values.scopes,
           tags: values.tags,
+          environment: values.environment,
           insecure_skip_verify: values.insecure_skip_verify,
           token_id: values.token_id,
           ...(values.token_secret
@@ -152,6 +163,7 @@ export default function Servers() {
           token_secret: values.token_secret,
           scopes: values.scopes,
           tags: values.tags,
+          environment: values.environment,
           insecure_skip_verify: values.insecure_skip_verify,
         });
         message.success("Server enrolled successfully");
@@ -332,6 +344,15 @@ export default function Servers() {
             maxTagCount="responsive"
             style={{ minWidth: 240 }}
           />
+          <Select
+            allowClear
+            aria-label="Filter servers by environment"
+            placeholder="Environment"
+            value={envFilter}
+            options={envOptions}
+            onChange={setEnvFilter}
+            style={{ minWidth: 160 }}
+          />
         </Space>
         {canWrite ? (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -445,6 +466,20 @@ export default function Servers() {
               tokenSeparators={[","]}
               maxCount={20}
               placeholder="production, eu-west, customer-a"
+            />
+          </Form.Item>
+          <Form.Item name="environment" label="Environment">
+            <AutoComplete
+              allowClear
+              options={envOptions.length ? envOptions : [
+                { label: "production", value: "production" },
+                { label: "staging", value: "staging" },
+                { label: "development", value: "development" },
+              ]}
+              placeholder="production"
+              filterOption={(input, option) =>
+                (option?.value ?? "").toString().toLowerCase().includes(input.toLowerCase())
+              }
             />
           </Form.Item>
           <Form.Item

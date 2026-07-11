@@ -5,6 +5,7 @@ export interface Server {
   token_id: string;
   scopes: string[];
   tags: string[];
+  environment?: string;
   insecure_skip_verify: boolean;
   version: string;
   cert_expires_at?: string;
@@ -22,6 +23,7 @@ export interface DashboardEntry {
   credential_status: "valid" | "invalid" | "unknown";
   version: string;
   healthy: boolean;
+  environment?: string;
 }
 
 export interface ListEnvelope<T> {

@@ -44,6 +44,7 @@ func (h *dashboardHandler) get(c *gin.Context) {
 		Status           string `json:"status"`
 		CredentialStatus string `json:"credential_status"`
 		Version          string `json:"version"`
+		Environment      string `json:"environment"`
 		Healthy          bool   `json:"healthy"`
 	}
 
@@ -57,6 +58,7 @@ func (h *dashboardHandler) get(c *gin.Context) {
 			Status:           string(s.Status),
 			CredentialStatus: string(s.CredentialStatus),
 			Version:          s.Version,
+			Environment:      s.Environment,
 			Healthy:          healthy,
 		})
 	}

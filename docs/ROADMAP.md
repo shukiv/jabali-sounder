@@ -81,8 +81,9 @@ acting user.
 
 **Goal:** features that matter as the managed fleet grows.
 
-- **Server groups / environments** (prod / staging) beyond flat tags, with
-  per-group dashboards.
+- ✅ **Server groups / environments** — a single-value environment field per
+  server (distinct from multi-tags), an environment filter, and a dashboard
+  breakdown (servers + healthy per environment).
 - **Fleet version-drift overview** — one glance at "N panels behind latest,"
   highlighting stragglers.
 - ✅ **Global search** (Ctrl/Cmd+K command palette) across enrolled servers and

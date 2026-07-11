@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Card, Col, Row, Space, Table, Tag, Typography, Button } from "antd";
 import { Link, useNavigate } from "react-router";
 import {
@@ -34,6 +35,19 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const serverRows = servers || [];
+  const envBreakdown = useMemo(() => {
+    const map = new Map<string, { total: number; healthy: number }>();
+    for (const srv of serverRows) {
+      const env = srv.environment || "unassigned";
+      const e = map.get(env) || { total: 0, healthy: 0 };
+      e.total++;
+      if (srv.healthy) e.healthy++;
+      map.set(env, e);
+    }
+    return Array.from(map.entries())
+      .map(([env, v]) => ({ env, ...v }))
+      .sort((a, b) => b.total - a.total);
+  }, [serverRows]);
   const total = serverRows.length;
   const healthy = serverRows.filter((s) => s.healthy && s.status === "active").length;
 
@@ -137,6 +151,22 @@ export default function Dashboard() {
                 onClick: () => navigate("/servers"),
                 style: { cursor: "pointer" },
               })}
+            />
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={12}>
+          <Card title="Environments" size="small">
+            <Table
+              size="small"
+              rowKey="env"
+              pagination={false}
+              dataSource={envBreakdown}
+              columns={[
+                { title: "Environment", dataIndex: "env", key: "env", render: (e: string) => <Tag color="geekblue">{e}</Tag> },
+                { title: "Servers", dataIndex: "total", key: "total" },
+                { title: "Healthy", key: "healthy", render: (_: unknown, r: { total: number; healthy: number }) => `${r.healthy} / ${r.total}` },
+              ]}
             />
           </Card>
         </Col>

@@ -39,6 +39,7 @@ export function useCreateServer() {
       token_secret: string;
       scopes?: string[];
       tags?: string[];
+      environment?: string;
       insecure_skip_verify?: boolean;
     }) => {
       const resp = await apiClient.post<Server>("/admin/servers", input);
@@ -57,6 +58,7 @@ export function useUpdateServer() {
       base_url?: string;
       scopes?: string[];
       tags?: string[];
+      environment?: string;
       insecure_skip_verify?: boolean;
       token_id?: string;
       token_secret?: string;

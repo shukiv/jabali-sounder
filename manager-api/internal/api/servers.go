@@ -70,6 +70,7 @@ type createServerRequest struct {
 	TokenSecret string   `json:"token_secret" binding:"required"`
 	Scopes      []string `json:"scopes"`
 	Tags        []string `json:"tags"`
+	Environment string   `json:"environment"`
 	// InsecureSkipVerify skips TLS cert verification for this panel (self-signed).
 	InsecureSkipVerify bool `json:"insecure_skip_verify"`
 }
@@ -144,6 +145,7 @@ func (h *serverHandler) create(c *gin.Context) {
 		TokenSecretEnc:     secretEnc,
 		Scopes:             models.JSONStringArray(scopes),
 		Tags:               models.JSONStringArray(tags),
+		Environment:        normalizeEnvironment(req.Environment),
 		InsecureSkipVerify: req.InsecureSkipVerify,
 		Version:            check.Version,
 		HealthURL:          baseURL + "/health",
@@ -213,6 +215,7 @@ type updateServerRequest struct {
 	BaseURL            *string   `json:"base_url"`
 	Scopes             *[]string `json:"scopes"`
 	Tags               *[]string `json:"tags"`
+	Environment        *string   `json:"environment"`
 	InsecureSkipVerify *bool     `json:"insecure_skip_verify"`
 	TokenID            *string   `json:"token_id"`
 	TokenSecret        *string   `json:"token_secret"`
@@ -261,6 +264,9 @@ func (h *serverHandler) update(c *gin.Context) {
 			return
 		}
 		s.Tags = models.JSONStringArray(tags)
+	}
+	if req.Environment != nil {
+		s.Environment = normalizeEnvironment(*req.Environment)
 	}
 	if req.InsecureSkipVerify != nil {
 		s.InsecureSkipVerify = *req.InsecureSkipVerify
@@ -358,6 +364,16 @@ const (
 var serverTagPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 
 // normalizeServerTags applies the server-tag contract at the API boundary.
+// normalizeEnvironment lowercases + trims a server's environment label. Empty
+// is allowed (unassigned). Same character contract as a tag.
+func normalizeEnvironment(raw string) string {
+	env := strings.ToLower(strings.TrimSpace(raw))
+	if len(env) > maxServerTagLength || !serverTagPattern.MatchString(env) {
+		return ""
+	}
+	return env
+}
+
 func normalizeServerTags(input []string) ([]string, error) {
 	tags := make([]string, 0, len(input))
 	seen := make(map[string]struct{}, len(input))
