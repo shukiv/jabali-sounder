@@ -77,7 +77,7 @@ acting user.
 
 ---
 
-## M4 — Scale & polish 🔭
+## M4 — Scale & polish 🚧
 
 **Goal:** features that matter as the managed fleet grows.
 
@@ -86,8 +86,9 @@ acting user.
 - **Fleet version-drift overview** — one glance at "N panels behind latest,"
   highlighting stragglers.
 - **Global search** across servers / domains / users / mail.
-- **Sounder read-only API tokens** — let external tooling query Sounder, not just
-  the SPA.
+- ✅ **Sounder read-only API tokens** — external tooling authenticates with
+  `Authorization: Bearer snd_…` for viewer (read-only) access; mint/list/revoke
+  in Settings (operator+), sha256-hashed, optional expiry, shown once.
 - **Scheduled reports** — CSV / PDF fleet summaries.
 
 **Acceptance:** servers can be grouped and filtered; out-of-date panels are

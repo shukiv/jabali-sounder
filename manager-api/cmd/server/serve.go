@@ -78,6 +78,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	var heartbeatRepo repository.HeartbeatRepository
 	var metricRepo repository.MetricSampleRepository
 	var sessionRepo repository.SessionRepository
+	var apiTokenRepo repository.APITokenRepository
 	if cfg.Database.URL != "" {
 		if err := db.Migrate(cfg.Database.Driver, cfg.Database.URL); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -93,6 +94,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		heartbeatRepo = repository.NewHeartbeatRepository(gormDB)
 		metricRepo = repository.NewMetricSampleRepository(gormDB)
 		sessionRepo = repository.NewSessionRepository(gormDB)
+		apiTokenRepo = repository.NewAPITokenRepository(gormDB)
 	} else {
 		log.Warn("database.url not set; running without DB — enrollment disabled")
 	}
@@ -125,6 +127,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		HeartbeatRepo:         heartbeatRepo,
 		MetricSampleRepo:      metricRepo,
 		SessionRepo:           sessionRepo,
+		APITokenRepo:          apiTokenRepo,
 		AdminRepo:             adminRepo,
 		SecretKey:             key,
 		JWTSecret:             jwtSecret,

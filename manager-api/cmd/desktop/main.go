@@ -113,12 +113,14 @@ func newDesktopHandler() (http.Handler, error) {
 	heartbeatRepo := repository.NewHeartbeatRepository(gormDB)
 	metricRepo := repository.NewMetricSampleRepository(gormDB)
 	sessionRepo := repository.NewSessionRepository(gormDB)
+	apiTokenRepo := repository.NewAPITokenRepository(gormDB)
 	apiEngine := app.NewWithDeps(app.Deps{
 		Log:              slog.Default(),
 		ServerRepo:       serverRepo,
 		HeartbeatRepo:    heartbeatRepo,
 		MetricSampleRepo: metricRepo,
 		SessionRepo:      sessionRepo,
+		APITokenRepo:     apiTokenRepo,
 		AdminRepo:        repository.NewAdminRepository(gormDB),
 		SecretKey:        key,
 		JWTSecret:        jwtSecret,

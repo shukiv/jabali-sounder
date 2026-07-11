@@ -135,6 +135,22 @@ type Session struct {
 
 func (Session) TableName() string { return "sessions" }
 
+// APIToken is a read-only credential for external tooling to call Sounder's
+// read endpoints without the SPA login (M4). Only the secret hash is stored;
+// the token grants viewer role.
+type APIToken struct {
+	ID         string       `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	Name       string       `gorm:"column:name;type:varchar(200);not null" json:"name"`
+	SecretHash string       `gorm:"column:secret_hash;type:char(64);not null" json:"-"`
+	CreatedBy  string       `gorm:"column:created_by;type:char(26)" json:"created_by"`
+	CreatedAt  time.Time    `gorm:"column:created_at" json:"created_at"`
+	LastUsedAt sql.NullTime `gorm:"column:last_used_at" json:"-"`
+	ExpiresAt  sql.NullTime `gorm:"column:expires_at" json:"-"`
+	RevokedAt  sql.NullTime `gorm:"column:revoked_at" json:"-"`
+}
+
+func (APIToken) TableName() string { return "api_tokens" }
+
 // JSONStringArray is a []string stored as JSON in a column.
 type JSONStringArray []string
 

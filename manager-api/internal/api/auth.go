@@ -50,7 +50,7 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 		}
 		return cfg.SessionRepo.Active(ctx, sid)
 	}
-	authMW := middleware.AuthMiddleware(cfg.JWTSecret, sessionCheck)
+	authMW := middleware.AuthMiddleware(cfg.JWTSecret, sessionCheck, nil)
 	auth := g.Group("/auth")
 	// Throttle brute force against the sole admin password (SND-3).
 	loginLimiter := middleware.NewLoginLimiter(cfg.LoginMaxFailures, cfg.LoginLockout, cfg.LoginWindow, nil, cfg.Log)

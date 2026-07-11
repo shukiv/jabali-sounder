@@ -22,6 +22,7 @@ type Deps struct {
 	HeartbeatRepo    repository.HeartbeatRepository
 	MetricSampleRepo repository.MetricSampleRepository
 	SessionRepo      repository.SessionRepository
+	APITokenRepo     repository.APITokenRepository
 	AdminRepo        repository.AdminRepository
 	SecretKey        *secrets.Key
 	JWTSecret        string
@@ -90,8 +91,17 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		}
 		return deps.SessionRepo.Active(ctx, sid)
 	}
+	apiTokenCheck := func(ctx context.Context, token string) (string, string, bool) {
+		if deps.APITokenRepo == nil {
+			return "", "", false
+		}
+		if tk := deps.APITokenRepo.Validate(ctx, token); tk != nil {
+			return tk.ID, tk.Name, true
+		}
+		return "", "", false
+	}
 	adminGroup := v1.Group("")
-	adminGroup.Use(middleware.AuthMiddleware(deps.JWTSecret, sessionCheck))
+	adminGroup.Use(middleware.AuthMiddleware(deps.JWTSecret, sessionCheck, apiTokenCheck))
 
 	// Server enrollment + dashboard (behind auth).
 	api.RegisterServerRoutes(adminGroup, api.ServerHandlerConfig{
@@ -134,6 +144,11 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	api.RegisterAdminRoutes(adminGroup, api.AdminHandlerConfig{
 		AdminRepo: deps.AdminRepo,
 		Log:       deps.Log,
+	})
+
+	api.RegisterAPITokenRoutes(adminGroup, api.APITokenHandlerConfig{
+		Repo: deps.APITokenRepo,
+		Log:  deps.Log,
 	})
 
 	api.RegisterSettingsRoutes(adminGroup, api.SettingsHandlerConfig{

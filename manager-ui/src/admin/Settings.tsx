@@ -6,6 +6,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
 import TwoFactorSettings from "../components/TwoFactorSettings";
 import SessionsSettings from "../components/SessionsSettings";
+import ApiTokensSettings from "../components/ApiTokensSettings";
+import { roleAtLeast } from "../hooks/useAuth";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -222,6 +224,8 @@ export default function Settings() {
       <TwoFactorSettings />
 
       <SessionsSettings />
+
+      {roleAtLeast("operator") ? <ApiTokensSettings /> : null}
     </div>
   );
 }

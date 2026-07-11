@@ -25,6 +25,10 @@ type Claims struct {
 // expired). nil disables the server-side session check (stateless JWT).
 type SessionCheck func(ctx context.Context, sessionID string) bool
 
+// APITokenCheck validates a presented API token, returning (id, name, ok). nil
+// disables API-token auth (JWT only).
+type APITokenCheck func(ctx context.Context, token string) (id, name string, ok bool)
+
 // Context keys for storing admin identity.
 const (
 	ctxAdminID   = "admin_id"
@@ -35,7 +39,7 @@ const (
 
 // AuthMiddleware verifies a JWT Bearer token and sets the admin identity
 // in the gin context. Returns 401 if missing/invalid.
-func AuthMiddleware(secret string, sessions SessionCheck) gin.HandlerFunc {
+func AuthMiddleware(secret string, sessions SessionCheck, apiTokens APITokenCheck) gin.HandlerFunc {
 	// Fail closed: an empty secret means auth is misconfigured. Reject every
 	// request rather than serve the protected surface unauthenticated (and an
 	// attacker could otherwise forge a token by HMAC-signing with the empty key).
@@ -51,6 +55,21 @@ func AuthMiddleware(secret string, sessions SessionCheck) gin.HandlerFunc {
 			return
 		}
 		tokenStr := raw[len("Bearer "):]
+
+		// API token (M4): read-only credential for external tooling. Grants the
+		// viewer role and skips the JWT/session path. Only where enabled.
+		if apiTokens != nil && isAPIToken(tokenStr) {
+			id, name, ok := apiTokens(c.Request.Context(), tokenStr)
+			if !ok {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+				return
+			}
+			c.Set(ctxAdminID, "apitoken:"+id)
+			c.Set(ctxAdminUser, "token:"+name)
+			c.Set(ctxAdminRole, string(models.RoleViewer))
+			c.Next()
+			return
+		}
 
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
@@ -100,6 +119,8 @@ func AdminRole(c *gin.Context) string {
 	s, _ := v.(string)
 	return s
 }
+
+func isAPIToken(s string) bool { return len(s) > 4 && s[:4] == "snd_" }
 
 // AdminSessionID returns the current session id from the context, or "".
 func AdminSessionID(c *gin.Context) string {
