@@ -135,11 +135,25 @@ func (h *settingsHandler) reportCSV(c *gin.Context) {
 	_ = w.Write([]string{"name", "base_url", "status", "credential_status", "environment", "version", "tags"})
 	for _, s := range servers {
 		_ = w.Write([]string{
-			s.Name, s.BaseURL, string(s.Status), string(s.CredentialStatus),
-			s.Environment, s.Version, strings.Join([]string(s.Tags), " "),
+			csvSafe(s.Name), csvSafe(s.BaseURL), csvSafe(string(s.Status)), csvSafe(string(s.CredentialStatus)),
+			csvSafe(s.Environment), csvSafe(s.Version), csvSafe(strings.Join([]string(s.Tags), " ")),
 		})
 	}
 	w.Flush()
+}
+
+// csvSafe defuses spreadsheet formula injection: a cell beginning with a formula
+// trigger (= + - @, tab, CR) is prefixed with a quote so Excel/Sheets treat it
+// as text, not a formula.
+func csvSafe(v string) string {
+	if v == "" {
+		return v
+	}
+	switch v[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + v
+	}
+	return v
 }
 
 func (h *settingsHandler) importSettings(c *gin.Context) {
