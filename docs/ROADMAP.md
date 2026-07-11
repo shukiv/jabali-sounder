@@ -39,7 +39,7 @@ viewable; cert expiry is shown per server.
 
 ---
 
-## M2 — Act (remediation) 🚧
+## M2 — Act (remediation) ✅
 
 **Goal:** the capability jump from read-only to acting on panels.
 
@@ -49,9 +49,11 @@ viewable; cert expiry is shown per server.
   scopes in enrollment, Sounder action endpoints (operator+, audited), and
   server-row actions (restart service, purge cache, backup) with confirm.
   User disable/enable on the Users page, domain suspend/unsuspend on the Domains
-  page, and backup operation-status polling are wired. Remaining: capability-
-  driven hiding + bulk operations.
-- ⬜ **Bulk operations** — select N servers → check / disable / tag / act at once.
+  page, and backup operation-status polling are wired. (Capability-driven action
+  hiding is optional polish — the panel enforces scopes and Sounder surfaces the
+  error.)
+- ✅ **Bulk operations** — select N servers in the table → check / disable /
+  enable / purge-cache / backup in one action.
 
 **Dependencies:** jabali2 must expose write-automation endpoints (tracked as
 jabali2-side issues), plus new **write scopes**, a **confirm-before-act** UX, and

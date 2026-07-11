@@ -99,6 +99,7 @@ export default function Servers() {
   const [envFilter, setEnvFilter] = useState<string | undefined>(undefined);
   const [form] = Form.useForm();
   const canWrite = roleAtLeast("operator");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const actionMut = useServerAction();
   const [restartServer, setRestartServer] = useState<Server | null>(null);
   const [restartForm] = Form.useForm();
@@ -140,6 +141,15 @@ export default function Servers() {
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
+  };
+
+  const bulk = async (label: string, fn: (id: string) => Promise<unknown>) => {
+    const ids = [...selectedIds];
+    const results = await Promise.allSettled(ids.map((id) => fn(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed) message.warning(`${label}: ${ids.length - failed} ok, ${failed} failed`);
+    else message.success(`${label}: ${ids.length} server(s)`);
+    setSelectedIds([]);
   };
 
   const submitRestart = async () => {
@@ -450,8 +460,39 @@ export default function Servers() {
           </Button>
         ) : null}
       </Space>
+      {selectedIds.length > 0 ? (
+        <Space style={{ marginBottom: 12 }} wrap>
+          <span>{selectedIds.length} selected:</span>
+          <Button size="small" onClick={() => bulk("Checked", (id) => checkMut.mutateAsync(id))}>
+            Check
+          </Button>
+          {canWrite ? (
+            <>
+              <Button size="small" onClick={() => bulk("Disabled", (id) => disableMut.mutateAsync(id))}>
+                Disable
+              </Button>
+              <Button size="small" onClick={() => bulk("Enabled", (id) => enableMut.mutateAsync(id))}>
+                Enable
+              </Button>
+              <Button size="small" onClick={() => bulk("Cache purged", (id) => actionMut.mutateAsync({ id, action: "purge-cache", body: { scope: "all" } }))}>
+                Purge cache
+              </Button>
+              <Button size="small" onClick={() => bulk("Backup started", (id) => actionMut.mutateAsync({ id, action: "backup", body: {} }))}>
+                Backup
+              </Button>
+            </>
+          ) : null}
+          <Button size="small" type="text" onClick={() => setSelectedIds([])}>
+            Clear
+          </Button>
+        </Space>
+      ) : null}
       <Card>
         <Table<Server>
+          rowSelection={{
+            selectedRowKeys: selectedIds,
+            onChange: (keys) => setSelectedIds(keys as string[]),
+          }}
           dataSource={filteredServers}
           columns={columns}
           rowKey="id"
