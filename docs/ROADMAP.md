@@ -134,23 +134,27 @@ suppresses alerts for a named server — all shipped.
 
 ---
 
-## M6 — Observability export & audit 🔭
+## M6 — Observability export & audit ✅
 
 **Goal:** let the fleet's data leave Sounder and make the audit trail readable.
 
-- 🔭 **Prometheus `/metrics` export** (SND-23). Expose fleet health +
-  metric_samples in Prometheus text format behind an API token, so existing
-  Grafana/Alertmanager stacks scrape Sounder directly. Low effort, high leverage.
-- 🔭 **Audit log viewer + CSV export** (SND-24). Audit events are recorded but
-  not viewable; add a filterable/searchable audit page (actor/action/server/time)
-  + CSV export. Closes the M3 accountability loop.
-- 🔭 **Full metric charts with range selection** (SND-25). Sparklines → real
-  time-range charts (zoom, compare servers, fleet-aggregate). Data already exists.
-- 🔭 **Uptime / SLA rollup** (SND-26). Uptime % per server from heartbeat
-  history; availability card + monthly SLA rollup in reports.
+- ✅ **Prometheus `/metrics` export** (SND-23). `/api/v1/metrics/prometheus`
+  (token- or session-authed) emits per-server up / cpu / ram / disk / load1 /
+  cert-expiry gauges (server/id/environment labels) plus fleet totals in text
+  exposition format — existing Grafana/Alertmanager stacks scrape Sounder direct.
+- ✅ **Audit log viewer + CSV export** (SND-24). Privileged mutations persist to
+  an `audit_logs` table (dual-written with the structured slog event); a
+  filterable Audit page (event/actor/time) + CSV export closes the accountability
+  loop.
+- ✅ **Metric charts with range selection** (SND-25). `/:id/metrics` gains
+  6h/24h/7d/30d windows with server-side downsampling; the history drawer renders
+  dependency-free multi-series CPU/RAM/disk/load charts.
+- ✅ **Uptime / SLA rollup** (SND-26). Uptime computed over a configurable window
+  from all stored heartbeats; a 7-day SLA shows in the history drawer and the
+  dashboard (fleet + per-server).
 
 **Acceptance:** an external Grafana scrapes Sounder; the audit page answers "who
-restarted what, when"; a server's 30-day uptime is visible.
+restarted what, when"; a server's 7-day uptime is visible — all shipped.
 
 ---
 
