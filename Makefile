@@ -1,6 +1,7 @@
 .PHONY: help build run test test-short test-coverage lint fmt vet tidy clean \
 	test-ui test-e2e test-all ui-install ui-build migrate-up migrate-down \
-	desktop-stage desktop-build server-stage server-build
+	desktop-stage desktop-build server-stage server-build \
+	android-stage android-lib android-apk
 
 GO         := go
 API_PKG    := ./manager-api/...
@@ -84,6 +85,33 @@ desktop-stage: ui-build ## Stage built SPA assets for the Wails desktop entrypoi
 desktop-build: desktop-stage ## Build the local standalone desktop binary for the current OS
 	mkdir -p bin
 	CGO_ENABLED=1 $(GO) build -tags $(DESKTOP_TAGS) -ldflags "$(VLDFLAGS)" -o ./bin/jabali-sounder-desktop ./manager-api/cmd/desktop
+
+# --- Android (Wails v3 mobile). Requires the Android SDK (API 35) + NDK 26.3. ---
+NDK_VERSION ?= 26.3.11579264
+ANDROID_SDK ?= $(HOME)/Android/Sdk
+ANDROID_NDK ?= $(ANDROID_SDK)/ndk/$(NDK_VERSION)
+NDK_TC      := $(ANDROID_NDK)/toolchains/llvm/prebuilt/linux-x86_64
+JNILIBS     := build/android/app/src/main/jniLibs
+MOBILE_PKG  := ./manager-api/cmd/desktop
+
+android-stage: ui-build ## Stage the SPA where the mobile lib embeds it (//go:embed dist)
+	rm -rf manager-api/cmd/desktop/dist
+	mkdir -p manager-api/cmd/desktop/dist
+	cp -R manager-ui/dist/. manager-api/cmd/desktop/dist/
+
+android-lib: android-stage ## Cross-compile libwails.so for arm64 + x86_64 via the NDK
+	mkdir -p $(JNILIBS)/arm64-v8a $(JNILIBS)/x86_64
+	CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC=$(NDK_TC)/bin/aarch64-linux-android21-clang \
+	  $(GO) build -buildmode=c-shared -tags "android,debug" -o $(JNILIBS)/arm64-v8a/libwails.so $(MOBILE_PKG)
+	CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC=$(NDK_TC)/bin/x86_64-linux-android21-clang \
+	  $(GO) build -buildmode=c-shared -tags "android,debug" -o $(JNILIBS)/x86_64/libwails.so $(MOBILE_PKG)
+	rm -f $(JNILIBS)/*/libwails.h
+
+android-apk: android-lib ## Build a debug APK -> bin/jabali-sounder.apk
+	cd build/android && chmod +x ./gradlew && ANDROID_HOME=$(ANDROID_SDK) ./gradlew assembleDebug --no-daemon
+	mkdir -p bin
+	cp build/android/app/build/outputs/apk/debug/app-debug.apk bin/jabali-sounder.apk
+	@echo "APK: bin/jabali-sounder.apk"
 
 server-stage: ui-build ## Stage the built SPA for the embedded-UI server binary
 	rm -rf manager-api/cmd/server/dist

@@ -71,7 +71,7 @@ the app sandbox:
 | Desktop Linux | Linux | Go + `-tags gtk3` (webkit2gtk-4.1) or GTK4/webkitgtk-6.0 | ✅ yes |
 | Desktop Windows | Windows (or cross) | Go + webview2 | ⚠️ CI |
 | Desktop macOS | macOS | Go + Xcode CLT | ❌ needs Mac |
-| **Android** | Linux/macOS | Android SDK (API 35) + NDK 26.3 + JDK 21 + Go | ⚠️ needs SDK/NDK install |
+| **Android** | Linux/macOS | Android SDK (API 35) + NDK 26.3 + JDK 21 + Go | ✅ yes (`make android-apk`) |
 | **iOS** | **macOS only** | full Xcode + Go | ❌ needs Mac |
 
 Notes:
@@ -82,10 +82,28 @@ Notes:
   `libgtk-4-dev libwebkitgtk-6.0-dev`.
 - **Android** needs `sdkmanager "platform-tools" "platforms;android-35"
   "build-tools;35.0.0" "ndk;26.3.11579264"` and `ANDROID_HOME` set. The dev box
-  has JDK 21 and `adb` but not the SDK/NDK yet.
+  has all of these — `make android-apk` produces a working APK.
 - **iOS** cannot be built or tested on Linux at all — it requires macOS with the
   full Xcode (command-line tools alone are insufficient). iOS code is written
   here and built on a Mac.
+
+## Building the APK (validated on Linux)
+
+The repo carries a self-contained gradle project under `build/android`. A debug
+APK is one command (needs the Android SDK API 35 + NDK 26.3 + JDK 21):
+
+```bash
+make android-apk          # -> bin/jabali-sounder.apk
+```
+
+Under the hood this: builds the SPA and stages it where the Go lib embeds it
+(`//go:embed dist`); cross-compiles the shared `main` package to
+`libwails.so` for `arm64-v8a` and `x86_64` with the NDK clang
+(`-buildmode=c-shared -tags android`); then runs `gradlew assembleDebug`, which
+packages both libs + the Java WebView host into the APK. The produced APK is
+`com.jabali.sounder` (label "Jabali Sounder"), min SDK 21, target SDK 35.
+
+For a Play-ready bundle, use the wails3 tasks below (`.aab`, signed).
 
 ## Commands (Wails v3 CLI)
 

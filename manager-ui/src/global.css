@@ -50,7 +50,9 @@
     margin: 8px auto;
   }
   .ant-layout-content {
-    padding: 12px !important;
+    padding: 12px max(12px, env(safe-area-inset-right))
+             max(12px, env(safe-area-inset-bottom))
+             max(12px, env(safe-area-inset-left)) !important;
   }
   .ant-card-body {
     padding: 16px !important;
@@ -130,4 +132,24 @@ code {
 pre {
   max-width: 100%;
   overflow-x: auto;
+}
+
+/* --- Mobile safe-area insets (notch / home indicator) for the iOS/Android
+   webview. index.html sets viewport-fit=cover to expose env(safe-area-inset-*).
+   Every value collapses to the desktop default when the inset is 0. --- */
+.ant-layout-header {
+  height: calc(76px + env(safe-area-inset-top)) !important;
+  padding-top: env(safe-area-inset-top) !important;
+  padding-left: max(24px, env(safe-area-inset-left)) !important;
+  padding-right: max(24px, env(safe-area-inset-right)) !important;
+}
+.ant-layout-footer {
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+}
+.ant-drawer-body {
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+}
+/* Stop the webview rubber-band scrolling the shell behind the app. */
+html, body {
+  overscroll-behavior-y: none;
 }

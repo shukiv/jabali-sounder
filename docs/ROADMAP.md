@@ -221,11 +221,16 @@ the existing frontend, `@wailsio/runtime` bindings unchanged). See
   (webkit2gtk-4.1); server build, tests, and UI unaffected.
 - 🔭 **P1 — Responsive UI.** Phone-width layouts: bottom-tab nav, safe-area
   insets, mobile-friendly tables/drawers.
-- 🔭 **P2 — Android target.** wails3 android build tasks, NDK 26.3 wiring,
-  native push (`PostNotification` → the alerting system), Play `.aab`. Needs the
-  Android SDK/NDK installed.
-- 🔭 **P3 — iOS target.** iOS `//go:build ios` wiring, entitlements, push, App
-  Store `.ipa`. Built and tested on macOS (Xcode) — not on the Linux CI box.
+- ✅ **P2 — Android target.** Vendored gradle project (`build/android`), the
+  shared `main` builds as `libwails.so` (arm64 + x86_64) via the NDK, packaged
+  into a debug APK with `make android-apk`. Verified: a 50 MB APK
+  (`com.jabali.sounder`, label "Jabali Sounder", target API 35) that carries the
+  full Go backend + embedded SPA. Native push (`PostNotification` → alerting) is
+  a follow-up.
+- 🚧 **P3 — iOS target.** iOS Go entry files added (`main_ios.go` +
+  `app_options_*.go`, so the shared `main` compiles for `ios`). The c-archive +
+  Xcode `.ipa` flow runs on macOS (`wails3 task ios:*`) — cannot be built on the
+  Linux box.
 - 🔭 **P4 — Store release.** Signing, metadata, CI. Mobile updates ship through
   the App Store / Play Store (binary self-update is desktop-only).
 

@@ -1,4 +1,4 @@
-//go:build desktop
+//go:build desktop || android || ios
 
 package main
 
@@ -56,7 +56,7 @@ func main() {
 	// also targets iOS/Android. The combined gin+SPA handler is passed straight
 	// in as the asset handler, so /api/v1 and the embedded SPA are served
 	// in-process on every platform (no localhost server, no open ports on mobile).
-	wailsApp := application.New(application.Options{
+	opts := application.Options{
 		Name:        "Jabali Sounder",
 		Description: "Central control plane for a sounder of Jabali Panel servers.",
 		Services: []application.Service{
@@ -65,7 +65,11 @@ func main() {
 		Assets: application.AssetOptions{
 			Handler: handler,
 		},
-	})
+	}
+	// iOS-only option tweaks (no-op elsewhere); see app_options_*.go.
+	modifyOptionsForIOS(&opts)
+
+	wailsApp := application.New(opts)
 	bridge.app = wailsApp
 
 	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -245,14 +249,15 @@ func loadOrCreateHexSecret(path string, size int) (string, error) {
 	return secret, nil
 }
 
-// appDataDir returns (creating if needed) the per-user data directory where the
-// desktop app stores its SQLite DB, secret key, and JWT secret.
+// appDataDir returns (creating if needed) the per-platform data directory where
+// the app stores its SQLite DB, secret key, and JWT secret. The base directory
+// is platform-specific — desktop uses os.UserConfigDir, mobile uses the app
+// sandbox — see platformDataDir in the datadir_*.go files.
 func appDataDir() (string, error) {
-	base, err := os.UserConfigDir()
+	dir, err := platformDataDir()
 	if err != nil {
-		return "", fmt.Errorf("user config dir: %w", err)
+		return "", err
 	}
-	dir := filepath.Join(base, "Jabali Sounder")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", fmt.Errorf("create data dir: %w", err)
 	}
