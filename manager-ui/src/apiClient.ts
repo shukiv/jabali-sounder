@@ -11,12 +11,20 @@ const client = axios.create({
 // GET with no Authorization header. So route all API calls through the Go
 // backend via the runtime (main.Bridge.ApiCall), which carries the full
 // payload. No-op in the browser/desktop build (they use the normal XHR adapter).
-function isMobileApp(): boolean {
+// Decide per-request (NOT at import time — the runtime environment isn't ready
+// yet then). Route through the bridge only inside the Wails webview
+// (hostname wails.localhost) on a mobile OS, using timing-independent signals
+// (hostname + user agent, with System.IsMobile as a hint). The browser/server
+// build and the desktop webview keep the normal XHR path.
+function shouldUseBridge(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.location.hostname !== "wails.localhost") return false;
   try {
-    return System.IsMobile();
+    if (System.IsMobile()) return true;
   } catch {
-    return false;
+    /* environment not ready — fall through to UA */
   }
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent || "");
 }
 
 const wailsAdapter: AxiosAdapter = async (config) => {
@@ -89,9 +97,13 @@ const wailsAdapter: AxiosAdapter = async (config) => {
   throw err;
 };
 
-if (isMobileApp()) {
-  client.defaults.adapter = wailsAdapter;
-}
+// Install unconditionally; dispatch per request so the check happens after the
+// runtime is initialised. Non-bridge requests delegate to axios's built-in adapter.
+const builtinAdapter = axios.getAdapter(
+  client.defaults.adapter ?? axios.defaults.adapter,
+);
+client.defaults.adapter = (config) =>
+  shouldUseBridge() ? wailsAdapter(config) : builtinAdapter(config);
 
 // Error envelope — extract the message from the standard error shape.
 // On 401, clear auth and redirect to login IF we were authenticated (session
