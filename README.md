@@ -120,6 +120,34 @@ Change the password in **Settings** after logging in.
 
 For desktop use instead, grab a build from [Downloads](#downloads).
 
+## Run with Docker
+
+A single container serves the API and the UI on one port, backed by SQLite on a
+persistent volume (no external database required):
+
+```bash
+JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d --build
+```
+
+Or with plain Docker:
+
+```bash
+docker build -t jabali-sounder .
+docker run -d -p 8484:8484 -v sounder-data:/data \
+  -e JABALI_SOUNDER_ADMIN_PASSWORD=change-me jabali-sounder
+```
+
+Open `http://localhost:8484` and log in as `admin`. The entrypoint generates the
+encryption key + JWT secret on first run (persisted under `/data`), applies
+migrations, and bootstraps the admin from `JABALI_SOUNDER_ADMIN_PASSWORD`.
+
+- Data (SQLite DB, `secrets.key`, `jwt.secret`) lives in the `/data` volume —
+  back it up. Losing `secrets.key` makes sealed panel tokens unrecoverable.
+- Serves plain HTTP; front it with a TLS reverse proxy for anything public.
+- To use MariaDB instead of SQLite, see the commented service in
+  `docker-compose.yml` and set `JABALI_SOUNDER_DATABASE_DRIVER`/`_URL`.
+- `make docker-build` / `make docker-run` wrap the same flow with version stamping.
+
 ## Repository Layout
 
 ```text

@@ -1,0 +1,46 @@
+# Jabali Sounder — single-container deployment (SQLite on a named volume).
+#
+#   JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d --build
+#
+# Then open http://localhost:8484 and log in as `admin`. Put a TLS reverse
+# proxy in front for anything public — the app serves plain HTTP.
+services:
+  sounder:
+    build:
+      context: .
+      args:
+        VERSION: compose
+    image: jabali-sounder:latest
+    restart: unless-stopped
+    ports:
+      - "8484:8484"
+    environment:
+      # First-run admin bootstrap (set this before the first `up`). After the
+      # first start you can remove it; re-adding updates the password.
+      JABALI_SOUNDER_ADMIN: "${JABALI_SOUNDER_ADMIN:-admin}"
+      JABALI_SOUNDER_ADMIN_PASSWORD: "${JABALI_SOUNDER_ADMIN_PASSWORD:-}"
+      # Allow enrolling panels on private/LAN addresses (control-plane on a LAN).
+      JABALI_SOUNDER_ALLOW_PRIVATE_TARGETS: "true"
+    volumes:
+      - sounder-data:/data
+
+volumes:
+  sounder-data:
+
+# --- Optional: MariaDB instead of SQLite ------------------------------------
+# Uncomment the db service + the two db env lines, and set the driver/url on the
+# sounder service:
+#     JABALI_SOUNDER_DATABASE_DRIVER: "mysql"
+#     JABALI_SOUNDER_DATABASE_URL: "sounder:sounder@tcp(db:3306)/sounder?parseTime=true&charset=utf8mb4"
+#   db:
+#     image: mariadb:11
+#     restart: unless-stopped
+#     environment:
+#       MARIADB_DATABASE: sounder
+#       MARIADB_USER: sounder
+#       MARIADB_PASSWORD: sounder
+#       MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+#     volumes:
+#       - sounder-db:/var/lib/mysql
+# volumes:
+#   sounder-db:

@@ -1,7 +1,7 @@
 .PHONY: help build run test test-short test-coverage lint fmt vet tidy clean \
 	test-ui test-e2e test-all ui-install ui-build migrate-up migrate-down \
 	desktop-stage desktop-build server-stage server-build \
-	android-stage android-lib android-apk
+	android-stage android-lib android-apk docker-build docker-run
 
 GO         := go
 API_PKG    := ./manager-api/...
@@ -121,3 +121,16 @@ server-stage: ui-build ## Stage the built SPA for the embedded-UI server binary
 server-build: server-stage ## Build the headless server binary with the SPA embedded (one binary, one port)
 	mkdir -p bin
 	CGO_ENABLED=0 $(GO) build -tags embedui -ldflags "-s -w $(VLDFLAGS)" -o ./bin/jabali-sounder-server ./manager-api/cmd/server
+
+# --- Docker (headless server image) ---
+DOCKER_IMAGE ?= jabali-sounder:latest
+
+docker-build: ## Build the server Docker image (multi-stage: SPA + static server)
+	docker build \
+	  --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg DATE=$(DATE) \
+	  -t $(DOCKER_IMAGE) .
+
+docker-run: docker-build ## Run the image on :8484 with a persistent data volume
+	docker run --rm -p 8484:8484 -v sounder-data:/data \
+	  -e JABALI_SOUNDER_ADMIN_PASSWORD=$${JABALI_SOUNDER_ADMIN_PASSWORD:-changeme} \
+	  $(DOCKER_IMAGE)

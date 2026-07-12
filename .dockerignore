@@ -1,0 +1,31 @@
+# Keep the build context small and reproducible. The Dockerfile builds the SPA
+# and the server from source; everything below is either regenerated, huge, or
+# irrelevant to the image.
+.git
+.gitignore
+.gotmp/
+bin/
+coverage.out
+
+# Node / frontend build outputs (the image runs `npm ci` + build itself)
+manager-ui/node_modules/
+manager-ui/dist/
+
+# Staged SPA copies (the Dockerfile stages its own)
+manager-api/cmd/server/dist/
+manager-api/cmd/desktop/dist/
+
+# Desktop / mobile build artifacts — not used by the server image
+build/android/app/build/
+build/android/.gradle/
+build/android/build/
+build/android/app/src/main/jniLibs/
+*.apk
+*.aab
+
+# Local/editor cruft
+*.log
+*.key
+secrets.key
+.DS_Store
+.envrc
