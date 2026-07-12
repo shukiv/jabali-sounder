@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/shukiv/jabali-sounder/releases"><img alt="Release" src="https://img.shields.io/github/v/release/shukiv/jabali-sounder?sort=semver" /></a>
-  <img alt="Status" src="https://img.shields.io/badge/status-early-orange" />
+  <img alt="Status" src="https://img.shields.io/badge/status-beta-yellow" />
   <img alt="Go" src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white" />
   <img alt="React" src="https://img.shields.io/badge/React-18-20232A?logo=react&logoColor=61DAFB" />
   <img alt="Ant Design" src="https://img.shields.io/badge/Ant%20Design-6-0170FE?logo=antdesign&logoColor=white" />
@@ -29,18 +29,53 @@ nodes.
 > A *sounder* is a group of wild boar (*jabalí*) — the mark above, and the
 > reason this control plane herds many panels from one place.
 
-The current implementation provides:
+## Features
 
-- Admin login and JWT-protected API access.
-- Managed server enrollment with HMAC automation credentials.
-- Server health checks and dashboard status.
-- Cross-server domain and user inventory.
-- Monitor tab with live CPU, RAM, IO, load, and summary disk/account/domain data.
-- Mail tab for mailboxes, forwarders, domain forwarders, groups, and
-  autoresponders. This tab is ready on the Sounder side, but requires Jabali
-  Panel automation mail endpoints to be available on managed servers.
-- Standalone Wails desktop target for Windows, macOS, and Linux using local
-  SQLite storage and first-run admin setup.
+**Fleet monitoring**
+- Background health poller: status history + heartbeats without a manual check.
+- Resource trends (CPU / RAM / disk / load) with range-selectable charts
+  (6h / 24h / 7d / 30d) and per-server + fleet uptime / SLA.
+- TLS certificate-expiry tracking and version-drift overview.
+
+**Alerting & incidents**
+- Configurable per-metric alert rules (threshold + duration + severity).
+- Delivery channels: webhook (Slack/Discord/Mattermost), ntfy push, SMTP email,
+  and PagerDuty, with severity-based routing.
+- In-app incidents with acknowledge / snooze / mute and one-shot escalation.
+- Maintenance windows that suppress alerts during planned work.
+
+**Remediation & ops**
+- Scoped write actions — restart service, enable/disable user, suspend/unsuspend
+  domain, purge cache, create backup — gated by confirm + role and audited.
+- Bulk operations across selected servers.
+- Backup tracking (runs polled to completion) with stale-backup alerts.
+- Opt-in auto-restart remediation after repeated failed checks.
+
+**Multi-operator & auth**
+- Multiple admins with RBAC (viewer / operator / owner).
+- TOTP two-factor authentication and server-side session management.
+- Login throttling: per-IP lockout plus per-account backoff + brute-force alert.
+
+**Security & compliance**
+- Per-server automation token IDs with encrypted secrets; HMAC-signed requests.
+- Read-only API tokens with coarse scopes, source-IP/CIDR allowlist, per-token
+  rate limit, and one-click rotation.
+- Persisted audit log with filtering and CSV export.
+- Compliance/policy drift detection (weak TLS, invalid credentials, cert expiry,
+  version drift).
+
+**Observability export & inventory**
+- Prometheus `/metrics` endpoint for external Grafana/Alertmanager.
+- Fleet CSV export and scheduled fleet-summary reports.
+- Cross-server domain and user inventory, plus a global search palette (⌘/Ctrl+K).
+- Mail tab (mailboxes, forwarders, groups, autoresponders) — ready on the Sounder
+  side; requires the panel automation mail endpoints (see below).
+
+**Updates & deployment**
+- Version endpoint + in-app "update available" notice; checksum-verified desktop
+  self-update and a server update script. See [Updating](docs/UPDATING.md).
+- Two deploy targets: a headless Linux server (single binary, embedded UI) and a
+  standalone Wails desktop app for Windows / macOS / Linux with local SQLite.
 
 ## Downloads
 
@@ -202,6 +237,8 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 - [Operations](docs/OPERATIONS.md)
 - [Managed Panel Requirements](docs/MANAGED-PANEL-REQUIREMENTS.md)
 - [Security](docs/SECURITY.md)
+- [Updating](docs/UPDATING.md)
+- [Roadmap](docs/ROADMAP.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 
 ## Security Model
@@ -215,6 +252,11 @@ Token secret encryption uses a local 32-byte key file configured by
 `[secrets].key_file`. If the key cannot be loaded, the code has a development
 fallback that stores hex-encoded plaintext; do not use that fallback in
 production.
+
+Access is gated by RBAC (viewer / operator / owner) with optional TOTP 2FA and
+server-side sessions. Failed logins are throttled per-IP and per-account.
+Privileged mutations are recorded in an audit log, and read-only API tokens can
+be scoped, IP-restricted, and rate-limited. See [Security](docs/SECURITY.md).
 
 ## Known External Dependency
 
