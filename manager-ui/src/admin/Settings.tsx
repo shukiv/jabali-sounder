@@ -25,7 +25,7 @@ interface ImportResult {
 }
 
 export default function Settings() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const [exporting, setExporting] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
@@ -56,15 +56,16 @@ export default function Settings() {
     }
   };
 
-  const handleExport = async () => {
+  const handleExport = async (includeSecrets = false) => {
     setExporting(true);
     try {
-      const resp = await apiClient.get("/admin/settings/export", {
-        responseType: "blob",
-      });
+      const resp = await apiClient.get(
+        `/admin/settings/export${includeSecrets ? "?include_secrets=true" : ""}`,
+        { responseType: "blob" },
+      );
       const text = await (resp.data as Blob).text();
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-      const filename = `jabali-sounder-settings-${stamp}.json`;
+      const filename = `jabali-sounder-settings${includeSecrets ? "-with-secrets" : ""}-${stamp}.json`;
 
       // Desktop (Wails): open a native Save As dialog. The browser <a download>
       // trick below is a no-op inside the WebKit webview.
@@ -162,15 +163,32 @@ export default function Settings() {
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
           <Paragraph type="secondary" style={{ margin: 0 }}>
             Export the current Sounder settings and enrolled server list as JSON.
-            Token secrets are exported only as encrypted local backup data.
+            By default token secrets are exported encrypted (usable only on this install). Use “Export + tokens” to include them in plaintext for migrating to another install.
           </Paragraph>
           <Space wrap>
             <Button
               icon={<DownloadOutlined />}
               loading={exporting}
-              onClick={handleExport}
+              onClick={() => handleExport(false)}
             >
               Export Settings
+            </Button>
+            <Button
+              danger
+              icon={<DownloadOutlined />}
+              loading={exporting}
+              onClick={() =>
+                modal.confirm({
+                  title: "Export with token secrets?",
+                  content:
+                    "The file will contain your panels' token secrets in PLAINTEXT so it can be imported on another install. Anyone with the file can control those panels — store it like a password and delete it after use.",
+                  okText: "Export with secrets",
+                  okButtonProps: { danger: true },
+                  onOk: () => handleExport(true),
+                })
+              }
+            >
+              Export + tokens
             </Button>
             <Button
               icon={<DownloadOutlined />}

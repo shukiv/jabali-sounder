@@ -84,6 +84,16 @@ type settingsImportResult struct {
 }
 
 func (h *settingsHandler) export(c *gin.Context) {
+	// include_secrets=true decrypts each token secret into a portable plaintext
+	// field so the export can be imported on a *different* install (whose key
+	// cannot open the locally-sealed blob). This exposes live panel tokens, so
+	// it is operator+ only and audited; default exports stay sealed (SND-6).
+	includeSecrets := c.Query("include_secrets") == "true"
+	if includeSecrets && !models.Role(middleware.AdminRole(c)).AtLeast(models.RoleOperator) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "operator role required to export token secrets"})
+		return
+	}
+
 	servers, err := h.cfg.Repo.List(c.Request.Context())
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
@@ -100,8 +110,9 @@ func (h *settingsHandler) export(c *gin.Context) {
 		},
 		Servers: make([]settingsServerExport, 0, len(servers)),
 	}
+	exported := 0
 	for _, server := range servers {
-		out.Servers = append(out.Servers, settingsServerExport{
+		item := settingsServerExport{
 			ID:                 server.ID,
 			Name:               server.Name,
 			BaseURL:            server.BaseURL,
@@ -116,7 +127,23 @@ func (h *settingsHandler) export(c *gin.Context) {
 			HealthURL:          server.HealthURL,
 			Status:             string(server.Status),
 			CredentialStatus:   string(server.CredentialStatus),
-		})
+		}
+		if includeSecrets && len(server.TokenSecretEnc) > 0 {
+			// Only what we can decrypt here can be exported in the clear; a
+			// blob sealed by another install is left as-is.
+			if plain, derr := secrets.OpenSecret(h.cfg.SecretKey, server.TokenSecretEnc, h.cfg.AllowPlaintext); derr == nil {
+				item.TokenSecret = plain
+				item.TokenSecretEnc = ""
+				item.SecretFormat = "plaintext"
+				exported++
+				auditServerMutation(h.cfg.Log, h.cfg.Audit, c, "export-secret", server.ID, server.Name)
+			}
+		}
+		out.Servers = append(out.Servers, item)
+	}
+	if includeSecrets {
+		h.cfg.Log.Info("audit", "event", "settings.export_secrets", "actor", middleware.AdminUsername(c),
+			"servers", len(out.Servers), "secrets_exported", exported, "request_id", middleware.GetRequestID(c))
 	}
 
 	c.Header("Content-Disposition", `attachment; filename="jabali-sounder-settings.json"`)
