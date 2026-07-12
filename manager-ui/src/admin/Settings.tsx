@@ -12,14 +12,9 @@ import AlertChannelsSettings from "../components/AlertChannelsSettings";
 import MaintenanceSettings from "../components/MaintenanceSettings";
 import AboutSettings from "../components/AboutSettings";
 import { roleAtLeast } from "../hooks/useAuth";
+import { desktopBridge } from "../lib/desktop";
 
 const { Title, Text, Paragraph } = Typography;
-
-// Native bridge exposed by the Wails desktop build (window.go.main.Bridge).
-// Absent in the browser/server build.
-interface WailsBridgeWindow {
-  go?: { main?: { Bridge?: { SaveFile?: (name: string, content: string) => Promise<string> } } };
-}
 
 interface ImportResult {
   imported: number;
@@ -73,7 +68,7 @@ export default function Settings() {
 
       // Desktop (Wails): open a native Save As dialog. The browser <a download>
       // trick below is a no-op inside the WebKit webview.
-      const bridge = (window as unknown as WailsBridgeWindow).go?.main?.Bridge;
+      const bridge = desktopBridge();
       if (bridge?.SaveFile) {
         const saved = await bridge.SaveFile(filename, text);
         if (saved) message.success(`Exported to ${saved}`);
@@ -103,7 +98,7 @@ export default function Settings() {
       const text = await (resp.data as Blob).text();
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
       const filename = `jabali-sounder-fleet-${stamp}.csv`;
-      const bridge = (window as unknown as WailsBridgeWindow).go?.main?.Bridge;
+      const bridge = desktopBridge();
       if (bridge?.SaveFile) {
         const saved = await bridge.SaveFile(filename, text);
         if (saved) message.success(`Exported to ${saved}`);

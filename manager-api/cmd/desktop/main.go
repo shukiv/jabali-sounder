@@ -1,4 +1,4 @@
-//go:build desktop
+//go:build desktop || android || ios
 
 package main
 
@@ -19,10 +19,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	runtime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/api"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/app"
@@ -55,21 +52,38 @@ func main() {
 
 	bridge := &Bridge{}
 
-	if err := wails.Run(&options.App{
+	// Wails v3: the Go backend is created with application.New. The same main.go
+	// also targets iOS/Android. The combined gin+SPA handler is passed straight
+	// in as the asset handler, so /api/v1 and the embedded SPA are served
+	// in-process on every platform (no localhost server, no open ports on mobile).
+	opts := application.Options{
+		Name:        "Jabali Sounder",
+		Description: "Central control plane for a sounder of Jabali Panel servers.",
+		Services: []application.Service{
+			application.NewService(bridge),
+		},
+		Assets: application.AssetOptions{
+			Handler: handler,
+		},
+	}
+	// iOS-only option tweaks (no-op elsewhere); see app_options_*.go.
+	modifyOptionsForIOS(&opts)
+
+	wailsApp := application.New(opts)
+	bridge.app = wailsApp
+
+	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "Jabali Sounder",
 		Width:  1280,
 		Height: 820,
-		// Start maximized (fills the screen); the user can restore/resize.
-		// Width/Height above are the restored (un-maximized) size.
-		WindowStartState: options.Maximised,
-		OnStartup:        bridge.startup,
-		Bind:             []interface{}{bridge},
-		AssetServer: &assetserver.Options{
-			Assets:  assets,
-			Handler: handler,
-		},
-		BackgroundColour: &options.RGBA{R: 20, G: 20, B: 20, A: 255},
-	}); err != nil {
+		// Start maximised (fills the screen); the user can restore/resize.
+		// Width/Height above are the restored (un-maximised) size.
+		StartState:       application.WindowStateMaximised,
+		BackgroundColour: application.NewRGBA(20, 20, 20, 255),
+		URL:              "/",
+	})
+
+	if err := wailsApp.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -235,14 +249,15 @@ func loadOrCreateHexSecret(path string, size int) (string, error) {
 	return secret, nil
 }
 
-// appDataDir returns (creating if needed) the per-user data directory where the
-// desktop app stores its SQLite DB, secret key, and JWT secret.
+// appDataDir returns (creating if needed) the per-platform data directory where
+// the app stores its SQLite DB, secret key, and JWT secret. The base directory
+// is platform-specific — desktop uses os.UserConfigDir, mobile uses the app
+// sandbox — see platformDataDir in the datadir_*.go files.
 func appDataDir() (string, error) {
-	base, err := os.UserConfigDir()
+	dir, err := platformDataDir()
 	if err != nil {
-		return "", fmt.Errorf("user config dir: %w", err)
+		return "", err
 	}
-	dir := filepath.Join(base, "Jabali Sounder")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", fmt.Errorf("create data dir: %w", err)
 	}
@@ -313,29 +328,26 @@ func resetPassword(args []string) error {
 
 // Bridge exposes native desktop capabilities to the SPA over the Wails runtime.
 // The browser <a download> trick does not trigger a save in the WebKit webview,
-// so file export goes through a native Save As dialog here instead.
+// so file export goes through a native Save As dialog here instead. In Wails v3
+// the SPA calls these via @wailsio/runtime Call.ByName("main.Bridge.<Method>").
 type Bridge struct {
-	ctx context.Context
+	app *application.App
 }
 
-func (b *Bridge) startup(ctx context.Context) { b.ctx = ctx }
-
 // OpenExternal opens a URL in the user's default system browser. The webview
-// does not open target="_blank" links itself. Bound to JS as
-// window.go.main.Bridge.OpenExternal.
+// does not open target="_blank" links itself.
 func (b *Bridge) OpenExternal(url string) {
-	runtime.BrowserOpenURL(b.ctx, url)
+	_ = b.app.Browser.OpenURL(url)
 }
 
 // SaveFile opens a native "Save As" dialog seeded with defaultName and writes
 // content to the chosen path. Returns the saved path, or "" if the user
-// cancelled. Bound to JS as window.go.main.Bridge.SaveFile.
+// cancelled.
 func (b *Bridge) SaveFile(defaultName, content string) (string, error) {
-	path, err := runtime.SaveFileDialog(b.ctx, runtime.SaveDialogOptions{
-		DefaultFilename:      defaultName,
-		Title:                "Save Jabali Sounder settings",
-		CanCreateDirectories: true,
-	})
+	path, err := b.app.Dialog.SaveFile().
+		SetFilename(defaultName).
+		CanCreateDirectories(true).
+		PromptForSingleSelection()
 	if err != nil {
 		return "", fmt.Errorf("save dialog: %w", err)
 	}

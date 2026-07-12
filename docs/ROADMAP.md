@@ -203,6 +203,40 @@ re-enrollment; a flapping service auto-restarts under an operator's standing
 a token can be scoped + IP-restricted; the dashboard flags non-compliant panels —
 all shipped.
 
+## M9 — Mobile (iOS & Android) 🚧
+
+**Goal:** ship Jabali Sounder as native iOS and Android apps from the *same*
+Go backend and React SPA — no second codebase.
+
+Enabled by migrating the desktop app from **Wails v2 to v3**, whose mobile
+targets compile the same `main.go` (Go → C shared library, OS WebView renders
+the existing frontend, `@wailsio/runtime` bindings unchanged). See
+[MOBILE.md](MOBILE.md) for the architecture and build matrix.
+
+- ✅ **P0 — Desktop v2 → v3 migration.** `cmd/desktop` rewritten for
+  `application.New` + `AssetOptions{Handler}` (the gin+SPA handler is the asset
+  handler, so `/api/v1` and the SPA are served in-process on every platform —
+  no open ports on mobile). Bridge is now a v3 Service; the SPA calls it via
+  `@wailsio/runtime` `Call.ByName`. Builds on Linux with `-tags gtk3`
+  (webkit2gtk-4.1); server build, tests, and UI unaffected.
+- 🔭 **P1 — Responsive UI.** Phone-width layouts: bottom-tab nav, safe-area
+  insets, mobile-friendly tables/drawers.
+- ✅ **P2 — Android target.** Vendored gradle project (`build/android`), the
+  shared `main` builds as `libwails.so` (arm64 + x86_64) via the NDK, packaged
+  into a debug APK with `make android-apk`. Verified: a 50 MB APK
+  (`com.jabali.sounder`, label "Jabali Sounder", target API 35) that carries the
+  full Go backend + embedded SPA. Native push (`PostNotification` → alerting) is
+  a follow-up.
+- 🚧 **P3 — iOS target.** iOS Go entry files added (`main_ios.go` +
+  `app_options_*.go`, so the shared `main` compiles for `ios`). The c-archive +
+  Xcode `.ipa` flow runs on macOS (`wails3 task ios:*`) — cannot be built on the
+  Linux box.
+- 🔭 **P4 — Store release.** Signing, metadata, CI. Mobile updates ship through
+  the App Store / Play Store (binary self-update is desktop-only).
+
+**Acceptance:** the same account, fleet, alerting, and actions work from a phone
+app installed from the store; incidents arrive as native push.
+
 ---
 
 If you had to pick one to build next: **M1's poller + alerting** — it changes
