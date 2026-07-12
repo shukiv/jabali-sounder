@@ -7,12 +7,12 @@ import {
   Input,
   Row,
   Space,
-  Statistic,
   Table,
   Tabs,
   Tag,
   Typography,
 } from "antd";
+import { StatCard } from "../components/StatCard";
 import type { TableColumnsType } from "antd";
 import {
   CheckCircleOutlined,
@@ -220,7 +220,7 @@ export default function Mail() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <Space style={{ width: "100%", justifyContent: "space-between" }}>
+      <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
         <Title level={3} style={{ margin: 0 }}>Mail</Title>
         <Button type="primary" icon={<ReloadOutlined />} loading={mail.isFetching} onClick={() => mail.refetch()}>
           Refresh
@@ -238,29 +238,21 @@ export default function Mail() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} xl={6}>
-          <Card>
-            <Statistic title="Mailboxes" value={rows.mailboxes.length} prefix={<MailOutlined />} />
-          </Card>
+          <StatCard label="Mailboxes" value={rows.mailboxes.length} Icon={MailOutlined} iconColor="#1677ff" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card>
-            <Statistic title="Forwarders" value={rows.forwarders.length + rows.domainForwarders.length} prefix={<SwapOutlined />} />
-          </Card>
+          <StatCard label="Forwarders" value={rows.forwarders.length + rows.domainForwarders.length} Icon={SwapOutlined} iconColor="#fa8c16" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card>
-            <Statistic title="Groups" value={rows.groups.length} prefix={<TeamOutlined />} />
-          </Card>
+          <StatCard label="Groups" value={rows.groups.length} Icon={TeamOutlined} iconColor="#9254de" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card>
-            <Statistic title="Autoresponders" value={rows.autoresponders.length} prefix={<CheckCircleOutlined />} />
-          </Card>
+          <StatCard label="Autoresponders" value={rows.autoresponders.length} Icon={CheckCircleOutlined} iconColor="#3f8600" />
         </Col>
       </Row>
 
       <Card>
-        <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+        <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
             placeholder="Search mail stack..."
             prefix={<SearchOutlined />}

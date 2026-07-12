@@ -79,7 +79,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+      <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
         <Title level={3} style={{ margin: 0 }}>
           Dashboard
         </Title>
@@ -89,7 +89,7 @@ export default function Dashboard() {
       </Space>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={12} lg={6}>
           <StatCard
             label="Active Servers"
             value={`${healthy} / ${total}`}
@@ -98,7 +98,7 @@ export default function Dashboard() {
             to="/servers"
           />
         </Col>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={12} lg={6}>
           <StatCard
             label="Domains"
             value={fmt(domains.data?.length)}
@@ -107,7 +107,7 @@ export default function Dashboard() {
             to="/domains"
           />
         </Col>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={12} lg={6}>
           <StatCard
             label="Users"
             value={fmt(users.data?.length)}
@@ -116,7 +116,7 @@ export default function Dashboard() {
             to="/users"
           />
         </Col>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={12} lg={6}>
           <StatCard
             label={`Fleet SLA (${sla?.window_days ?? 7}d)`}
             value={sla?.fleet_ratio != null ? `${(sla.fleet_ratio * 100).toFixed(1)}%` : "—"}
@@ -127,7 +127,7 @@ export default function Dashboard() {
         </Col>
       </Row>
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={12} lg={8}>
           <StatCard
             label="Policy issues"
             value={policy ? `${policy.servers_at_risk} server${policy.servers_at_risk === 1 ? "" : "s"}` : "—"}

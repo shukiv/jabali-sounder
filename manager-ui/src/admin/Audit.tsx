@@ -110,7 +110,7 @@ export default function Audit() {
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>Audit log</Title>
         <Button icon={<DownloadOutlined />} loading={exporting} onClick={exportCSV}>
           Export CSV

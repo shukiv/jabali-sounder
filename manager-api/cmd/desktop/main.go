@@ -55,7 +55,7 @@ func main() {
 	// initial load of https://wails.localhost/ is served instead of refused.
 	handler := newLazyHandler(newDesktopHandler)
 
-	bridge := &Bridge{}
+	bridge := &Bridge{handler: handler}
 
 	// Wails v3: the Go backend is created with application.New. The same main.go
 	// also targets iOS/Android. The combined gin+SPA handler is passed straight
@@ -371,7 +371,8 @@ func resetPassword(args []string) error {
 // so file export goes through a native Save As dialog here instead. In Wails v3
 // the SPA calls these via @wailsio/runtime Call.ByName("main.Bridge.<Method>").
 type Bridge struct {
-	app *application.App
+	app     *application.App
+	handler http.Handler // the gin+SPA handler, for mobile ApiCall
 }
 
 // OpenExternal opens a URL in the user's default system browser. The webview

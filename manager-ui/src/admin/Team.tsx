@@ -117,7 +117,7 @@ export default function Team() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+      <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
         <h3 style={{ margin: 0 }}>Team</h3>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
           Add operator
@@ -130,6 +130,7 @@ export default function Team() {
           rowKey="id"
           loading={isLoading}
           pagination={false}
+          scroll={{ x: "max-content" }}
         />
       </Card>
 

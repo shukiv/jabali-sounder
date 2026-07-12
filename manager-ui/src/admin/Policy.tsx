@@ -1,5 +1,6 @@
-import { Card, Table, Typography, Tag, Button, Empty, Statistic, Row, Col } from "antd";
-import { ReloadOutlined, SafetyOutlined } from "@ant-design/icons";
+import { Card, Table, Typography, Tag, Button, Empty, Row, Col } from "antd";
+import { ReloadOutlined, SafetyOutlined, WarningOutlined, FileTextOutlined } from "@ant-design/icons";
+import { StatCard } from "../components/StatCard";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../apiClient";
 
@@ -60,21 +61,21 @@ export default function Policy() {
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}><SafetyOutlined /> Compliance</Title>
         <Button icon={<ReloadOutlined />} loading={isFetching} onClick={() => refetch()}>
           Refresh
         </Button>
       </div>
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={8}>
-          <Card><Statistic title="Servers at risk" value={data?.servers_at_risk ?? 0} suffix={`/ ${data?.servers_total ?? 0}`} valueStyle={{ color: (data?.servers_at_risk ?? 0) ? "#d48806" : "#3f8600" }} /></Card>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard label="Servers at risk" value={`${data?.servers_at_risk ?? 0} / ${data?.servers_total ?? 0}`} Icon={SafetyOutlined} iconColor={(data?.servers_at_risk ?? 0) ? "#d48806" : "#3f8600"} />
         </Col>
-        <Col xs={12} sm={8}>
-          <Card><Statistic title="Critical violations" value={critical} valueStyle={{ color: critical ? "#cf1322" : "#3f8600" }} /></Card>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard label="Critical violations" value={critical} Icon={WarningOutlined} iconColor={critical ? "#cf1322" : "#3f8600"} />
         </Col>
-        <Col xs={24} sm={8}>
-          <Card><Statistic title="Total violations" value={data?.total ?? 0} /></Card>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard label="Total violations" value={data?.total ?? 0} Icon={FileTextOutlined} iconColor="#8c8c8c" />
         </Col>
       </Row>
       <Card>

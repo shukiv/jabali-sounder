@@ -68,7 +68,7 @@ export default function Users() {
     <div>
       <Title level={3} style={{ marginBottom: 16 }}>Users</Title>
       <Card>
-        <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+        <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
             placeholder="Search by email or username…"
             prefix={<SearchOutlined />}
@@ -85,6 +85,7 @@ export default function Users() {
           rowKey={(r) => r.server_id + ":" + r.id}
           loading={isLoading}
           pagination={{ pageSize: 50, showSizeChanger: true }}
+          scroll={{ x: "max-content" }}
         />
       </Card>
     </div>

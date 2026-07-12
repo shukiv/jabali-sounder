@@ -6,11 +6,11 @@ import {
   Progress,
   Row,
   Space,
-  Statistic,
   Table,
   Tag,
   Typography,
 } from "antd";
+import { StatCard } from "../components/StatCard";
 import {
   DashboardOutlined,
   HddOutlined,
@@ -156,7 +156,7 @@ export default function Monitor() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <Space style={{ width: "100%", justifyContent: "space-between" }}>
+      <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
         <Title level={3} style={{ margin: 0 }}>Monitor</Title>
         <Space>
           <Button icon={<ReloadOutlined />} loading={summary.isFetching} onClick={() => summary.refetch()}>
@@ -179,24 +179,16 @@ export default function Monitor() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} xl={6}>
-          <Card>
-            <Statistic title="Live servers" value={totals.live} suffix={`/ ${liveRows.length}`} prefix={<DashboardOutlined />} />
-          </Card>
+          <StatCard label="Live servers" value={`${totals.live} / ${liveRows.length}`} Icon={DashboardOutlined} iconColor="#1677ff" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card>
-            <Statistic title="Avg CPU" value={totals.cpu / liveCount} precision={1} suffix="%" prefix={<ThunderboltOutlined />} />
-          </Card>
+          <StatCard label="Avg CPU" value={`${liveCount ? (totals.cpu / liveCount).toFixed(1) : "0.0"}%`} Icon={ThunderboltOutlined} iconColor="#fa8c16" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card>
-            <Statistic title="Avg RAM" value={totals.ram / liveCount} precision={1} suffix="%" prefix={<HddOutlined />} />
-          </Card>
+          <StatCard label="Avg RAM" value={`${liveCount ? (totals.ram / liveCount).toFixed(1) : "0.0"}%`} Icon={HddOutlined} iconColor="#9254de" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card>
-            <Statistic title="Accounts / Domains" value={`${totals.accounts.toLocaleString()} / ${totals.domains.toLocaleString()}`} prefix={<TeamOutlined />} />
-          </Card>
+          <StatCard label="Accounts / Domains" value={`${totals.accounts.toLocaleString()} / ${totals.domains.toLocaleString()}`} Icon={TeamOutlined} iconColor="#13c2c2" />
         </Col>
       </Row>
 

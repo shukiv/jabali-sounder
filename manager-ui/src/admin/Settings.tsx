@@ -155,7 +155,7 @@ export default function Settings() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+      <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
         <Title level={3} style={{ margin: 0 }}>Settings</Title>
       </Space>
 

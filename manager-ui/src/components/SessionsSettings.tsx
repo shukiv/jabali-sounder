@@ -92,6 +92,7 @@ export default function SessionsSettings() {
         loading={isLoading}
         pagination={false}
         size="small"
+        scroll={{ x: "max-content" }}
       />
     </Card>
   );

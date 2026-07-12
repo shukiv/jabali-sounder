@@ -41,6 +41,7 @@ export function BrandLogo({ mode, size = "header" }: BrandLogoProps) {
   const textStyle = {
     margin: 0,
     lineHeight: 1,
+    whiteSpace: "nowrap" as const,
     fontSize: size === "footer" ? 16 : 30,
     fontWeight: 700,
     color: mode === "dark" ? "#fff" : "#111827",
@@ -66,7 +67,7 @@ export function BrandLogo({ mode, size = "header" }: BrandLogoProps) {
           Jabali Sounder
         </Text>
       ) : (
-        <Title level={titleLevel} style={textStyle}>
+        <Title level={titleLevel} className="brand-wordmark" style={textStyle}>
           Jabali Sounder
         </Title>
       )}

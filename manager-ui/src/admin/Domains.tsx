@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Card, Table, Tag, Input, Space, Typography, Statistic, Row, Col, Button, Popconfirm, App } from "antd";
-import { SearchOutlined } from "@ant-design/icons";
+import { Card, Table, Tag, Input, Space, Typography, Row, Col, Button, Popconfirm, App } from "antd";
+import { SearchOutlined, GlobalOutlined, CheckCircleOutlined, CloudServerOutlined } from "@ant-design/icons";
+import { StatCard } from "../components/StatCard";
 import { useDomains } from "../hooks/useInventory";
 import { useServerAction } from "../hooks/useServers";
 import { roleAtLeast } from "../hooks/useAuth";
@@ -69,25 +70,19 @@ export default function Domains() {
   return (
     <div>
       <Title level={3} style={{ marginBottom: 16 }}>Domains</Title>
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic title="Total Domains" value={domains?.length || 0} />
-          </Card>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard label="Total Domains" value={domains?.length || 0} Icon={GlobalOutlined} iconColor="#1677ff" />
         </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic title="Enabled" value={enabled} valueStyle={{ color: "#3f8600" }} />
-          </Card>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard label="Enabled" value={enabled} Icon={CheckCircleOutlined} iconColor="#3f8600" />
         </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic title="Servers" value={servers.size} />
-          </Card>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard label="Servers" value={servers.size} Icon={CloudServerOutlined} iconColor="#9254de" />
         </Col>
       </Row>
       <Card>
-        <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+        <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
             placeholder="Search domains…"
             prefix={<SearchOutlined />}
@@ -104,6 +99,7 @@ export default function Domains() {
           rowKey={(r) => r.server_id + ":" + r.id}
           loading={isLoading}
           pagination={{ pageSize: 50, showSizeChanger: true }}
+          scroll={{ x: "max-content" }}
         />
       </Card>
     </div>

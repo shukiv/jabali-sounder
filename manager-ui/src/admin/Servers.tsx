@@ -432,7 +432,7 @@ export default function Servers() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+      <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
         <Space wrap>
           <h3 style={{ margin: 0 }}>Managed Servers</h3>
           <Select
@@ -499,6 +499,7 @@ export default function Servers() {
           columns={columns}
           rowKey="id"
           loading={isLoading}
+          scroll={{ x: "max-content" }}
           pagination={false}
         />
       </Card>

@@ -153,3 +153,14 @@ pre {
 html, body {
   overscroll-behavior-y: none;
 }
+
+/* Header brand wordmark: never wrap character-by-character; shrink then hide on
+   phones so it can't overrun the 76px header or collide with controls (SND-41).
+   The drawer/login wordmarks are unaffected. */
+.ant-layout-header .brand-wordmark { white-space: nowrap; }
+@media (max-width: 640px) {
+  .ant-layout-header .brand-wordmark { font-size: 20px !important; }
+}
+@media (max-width: 430px) {
+  .ant-layout-header .brand-wordmark { display: none !important; }
+}
