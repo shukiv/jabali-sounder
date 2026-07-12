@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"embed"
@@ -12,8 +13,10 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -230,15 +233,27 @@ type spaFileServer struct {
 }
 
 func (s spaFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/")
-	if path == "" {
-		path = "index.html"
+	name := strings.TrimPrefix(r.URL.Path, "/")
+	if name == "" {
+		name = "index.html"
 	}
-	if _, err := fs.Stat(s.fsys, path); err != nil {
-		path = "index.html"
+	data, err := fs.ReadFile(s.fsys, name)
+	if err != nil {
+		// SPA client-side routing: unknown paths fall back to index.html.
+		name = "index.html"
+		data, err = fs.ReadFile(s.fsys, name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
 	}
-	r.URL.Path = "/" + path
-	http.FileServer(http.FS(s.fsys)).ServeHTTP(w, r)
+	if ct := mime.TypeByExtension(path.Ext(name)); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	// Serve the bytes directly. http.FileServer would 301-redirect
+	// /index.html -> /, which the Android WebViewAssetLoader does not follow
+	// (it reports the asset as not found), leaving a blank screen.
+	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(data))
 }
 
 func ensureRandomFile(path string, size int) error {
