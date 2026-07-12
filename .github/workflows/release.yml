@@ -1,6 +1,7 @@
 name: release
 
-# Build the standalone desktop app for Linux, Windows and macOS.
+# Build the standalone desktop app (Linux, Windows, macOS), the headless
+# server binary, and the Android APK/AAB — all attached to the GitHub release.
 #
 # Two trigger modes:
 #   * push a version tag (v*)  -> build + publish a GitHub Release with binaries
@@ -230,9 +231,77 @@ jobs:
 
   # Publish a checksums.txt over every release asset. The desktop self-update
   # verifies its download against this file, so it must cover all binaries.
+  # Android APK + AAB (Wails v3 mobile). The shared cmd/desktop package is
+  # cross-compiled to libwails.so (arm64 + x86_64) with the NDK, then gradle
+  # assembles a release APK (sideload) and AAB (Play upload). Signed with the
+  # Android debug keystore unless ANDROID_KEYSTORE_* repo secrets are set.
+  android:
+    name: build (android)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: manager-ui/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install Android SDK packages (platform 35, build-tools, NDK 26.3)
+        run: |
+          SDKMGR="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true
+          "$SDKMGR" "platforms;android-35" "build-tools;35.0.0" "ndk;26.3.11579264"
+
+      - name: Install frontend deps
+        run: make ui-install
+
+      - name: Build APK + AAB
+        env:
+          # Optional real signing (Play upload key). Without these the release
+          # is debug-keystore signed — installable by sideload, rejected by Play.
+          ANDROID_KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          VER="${GITHUB_REF_NAME}"; case "${VER#v}" in [0-9]*) ;; *) VER="v0.0.0-dev" ;; esac
+          # Cross-compile the shared Go backend to libwails.so for both ABIs
+          # (ANDROID_SDK points make at the CI SDK/NDK location).
+          make android-lib ANDROID_SDK="$ANDROID_SDK_ROOT"
+          ( cd build/android && chmod +x ./gradlew \
+            && ANDROID_HOME="$ANDROID_SDK_ROOT" ./gradlew --no-daemon assembleRelease bundleRelease )
+          mkdir -p out
+          cp build/android/app/build/outputs/apk/release/app-release.apk "out/jabali-sounder-android-${VER}.apk"
+          cp build/android/app/build/outputs/bundle/release/app-release.aab "out/jabali-sounder-android-${VER}.aab"
+          echo "apk size: $(stat -c%s out/*.apk) bytes"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: out/*
+
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          fail_on_unmatched_files: true
+
   checksums:
     name: checksums
-    needs: [build, server]
+    needs: [build, server, android]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

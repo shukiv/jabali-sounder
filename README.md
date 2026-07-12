@@ -91,6 +91,7 @@ file is version-stamped:
 | Linux (x86-64) | `jabali-sounder-linux-amd64-<version>` |
 | Windows (x86-64) | `jabali-sounder-windows-amd64-<version>.exe` |
 | macOS (Apple Silicon) | `jabali-sounder-macos-arm64-<version>.dmg` |
+| Android (arm64 + x86-64) | `jabali-sounder-android-<version>.apk` |
 
 All versions: [Releases](https://github.com/shukiv/jabali-sounder/releases).
 
@@ -100,6 +101,18 @@ Notes:
   time (Gatekeeper). Windows: **More info → Run anyway** (SmartScreen).
 - macOS build is Apple Silicon (arm64) only. On Linux, `chmod +x` the binary
   before running.
+
+### Mobile
+
+- **Android** — the release page carries `jabali-sounder-android-<version>.apk`
+  (universal, arm64 + x86-64). Sideload it: enable **Install unknown apps** for
+  your browser/file manager, then open the APK (or `adb install <file>.apk`). It
+  is signed with the Android debug keystore unless a release keystore is
+  configured, which Android accepts for sideloading. A Play-ready `.aab` is
+  attached too.
+- **iOS** — not on the release page yet: a distributable `.ipa` requires a macOS
+  build **and** Apple Developer signing (certificate + provisioning profile).
+  The code is in place (`make`-buildable on a Mac); see [Mobile](docs/MOBILE.md).
 
 ## Install (Linux server)
 
