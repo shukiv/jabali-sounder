@@ -5,6 +5,7 @@ import {
 import { DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../apiClient";
+import { desktopBridge } from "../lib/desktop";
 
 const { Title, Text } = Typography;
 
@@ -18,10 +19,6 @@ interface AuditRow {
   source_ip: string;
   request_id: string;
   created_at: string;
-}
-
-interface WailsBridgeWindow {
-  go?: { main?: { Bridge?: { SaveFile?: (name: string, contents: string) => Promise<string> } } };
 }
 
 const DAYS_OPTIONS = [
@@ -65,7 +62,7 @@ export default function Audit() {
       const text = await (resp.data as Blob).text();
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
       const filename = `jabali-sounder-audit-${stamp}.csv`;
-      const bridge = (window as unknown as WailsBridgeWindow).go?.main?.Bridge;
+      const bridge = desktopBridge();
       if (bridge?.SaveFile) {
         const saved = await bridge.SaveFile(filename, text);
         if (saved) message.success(`Exported to ${saved}`);

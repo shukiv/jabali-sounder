@@ -10,7 +10,7 @@ name: release
 # Cut a real release with:
 #   git tag v0.1.0 && git push origin v0.1.0
 #
-# NOTE: the desktop app is a hand-rolled `go build` of the Wails v2 entrypoint
+# NOTE: the desktop app is a hand-rolled `go build` of the Wails v3 entrypoint
 # (manager-api/cmd/desktop) with the SPA embedded from dist/. Each OS needs its
 # native webview: WebKit2GTK on Linux, WebView2 on Windows, WebKit on macOS.
 
@@ -33,7 +33,7 @@ jobs:
         include:
           - label: linux-amd64
             runs-on: ubuntu-latest
-            tags: desktop,production,webkit2_41
+            tags: desktop,production,gtk3
             asset: jabali-sounder-linux-amd64
             ldflags: ""
             cgo_ldflags: ""

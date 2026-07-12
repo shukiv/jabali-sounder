@@ -8,7 +8,7 @@ ALL_PKG    := $(API_PKG)
 BIN        := ./bin/jabali-sounder
 COVER      := coverage.out
 MIN_COV    := 80
-DESKTOP_TAGS ?= desktop,production,webkit2_41
+DESKTOP_TAGS ?= desktop,production,gtk3
 
 # Build-time version stamping (update mechanism). Override VERSION on release.
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -83,7 +83,7 @@ desktop-stage: ui-build ## Stage built SPA assets for the Wails desktop entrypoi
 
 desktop-build: desktop-stage ## Build the local standalone desktop binary for the current OS
 	mkdir -p bin
-	$(GO) build -tags $(DESKTOP_TAGS) -ldflags "$(VLDFLAGS)" -o ./bin/jabali-sounder-desktop ./manager-api/cmd/desktop
+	CGO_ENABLED=1 $(GO) build -tags $(DESKTOP_TAGS) -ldflags "$(VLDFLAGS)" -o ./bin/jabali-sounder-desktop ./manager-api/cmd/desktop
 
 server-stage: ui-build ## Stage the built SPA for the embedded-UI server binary
 	rm -rf manager-api/cmd/server/dist
