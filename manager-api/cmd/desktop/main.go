@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -44,11 +45,12 @@ func main() {
 		return
 	}
 
-	handler, err := newDesktopHandler()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	// Build the backend lazily on the first asset request rather than up front.
+	// On mobile the app's storage path (and thus the DB) is only available once
+	// the runtime/activity is ready; deferring construction also lets
+	// application.New register the asset handler immediately, so the WebView's
+	// initial load of https://wails.localhost/ is served instead of refused.
+	handler := newLazyHandler(newDesktopHandler)
 
 	bridge := &Bridge{}
 
@@ -198,6 +200,29 @@ func (h *desktopHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.assets.ServeHTTP(w, r)
+}
+
+// lazyHandler builds the real backend once, on the first request. If
+// construction fails it serves the error (visible in the webview) instead of
+// leaving the WebView with a refused connection.
+type lazyHandler struct {
+	build func() (http.Handler, error)
+	once  sync.Once
+	h     http.Handler
+	err   error
+}
+
+func newLazyHandler(build func() (http.Handler, error)) *lazyHandler {
+	return &lazyHandler{build: build}
+}
+
+func (l *lazyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	l.once.Do(func() { l.h, l.err = l.build() })
+	if l.err != nil {
+		http.Error(w, "startup failed: "+l.err.Error(), http.StatusInternalServerError)
+		return
+	}
+	l.h.ServeHTTP(w, r)
 }
 
 type spaFileServer struct {
