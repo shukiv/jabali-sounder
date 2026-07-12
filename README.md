@@ -74,8 +74,11 @@ nodes.
 **Updates & deployment**
 - Version endpoint + in-app "update available" notice; checksum-verified desktop
   self-update and a server update script. See [Updating](docs/UPDATING.md).
-- Two deploy targets: a headless Linux server (single binary, embedded UI) and a
-  standalone Wails desktop app for Windows / macOS / Linux with local SQLite.
+- Deploy targets: a headless Linux server (single binary, embedded UI), a
+  [Docker](docs/DOCKER.md) image, and a standalone Wails desktop app for Windows
+  / macOS / Linux with local SQLite.
+- Native **iOS and Android** apps (beta) from the same Go backend + SPA via
+  Wails v3 — see [Mobile](docs/MOBILE.md).
 
 ## Downloads
 
@@ -147,6 +150,11 @@ migrations, and bootstraps the admin from `JABALI_SOUNDER_ADMIN_PASSWORD`.
 - To use MariaDB instead of SQLite, see the commented service in
   `docker-compose.yml` and set `JABALI_SOUNDER_DATABASE_DRIVER`/`_URL`.
 - `make docker-build` / `make docker-run` wrap the same flow with version stamping.
+
+The image is a ~33 MB Alpine build of the static server; it was verified
+end-to-end (provisioning, migrations, admin bootstrap, `/health`, login, SPA).
+Full guide — env vars, volumes/backup, MariaDB, TLS, health checks, rootless
+Podman — in [Docker](docs/DOCKER.md).
 
 ## Repository Layout
 
@@ -259,8 +267,10 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 - [Configuration](docs/CONFIGURATION.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Deployment](docs/DEPLOYMENT.md)
+- [Docker](docs/DOCKER.md)
 - [Database](docs/DATABASE.md)
 - [Desktop Standalone App](docs/DESKTOP.md)
+- [Mobile (iOS & Android)](docs/MOBILE.md)
 - [Frontend](docs/FRONTEND.md)
 - [Operations](docs/OPERATIONS.md)
 - [Managed Panel Requirements](docs/MANAGED-PANEL-REQUIREMENTS.md)

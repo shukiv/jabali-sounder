@@ -6,6 +6,20 @@ uncertainty about which release is actually serving (SND-33). Run it on the
 host; the code changes referenced here ship in the current build, but the host
 steps must be performed by an operator with verified access.
 
+## Container deployment (Docker / Podman)
+
+For a fresh containerised deploy (as opposed to the on-host reconciliation this
+runbook covers), use the image:
+
+```bash
+JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d --build
+```
+
+SQLite + secrets live in the `/data` volume; the entrypoint provisions keys,
+runs migrations, and bootstraps the admin. Full guide: [Docker](DOCKER.md).
+
+---
+
 ## 0. Verify host identity first (do NOT bypass)
 
 If SSH host-key verification fails (changed fingerprint), STOP. Confirm the new
