@@ -151,6 +151,10 @@ func TestMaintenanceAndMuteEndpoints(t *testing.T) {
 	if w := do(r, http.MethodPost, "/api/v1/admin/muted", `{"server_id":"S1","kind":"cpu_high"}`); w.Code != http.StatusOK {
 		t.Fatalf("mute: %d %s", w.Code, w.Body.String())
 	}
+	// Re-muting the same (server, kind) must stay idempotent, not 500 (SND-38).
+	if w := do(r, http.MethodPost, "/api/v1/admin/muted", `{"server_id":"S1","kind":"cpu_high"}`); w.Code != http.StatusOK {
+		t.Fatalf("re-mute should be idempotent: %d %s", w.Code, w.Body.String())
+	}
 	muted, _ := cfg.Muted.IsMuted(context.Background(), "S1", "cpu_high")
 	if !muted {
 		t.Fatal("expected muted")

@@ -6,14 +6,17 @@
 # Idempotent: exits early when already on the latest version.
 #
 # Usage:
-#   sudo ./update-server.sh [--binary /usr/local/bin/jabali-sounder-server] \
+#   sudo ./update-server.sh [--binary /usr/local/bin/jabali-sounder] \
 #                           [--service jabali-sounder] [--force]
 #
 # Requires: curl, sha256sum, python3, systemctl (optional; skipped if absent).
 set -euo pipefail
 
 REPO="${JABALI_UPDATE_REPO:-shukiv/jabali-sounder}"
-BINARY="/usr/local/bin/jabali-sounder-server"
+# Path the installer puts the running binary at (install.sh: /usr/local/bin/jabali-sounder,
+# ExecStart=... serve). The downloaded release asset is named ...-server, but it
+# is installed here; override with --binary for non-standard layouts (SND-37).
+BINARY="/usr/local/bin/jabali-sounder"
 SERVICE="jabali-sounder"
 ASSET="jabali-sounder-server-linux-amd64"
 FORCE=0

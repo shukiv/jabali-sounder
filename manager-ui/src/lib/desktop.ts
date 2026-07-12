@@ -30,6 +30,12 @@ function inWails(): boolean {
   }
 }
 
+// isNativeApp is true inside the Wails desktop/mobile webview (never a plain
+// browser). Used to skip PWA service-worker registration in the native apps.
+export function isNativeApp(): boolean {
+  return inWails();
+}
+
 export function desktopBridge(): DesktopBridge | undefined {
   if (!inWails()) return undefined;
   const bridge: DesktopBridge = {

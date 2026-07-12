@@ -12,6 +12,7 @@ import "antd/dist/reset.css";
 import "./global.css";
 
 import App from "./App";
+import { isNativeApp } from "./lib/desktop";
 import { ThemeModeProvider } from "./theme/ThemeModeContext";
 
 const queryClient = new QueryClient({
@@ -36,3 +37,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// Register the PWA service worker for the web/server build only. Skip it inside
+// the Wails desktop/mobile apps (they serve via the WebViewAssetLoader) and in
+// dev. Failures are non-fatal.
+if (import.meta.env.PROD && "serviceWorker" in navigator && !isNativeApp()) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}

@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/ids"
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
@@ -46,11 +46,13 @@ func (r *mutedRepo) IsMuted(ctx context.Context, serverID, kind string) (bool, e
 
 func (r *mutedRepo) Mute(ctx context.Context, serverID, kind, by string, now time.Time) error {
 	m := &models.MutedAlert{ID: ids.NewULID(), ServerID: serverID, Kind: kind, CreatedBy: by, CreatedAt: now}
-	err := r.db.WithContext(ctx).Create(m).Error
-	if err != nil && errors.Is(err, gorm.ErrDuplicatedKey) {
-		return nil // already muted; idempotent
-	}
-	if err != nil {
+	// Idempotent: muting an already-muted (server, kind) pair is a no-op. Use an
+	// upsert-do-nothing so it works across drivers without relying on GORM error
+	// translation (which is not enabled), rather than surfacing the unique
+	// constraint violation as a 500 (SND-38).
+	if err := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(m).Error; err != nil {
 		return fmt.Errorf("mute: %w", err)
 	}
 	return nil

@@ -24,12 +24,12 @@ for your OS, verifies its checksum, swaps itself in place, and relaunches.
 ## 2. Headless server — update script
 
 Use `scripts/update-server.sh`. It checks GitHub, compares against the running
-`jabali-sounder-server version`, verifies the checksum, keeps a `.bak` rollback
+server binary's `version`, verifies the checksum, keeps a `.bak` rollback
 copy, and restarts the systemd service.
 
 ```bash
 sudo ./scripts/update-server.sh \
-  --binary /usr/local/bin/jabali-sounder-server \
+  --binary /usr/local/bin/jabali-sounder \
   --service jabali-sounder
 ```
 
@@ -84,6 +84,6 @@ curl -fsSL https://raw.githubusercontent.com/shukiv/jabali-sounder/main/install.
 
 ## Rollback
 
-- Server: `sudo mv /usr/local/bin/jabali-sounder-server.bak /usr/local/bin/jabali-sounder-server && sudo systemctl restart jabali-sounder`.
+- Server: `sudo mv /usr/local/bin/jabali-sounder.bak /usr/local/bin/jabali-sounder && sudo systemctl restart jabali-sounder`.
 - Desktop (Windows): rename `jabali-sounder.exe.old` back over the `.exe`.
 - Any platform: download a specific older release from the Releases page.
