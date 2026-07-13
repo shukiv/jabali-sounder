@@ -3,4 +3,6 @@
     <!-- Camera captures are written here and shared with the camera app via the
          FileProvider. -->
     <cache-path name="captures" path="captures/" />
+    <!-- Settings exports written here and shared as a file via the FileProvider. -->
+    <files-path name="exports" path="exports/" />
 </paths>

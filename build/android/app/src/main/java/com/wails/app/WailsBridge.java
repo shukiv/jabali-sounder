@@ -427,6 +427,21 @@ public class WailsBridge {
         mainHandler.post(() -> {
             try {
                 JSONObject opts = new JSONObject(json);
+                String file = opts.optString("file", "");
+                if (!file.isEmpty()) {
+                    // Share a real file so the chooser offers "Save to Files/Drive".
+                    java.io.File f = new java.io.File(file);
+                    android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                            activity, activity.getPackageName() + ".fileprovider", f);
+                    Intent sendFile = new Intent(Intent.ACTION_SEND);
+                    sendFile.setType(opts.optString("mimeType", "application/octet-stream"));
+                    sendFile.putExtra(Intent.EXTRA_STREAM, uri);
+                    sendFile.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    Intent fileChooser = Intent.createChooser(sendFile, "Save export");
+                    fileChooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    activity.startActivity(fileChooser);
+                    return;
+                }
                 String text = opts.optString("text", "");
                 String url = opts.optString("url", "");
                 StringBuilder body = new StringBuilder();
