@@ -42,12 +42,15 @@ var assets embed.FS
 // scrolling on NVIDIA; override with JABALI_SOUNDER_WEBVIEW_GPU for tuning.
 func webviewGpuPolicy() application.WebviewGpuPolicy {
 	switch os.Getenv("JABALI_SOUNDER_WEBVIEW_GPU") {
+	case "never":
+		return application.WebviewGpuPolicyNever
 	case "ondemand":
 		return application.WebviewGpuPolicyOnDemand
-	case "always":
-		return application.WebviewGpuPolicyAlways
 	default:
-		return application.WebviewGpuPolicyNever
+		// Always (full acceleration) gives smooth, working wheel scrolling on
+		// the target NVIDIA/WebKitGTK box; override with =never if a machine's
+		// accelerated compositing breaks the wheel.
+		return application.WebviewGpuPolicyAlways
 	}
 }
 
@@ -100,10 +103,9 @@ func main() {
 		StartState:       application.WindowStateMaximised,
 		BackgroundColour: application.NewRGBA(20, 20, 20, 255),
 		URL:              "/",
-		// WebKitGTK on NVIDIA breaks mouse-wheel scrolling with hardware
-		// acceleration; software rendering (Never) is the reliable default.
-		// Tune per machine via JABALI_SOUNDER_WEBVIEW_GPU=never|ondemand|always
-		// (Linux-only; ignored on other platforms).
+		// Webview hardware-acceleration policy (Linux/WebKitGTK). Default
+		// Always for smooth, working scrolling; JABALI_SOUNDER_WEBVIEW_GPU=never
+		// falls back to software if a machine's accelerated wheel is broken.
 		Linux: application.LinuxWindow{
 			WebviewGpuPolicy: webviewGpuPolicy(),
 		},
