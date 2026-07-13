@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -52,7 +53,13 @@ func (h *versionHandler) get(c *gin.Context) {
 		return
 	}
 	resp["latest"] = st.Latest
-	resp["update_available"] = st.UpdateAvailable
+	// A dev/ahead build (git-describe like v0.5.9-7-g303222f, or a -dirty tree)
+	// is not behind the tagged release, so don't prompt it to "update" to an
+	// older release.
+	devBuild := version.IsDev() ||
+		strings.Contains(info.Version, "-g") ||
+		strings.HasSuffix(info.Version, "-dirty")
+	resp["update_available"] = st.UpdateAvailable && !devBuild
 	resp["release_url"] = st.ReleaseURL
 	resp["published_at"] = st.PublishedAt
 	c.JSON(http.StatusOK, resp)
