@@ -9,6 +9,8 @@ import {
   Space,
   Table,
   Tabs,
+  Select,
+  Grid,
   Tag,
   Typography,
 } from "antd";
@@ -91,6 +93,8 @@ function stampRows<T extends { id?: string }>(
 export default function Mail() {
   const mail = useMail();
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("mailboxes");
+  const screens = Grid.useBreakpoint();
 
   const snapshots = useMemo(() => mail.data || [], [mail.data]);
   const unavailable = snapshots.filter((row) => !row.available && row.error);
@@ -264,8 +268,8 @@ export default function Mail() {
           />
           <Text type="secondary">{snapshots.filter((row) => row.available).length} / {snapshots.length} servers available</Text>
         </Space>
-        <Tabs
-          items={[
+        {(() => {
+          const mailTabs = [
             {
               key: "mailboxes",
               label: `Mailboxes (${filteredMailboxes.length})`,
@@ -326,8 +330,22 @@ export default function Mail() {
                 />
               ),
             },
-          ]}
-        />
+          ];
+          return screens.sm === false ? (
+            <>
+              <Select
+                value={activeTab}
+                onChange={setActiveTab}
+                style={{ width: "100%", marginBottom: 12 }}
+                aria-label="Mail category"
+                options={mailTabs.map((t) => ({ value: t.key, label: t.label }))}
+              />
+              {mailTabs.find((t) => t.key === activeTab)?.children}
+            </>
+          ) : (
+            <Tabs items={mailTabs} activeKey={activeTab} onChange={setActiveTab} />
+          );
+        })()}
       </Card>
     </Space>
   );
