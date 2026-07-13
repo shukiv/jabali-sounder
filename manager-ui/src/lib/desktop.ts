@@ -17,6 +17,12 @@ export interface DesktopBridge {
   // checksum, swap the running binary, and relaunch. Desktop only — the app
   // stores forbid self-update, so this is hidden on iOS/Android.
   InstallUpdate?: () => Promise<UpdateResult>;
+  // Mobile export: open the native share sheet with the given text (the native
+  // save-file dialog is unsupported on Android/iOS).
+  ShareText?: (content: string) => Promise<void>;
+  // Native file picker returning the chosen file's text ("" if cancelled).
+  // Used for import (the WebView's <input type=file> does not open a picker).
+  PickFile?: () => Promise<string>;
 }
 
 // inWails is true inside any Wails webview (desktop or mobile). It reads the
@@ -36,6 +42,15 @@ export function isNativeApp(): boolean {
   return inWails();
 }
 
+// isMobileApp is true inside the native app on iOS/Android.
+export function isMobileApp(): boolean {
+  try {
+    return System.IsMobile();
+  } catch {
+    return false;
+  }
+}
+
 export function desktopBridge(): DesktopBridge | undefined {
   if (!inWails()) return undefined;
   const bridge: DesktopBridge = {
@@ -44,6 +59,8 @@ export function desktopBridge(): DesktopBridge | undefined {
     OpenExternal: (url) => {
       void Call.ByName("main.Bridge.OpenExternal", url);
     },
+    ShareText: (content) => Call.ByName("main.Bridge.ShareText", content) as Promise<void>,
+    PickFile: () => Call.ByName("main.Bridge.PickFile") as Promise<string>,
   };
   // Self-update is a desktop-only capability.
   if (System.IsDesktop()) {

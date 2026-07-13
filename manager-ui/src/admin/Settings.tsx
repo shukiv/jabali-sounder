@@ -12,7 +12,7 @@ import AlertChannelsSettings from "../components/AlertChannelsSettings";
 import MaintenanceSettings from "../components/MaintenanceSettings";
 import AboutSettings from "../components/AboutSettings";
 import { roleAtLeast } from "../hooks/useAuth";
-import { desktopBridge } from "../lib/desktop";
+import { desktopBridge, isMobileApp } from "../lib/desktop";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -70,6 +70,12 @@ export default function Settings() {
       // Desktop (Wails): open a native Save As dialog. The browser <a download>
       // trick below is a no-op inside the WebKit webview.
       const bridge = desktopBridge();
+      if (bridge && isMobileApp()) {
+        // Android/iOS have no save-file dialog — share the export instead.
+        await bridge.ShareText?.(text);
+        message.success("Opened the share sheet — save the file from there");
+        return;
+      }
       if (bridge?.SaveFile) {
         const saved = await bridge.SaveFile(filename, text);
         if (saved) message.success(`Exported to ${saved}`);
@@ -121,36 +127,50 @@ export default function Settings() {
     }
   };
 
+  const runImport = async (text: string) => {
+    setImporting(true);
+    setLastImport(null);
+    try {
+      const payload = JSON.parse(text) as unknown;
+      const resp = await apiClient.post<ImportResult>("/admin/settings/import", payload);
+      setLastImport(resp.data);
+      queryClient.invalidateQueries({ queryKey: ["servers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      if (resp.data.skipped > 0) {
+        message.warning(`Imported ${resp.data.imported}; skipped ${resp.data.skipped}`);
+      } else {
+        message.success(`Imported ${resp.data.imported} server settings`);
+      }
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        message.error("Import file is not valid JSON");
+      } else if (err instanceof Error) {
+        message.error(err.message);
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const uploadProps: UploadProps = {
     accept: "application/json,.json",
     maxCount: 1,
     showUploadList: false,
     beforeUpload: async (file) => {
-      setImporting(true);
-      setLastImport(null);
-      try {
-        const text = await file.text();
-        const payload = JSON.parse(text) as unknown;
-        const resp = await apiClient.post<ImportResult>("/admin/settings/import", payload);
-        setLastImport(resp.data);
-        queryClient.invalidateQueries({ queryKey: ["servers"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-        if (resp.data.skipped > 0) {
-          message.warning(`Imported ${resp.data.imported}; skipped ${resp.data.skipped}`);
-        } else {
-          message.success(`Imported ${resp.data.imported} server settings`);
-        }
-      } catch (err) {
-        if (err instanceof SyntaxError) {
-          message.error("Import file is not valid JSON");
-        } else if (err instanceof Error) {
-          message.error(err.message);
-        }
-      } finally {
-        setImporting(false);
-      }
+      await runImport(await file.text());
       return Upload.LIST_IGNORE;
     },
+  };
+
+  // Mobile: the WebView <input type=file> does not open a picker, so use the
+  // native file picker (SAF on Android) via the bridge.
+  const handleMobileImport = async () => {
+    try {
+      const content = await desktopBridge()?.PickFile?.();
+      if (content) await runImport(content);
+    } catch (err) {
+      if (err instanceof Error) message.error(err.message);
+    }
   };
 
   return (
@@ -197,11 +217,17 @@ export default function Settings() {
             >
               Fleet CSV
             </Button>
-            <Upload {...uploadProps}>
-              <Button icon={<UploadOutlined />} loading={importing}>
+            {isMobileApp() ? (
+              <Button icon={<UploadOutlined />} loading={importing} onClick={handleMobileImport}>
                 Import Settings
               </Button>
-            </Upload>
+            ) : (
+              <Upload {...uploadProps}>
+                <Button icon={<UploadOutlined />} loading={importing}>
+                  Import Settings
+                </Button>
+              </Upload>
+            )}
           </Space>
           <Alert
             type="info"

@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"os"
 	"strings"
 )
 
@@ -40,4 +41,30 @@ func (b *Bridge) ApiCall(method, path, headersJSON, body string) (APIResult, err
 	rec := httptest.NewRecorder()
 	b.handler.ServeHTTP(rec, req)
 	return APIResult{Status: rec.Code, Body: rec.Body.String()}, nil
+}
+
+// PickFile opens a native file picker and returns the chosen file's text
+// content ("" if cancelled). Used for import on mobile, where an
+// <input type=file> does not open a picker in the WebView. Works on desktop too.
+func (b *Bridge) PickFile() (string, error) {
+	path, err := b.app.Dialog.OpenFile().PromptForSingleSelection()
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// ShareText opens the native share sheet with the given text. Used for export on
+// mobile (the save-file dialog is unsupported there). No-op on desktop, which
+// uses SaveFile instead — see shareText in share_*.go.
+func (b *Bridge) ShareText(content string) error {
+	shareText(content)
+	return nil
 }
