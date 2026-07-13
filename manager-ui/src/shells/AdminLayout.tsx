@@ -33,6 +33,7 @@ import {
 import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { useAuth, roleAtLeast } from "../hooks/useAuth";
+import { useVersion } from "../hooks/useVersion";
 import apiClient from "../apiClient";
 import GlobalSearch from "../components/GlobalSearch";
 import { useThemeMode } from "../theme/ThemeModeContext";
@@ -65,6 +66,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { auth, logout } = useAuth();
+  const { data: versionInfo } = useVersion();
   const { mode } = useThemeMode();
 
   useEffect(() => {
@@ -292,7 +294,7 @@ export default function AdminLayout() {
               </Link>
               <Text type="secondary">·</Text>
               <Text type="secondary">AGPL-3.0</Text>
-              <Text strong>v{__APP_VERSION__}</Text>
+              <Text strong>{versionInfo?.version ?? `v${__APP_VERSION__}`}</Text>
             </Space>
           </Footer>
         </Layout>
