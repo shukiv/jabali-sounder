@@ -37,6 +37,20 @@ import (
 //go:embed all:dist
 var assets embed.FS
 
+// webviewGpuPolicy selects the Linux WebKitGTK hardware-acceleration policy.
+// Default Never (software) because accelerated compositing breaks mouse-wheel
+// scrolling on NVIDIA; override with JABALI_SOUNDER_WEBVIEW_GPU for tuning.
+func webviewGpuPolicy() application.WebviewGpuPolicy {
+	switch os.Getenv("JABALI_SOUNDER_WEBVIEW_GPU") {
+	case "ondemand":
+		return application.WebviewGpuPolicyOnDemand
+	case "always":
+		return application.WebviewGpuPolicyAlways
+	default:
+		return application.WebviewGpuPolicyNever
+	}
+}
+
 func main() {
 	// Lockout recovery: `jabali-sounder-desktop reset-password [username]`
 	// sets the admin password against the local SQLite DB, then exits.
@@ -86,11 +100,12 @@ func main() {
 		StartState:       application.WindowStateMaximised,
 		BackgroundColour: application.NewRGBA(20, 20, 20, 255),
 		URL:              "/",
-		// WebKitGTK on NVIDIA breaks mouse-wheel scrolling / rendering with
-		// hardware acceleration on; force software rendering for the webview.
-		// (Linux-only; ignored on other platforms.)
+		// WebKitGTK on NVIDIA breaks mouse-wheel scrolling with hardware
+		// acceleration; software rendering (Never) is the reliable default.
+		// Tune per machine via JABALI_SOUNDER_WEBVIEW_GPU=never|ondemand|always
+		// (Linux-only; ignored on other platforms).
 		Linux: application.LinuxWindow{
-			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
+			WebviewGpuPolicy: webviewGpuPolicy(),
 		},
 	})
 

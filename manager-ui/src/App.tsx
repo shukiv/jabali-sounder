@@ -44,20 +44,24 @@ export default function App() {
         });
     };
     tag();
-    // Debounce + rAF so the observer never blocks input (e.g. mouse wheel) with
-    // synchronous layout reads on every DOM mutation.
-    let scheduled = false;
-    const schedule = () => {
-      if (scheduled) return;
-      scheduled = true;
-      requestAnimationFrame(() => {
-        scheduled = false;
+    // Throttle heavily and only react when element nodes were actually added, so
+    // the observer never reads layout during scrolling (avoids jank).
+    let timer: number | undefined;
+    const schedule = (records: MutationRecord[]) => {
+      if (timer != null) return;
+      const added = records.some((r) => r.addedNodes.length > 0);
+      if (!added) return;
+      timer = window.setTimeout(() => {
+        timer = undefined;
         tag();
-      });
+      }, 300);
     };
     const obs = new MutationObserver(schedule);
     obs.observe(document.body, { childList: true, subtree: true });
-    return () => obs.disconnect();
+    return () => {
+      obs.disconnect();
+      if (timer != null) window.clearTimeout(timer);
+    };
   }, []);
 
   return (
