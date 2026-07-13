@@ -86,6 +86,12 @@ func main() {
 		StartState:       application.WindowStateMaximised,
 		BackgroundColour: application.NewRGBA(20, 20, 20, 255),
 		URL:              "/",
+		// WebKitGTK on NVIDIA breaks mouse-wheel scrolling / rendering with
+		// hardware acceleration on; force software rendering for the webview.
+		// (Linux-only; ignored on other platforms.)
+		Linux: application.LinuxWindow{
+			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
+		},
 	})
 
 	if err := wailsApp.Run(); err != nil {
