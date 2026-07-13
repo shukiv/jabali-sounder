@@ -280,7 +280,7 @@ jobs:
           # (ANDROID_SDK points make at the CI SDK/NDK location).
           make android-lib ANDROID_SDK="$ANDROID_SDK_ROOT"
           ( cd build/android && chmod +x ./gradlew \
-            && ANDROID_HOME="$ANDROID_SDK_ROOT" ./gradlew --no-daemon assembleRelease bundleRelease )
+            && ANDROID_HOME="$ANDROID_SDK_ROOT" ./gradlew --no-daemon -PappVersionName="${VER#v}" assembleRelease bundleRelease )
           mkdir -p out
           cp build/android/app/build/outputs/apk/release/app-release.apk "out/jabali-sounder-android-${VER}.apk"
           cp build/android/app/build/outputs/bundle/release/app-release.aab "out/jabali-sounder-android-${VER}.aab"

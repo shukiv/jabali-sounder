@@ -14,8 +14,12 @@ android {
         applicationId "com.jabali.sounder"
         minSdk 21
         targetSdk 35
-        versionCode 1
-        versionName "0.4.0"
+        // Version: overridable via -PappVersionName (the release CI passes the tag);
+        // versionCode is derived from it (MAJOR*10000 + MINOR*100 + PATCH).
+        def vName = (project.findProperty('appVersionName') ?: "0.5.8").toString()
+        def vp = vName.tokenize('.')
+        versionCode (vp.size() >= 3 ? vp[0].toInteger()*10000 + vp[1].toInteger()*100 + vp[2].toInteger() : 1)
+        versionName vName
 
         // Configure supported ABIs
         ndk {
