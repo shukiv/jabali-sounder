@@ -44,7 +44,18 @@ export default function App() {
         });
     };
     tag();
-    const obs = new MutationObserver(tag);
+    // Debounce + rAF so the observer never blocks input (e.g. mouse wheel) with
+    // synchronous layout reads on every DOM mutation.
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        tag();
+      });
+    };
+    const obs = new MutationObserver(schedule);
     obs.observe(document.body, { childList: true, subtree: true });
     return () => obs.disconnect();
   }, []);

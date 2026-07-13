@@ -149,9 +149,13 @@ pre {
 .ant-drawer-body {
   padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
 }
-/* Stop the webview rubber-band scrolling the shell behind the app. */
-html, body {
-  overscroll-behavior-y: none;
+/* Stop the webview rubber-band scrolling the shell behind the app. Touch only:
+   on desktop WebKitGTK, overscroll-behavior:none on the root can swallow mouse
+   wheel scrolling once the page overflows, so restrict it to touch devices. */
+@media (hover: none) and (pointer: coarse) {
+  html, body {
+    overscroll-behavior-y: none;
+  }
 }
 
 /* Header brand wordmark: never wrap character-by-character; shrink then hide on
