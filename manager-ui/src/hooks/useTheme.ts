@@ -16,6 +16,9 @@ export function useTheme(mode: ThemeMode): ConfigProviderProps {
           mode === "dark" ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
           fontSize: 15,
+          // WCAG AA: secondary text must hit 4.5:1 on the page bg (SND-62).
+          colorTextSecondary: mode === "dark" ? "rgba(255, 255, 255, 0.72)" : "#595959",
+          colorTextDescription: mode === "dark" ? "rgba(255, 255, 255, 0.72)" : "#595959",
           fontFamily:
             "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
           ...(mode === "light"

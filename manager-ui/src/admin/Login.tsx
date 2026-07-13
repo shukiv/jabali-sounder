@@ -74,13 +74,13 @@ export default function Login() {
             name="username"
             rules={[{ required: true, message: "Enter username" }]}
           >
-            <Input prefix={<UserOutlined />} placeholder="Username" />
+            <Input prefix={<UserOutlined />} placeholder="Username" aria-label="Username" />
           </Form.Item>
           <Form.Item
             name="password"
             rules={[{ required: true, message: "Enter password" }]}
           >
-            <Input.Password prefix={<LockOutlined />} placeholder="Password" />
+            <Input.Password prefix={<LockOutlined />} placeholder="Password" aria-label="Password" />
           </Form.Item>
           {needs2FA ? (
             <Form.Item

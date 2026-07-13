@@ -77,6 +77,12 @@ export default function AdminLayout() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // SND-65: each route gets a distinct document title.
+  useEffect(() => {
+    const item = navItems.find((n) => n.key === location.pathname);
+    document.title = (item ? item.label + " · " : "") + "Jabali Sounder";
+  }, [location.pathname]);
   const { token } = theme.useToken();
   const screens = Grid.useBreakpoint();
   const isDesktop = screens.lg ?? (typeof window !== "undefined" ? window.innerWidth >= 992 : true);
@@ -124,6 +130,7 @@ export default function AdminLayout() {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <Header
         style={{
           display: "flex",
@@ -185,6 +192,15 @@ export default function AdminLayout() {
             onCollapse={setCollapsed}
             trigger={
               <div
+                role="button"
+                tabIndex={0}
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setCollapsed(!collapsed);
+                  }
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -238,12 +254,18 @@ export default function AdminLayout() {
 
         <Layout>
           <Content
+            id="main-content"
+            role="main"
+            tabIndex={-1}
             style={{
               padding: screens.md ? "32px 24px 24px" : "20px 12px 12px",
               minWidth: 0,
               overflowX: "hidden",
             }}
           >
+            <h1 className="sr-only">
+              {navItems.find((n) => n.key === location.pathname)?.label ?? "Jabali Sounder"}
+            </h1>
             <Outlet />
           </Content>
           <Footer

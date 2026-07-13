@@ -118,9 +118,10 @@ export default function Audit() {
       </div>
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
-          <Select value={days} onChange={setDays} options={DAYS_OPTIONS} style={{ width: 140 }} />
+          <Select value={days} onChange={setDays} options={DAYS_OPTIONS} style={{ width: 140 }} aria-label="Time range" />
           <Input
             placeholder="Filter by actor"
+            aria-label="Filter by actor"
             value={actor}
             onChange={(e) => setActor(e.target.value)}
             allowClear
@@ -128,6 +129,7 @@ export default function Audit() {
           />
           <Input
             placeholder="Filter by event (e.g. server.delete)"
+            aria-label="Filter by event"
             value={event}
             onChange={(e) => setEvent(e.target.value)}
             allowClear

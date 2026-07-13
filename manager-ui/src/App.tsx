@@ -28,6 +28,27 @@ export default function App() {
   // target="_blank"). No-op in the browser build.
   useEffect(() => installExternalLinkHandler(), []);
 
+  // SND-59: AntD renders horizontally scrollable tables in a div with no
+  // keyboard affordance. Tag those scroll regions so keyboard-only users can
+  // focus and scroll them to reach clipped columns/actions.
+  useEffect(() => {
+    const tag = () => {
+      document
+        .querySelectorAll<HTMLElement>(".ant-table-content, .ant-table-body")
+        .forEach((el) => {
+          if (el.scrollWidth <= el.clientWidth) return;
+          if (el.getAttribute("tabindex") != null) return;
+          el.setAttribute("tabindex", "0");
+          el.setAttribute("role", "region");
+          el.setAttribute("aria-label", "Table, scrollable");
+        });
+    };
+    tag();
+    const obs = new MutationObserver(tag);
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, []);
+
   return (
     <ConfigProvider {...cfg}>
       {!auth.token ? (

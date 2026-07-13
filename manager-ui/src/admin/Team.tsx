@@ -86,6 +86,7 @@ export default function Team() {
           value={role}
           options={ROLE_OPTIONS}
           style={{ minWidth: 220 }}
+          aria-label={`Change role for ${record.username}`}
           onChange={(v) => changeRole(record.id, v)}
         />
       ),

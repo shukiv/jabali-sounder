@@ -87,9 +87,9 @@ export default function GlobalSearch({ open, onClose }: Props) {
         setQ("");
         onClose();
       }}
+      title="Global search"
       footer={null}
       destroyOnClose
-      styles={{ body: { paddingTop: 36 } }}
     >
       <Input
         autoFocus

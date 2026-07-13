@@ -255,6 +255,7 @@ export default function Mail() {
         <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
             placeholder="Search mail stack..."
+            aria-label="Search mail"
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}

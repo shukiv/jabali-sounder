@@ -37,7 +37,6 @@ export function BrandLogo({ mode, size = "header" }: BrandLogoProps) {
   }
 
   const logoHeight = size === "footer" ? 24 : 54;
-  const titleLevel = size === "footer" ? 4 : 3;
   const textStyle = {
     margin: 0,
     lineHeight: 1,
@@ -67,9 +66,9 @@ export function BrandLogo({ mode, size = "header" }: BrandLogoProps) {
           Jabali Sounder
         </Text>
       ) : (
-        <Title level={titleLevel} className="brand-wordmark" style={textStyle}>
+        <span className="brand-wordmark" style={{ ...textStyle, display: "inline-block" }}>
           Jabali Sounder
-        </Title>
+        </span>
       )}
     </div>
   );

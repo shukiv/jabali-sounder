@@ -111,8 +111,17 @@ export default function NotificationBell() {
           dataSource={rows}
           renderItem={(n) => (
             <List.Item
+              role="button"
+              tabIndex={0}
+              aria-label={`${n.severity} alert on ${n.server_name}: ${n.message} — open Monitor`}
               style={{ cursor: "pointer", padding: "10px 14px", background: n.read ? undefined : "rgba(24,144,255,0.06)", display: "block" }}
               onClick={() => openItem(n)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openItem(n);
+                }
+              }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Text strong>{n.server_name}</Text>

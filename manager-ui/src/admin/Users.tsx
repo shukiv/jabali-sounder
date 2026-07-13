@@ -71,6 +71,7 @@ export default function Users() {
         <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
             placeholder="Search by email or username…"
+            aria-label="Search users"
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}

@@ -85,6 +85,7 @@ export default function Domains() {
         <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
             placeholder="Search domains…"
+            aria-label="Search domains"
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
