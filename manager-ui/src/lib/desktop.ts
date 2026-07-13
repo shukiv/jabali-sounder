@@ -29,6 +29,9 @@ export interface DesktopBridge {
 // native-injected environment, so it is false in a plain browser and never
 // throws.
 function inWails(): boolean {
+  if (typeof window !== "undefined" && window.location.hostname === "wails.localhost") {
+    return true;
+  }
   try {
     return System.IsDesktop() || System.IsMobile();
   } catch {
@@ -42,13 +45,18 @@ export function isNativeApp(): boolean {
   return inWails();
 }
 
-// isMobileApp is true inside the native app on iOS/Android.
+// isMobileApp is true inside the native app on iOS/Android. Uses
+// timing-independent signals (webview hostname + user agent) because the Wails
+// environment (System.IsMobile) is not reliably populated on the Android alpha.
 export function isMobileApp(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.location.hostname !== "wails.localhost") return false;
   try {
-    return System.IsMobile();
+    if (System.IsMobile()) return true;
   } catch {
-    return false;
+    /* environment not ready — fall through to UA */
   }
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent || "");
 }
 
 export function desktopBridge(): DesktopBridge | undefined {
