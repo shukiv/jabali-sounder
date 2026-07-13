@@ -88,55 +88,50 @@ export default function Dashboard() {
         </Button>
       </Space>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} lg={6}>
-          <StatCard
-            label="Active Servers"
-            value={`${healthy} / ${total}`}
-            icon={<CloudServerOutlined />}
-            iconColor="#1677ff"
-            to="/servers"
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatCard
-            label="Domains"
-            value={fmt(domains.data?.length)}
-            icon={<GlobalOutlined />}
-            iconColor="#9254de"
-            to="/domains"
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatCard
-            label="Users"
-            value={fmt(users.data?.length)}
-            icon={<TeamOutlined />}
-            iconColor="#fa8c16"
-            to="/users"
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatCard
-            label={`Fleet SLA (${sla?.window_days ?? 7}d)`}
-            value={sla?.fleet_ratio != null ? `${(sla.fleet_ratio * 100).toFixed(1)}%` : "—"}
-            icon={<DashboardOutlined />}
-            iconColor={sla?.fleet_ratio != null && sla.fleet_ratio >= 0.99 ? "#3f8600" : "#d48806"}
-            to="/monitor"
-          />
-        </Col>
-      </Row>
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            label="Policy issues"
-            value={policy ? `${policy.servers_at_risk} server${policy.servers_at_risk === 1 ? "" : "s"}` : "—"}
-            icon={<DashboardOutlined />}
-            iconColor={policy && policy.servers_at_risk > 0 ? "#cf1322" : "#3f8600"}
-            to="/policy"
-          />
-        </Col>
-      </Row>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        <StatCard
+          label="Active Servers"
+          value={`${healthy} / ${total}`}
+          icon={<CloudServerOutlined />}
+          iconColor="#1677ff"
+          to="/servers"
+        />
+        <StatCard
+          label="Domains"
+          value={fmt(domains.data?.length)}
+          icon={<GlobalOutlined />}
+          iconColor="#9254de"
+          to="/domains"
+        />
+        <StatCard
+          label="Users"
+          value={fmt(users.data?.length)}
+          icon={<TeamOutlined />}
+          iconColor="#fa8c16"
+          to="/users"
+        />
+        <StatCard
+          label={`Fleet SLA (${sla?.window_days ?? 7}d)`}
+          value={sla?.fleet_ratio != null ? `${(sla.fleet_ratio * 100).toFixed(1)}%` : "—"}
+          icon={<DashboardOutlined />}
+          iconColor={sla?.fleet_ratio != null && sla.fleet_ratio >= 0.99 ? "#3f8600" : "#d48806"}
+          to="/monitor"
+        />
+        <StatCard
+          label="Policy issues"
+          value={policy ? `${policy.servers_at_risk} server${policy.servers_at_risk === 1 ? "" : "s"}` : "—"}
+          icon={<DashboardOutlined />}
+          iconColor={policy && policy.servers_at_risk > 0 ? "#cf1322" : "#3f8600"}
+          to="/policy"
+        />
+      </div>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
