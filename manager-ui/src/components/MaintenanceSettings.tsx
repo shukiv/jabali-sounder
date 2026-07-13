@@ -129,6 +129,7 @@ export default function MaintenanceSettings() {
         Schedule window
       </Button>
       <Table<Window>
+        scroll={{ x: "max-content" }}
         dataSource={data || []}
         columns={columns}
         rowKey="id"

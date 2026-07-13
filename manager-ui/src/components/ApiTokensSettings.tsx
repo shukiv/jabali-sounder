@@ -204,6 +204,7 @@ export default function ApiTokensSettings() {
         Create token
       </Button>
       <Table<ApiToken>
+        scroll={{ x: "max-content" }}
         dataSource={data || []}
         columns={columns}
         rowKey="id"

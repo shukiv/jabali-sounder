@@ -84,6 +84,7 @@ export default function Backups() {
           notification.
         </Text>
         <Table<BackupRow>
+          scroll={{ x: "max-content" }}
           style={{ marginTop: 16 }}
           dataSource={data || []}
           columns={columns}

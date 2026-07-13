@@ -138,6 +138,7 @@ export default function Audit() {
           </Button>
         </Space>
         <Table<AuditRow>
+          scroll={{ x: "max-content" }}
           dataSource={data?.data || []}
           columns={columns}
           rowKey="id"

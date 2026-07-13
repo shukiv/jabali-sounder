@@ -14,7 +14,7 @@ export function BrandLogo({ mode, size = "header" }: BrandLogoProps) {
   // Login: a larger logo stacked above the product name (SND-16).
   if (size === "login") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+      <div className="login-logo" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         <img
           src={jabaliLogo}
           alt=""

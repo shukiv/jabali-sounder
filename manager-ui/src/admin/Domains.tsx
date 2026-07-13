@@ -88,7 +88,7 @@ export default function Domains() {
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 400 }}
+            style={{ width: "100%", maxWidth: 400 }}
             allowClear
           />
           <span style={{ color: "#888" }}>{filtered.length} of {domains?.length || 0}</span>

@@ -164,3 +164,56 @@ html, body {
 @media (max-width: 430px) {
   .ant-layout-header .brand-wordmark { display: none !important; }
 }
+
+/* ===== Mobile responsive hardening (SND-46..55) ===== */
+
+/* SND-46: authenticated header must not overflow at 320px. */
+.ant-layout-header { overflow-x: hidden; }
+@media (max-width: 480px) {
+  .ant-layout-header {
+    padding-left: max(8px, env(safe-area-inset-left)) !important;
+    padding-right: max(8px, env(safe-area-inset-right)) !important;
+  }
+}
+
+/* SND-47/48: search & filter controls fill their card and shrink on phones
+   instead of overflowing with desktop widths. */
+@media (max-width: 575px) {
+  .ant-space-item { min-width: 0; max-width: 100%; }
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-select,
+  .ant-picker { max-width: 100% !important; }
+}
+
+/* SND-50: dropdown/popover surfaces (notifications, menus) stay within the
+   viewport with side margins instead of opening off-screen. */
+.ant-dropdown,
+.ant-popover { max-width: calc(100vw - 12px) !important; }
+.ant-dropdown-menu,
+.ant-popover-inner { max-width: calc(100vw - 12px); overflow-x: hidden; }
+
+/* SND-52: long dialogs stay usable in short (landscape) viewports — bounded
+   height, scrollable body, always-visible footer actions. */
+@media (max-height: 560px) {
+  .ant-modal { top: 8px !important; padding-bottom: 8px; }
+  .ant-modal-content {
+    max-height: calc(100vh - 16px);
+    display: flex;
+    flex-direction: column;
+  }
+  .ant-modal-header,
+  .ant-modal-footer { flex: 0 0 auto; }
+  .ant-modal-body { flex: 1 1 auto; overflow-y: auto; }
+}
+
+/* SND-54: empty/loading states stay in the visible area of horizontally
+   scrollable tables rather than centring in the clipped off-screen canvas. */
+.ant-table-placeholder .ant-table-cell { position: sticky; left: 0; }
+.ant-table-placeholder .ant-empty { position: sticky; left: 8px; }
+
+/* SND-51: login remains usable on short landscape phones (smaller logo so the
+   submit button stays near the fold). */
+@media (max-height: 520px) {
+  .login-logo img { height: 52px !important; }
+}

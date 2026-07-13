@@ -148,6 +148,7 @@ export default function AlertChannelsSettings() {
         Add channel
       </Button>
       <Table<Channel>
+        scroll={{ x: "max-content" }}
         dataSource={data || []}
         columns={columns}
         rowKey="id"

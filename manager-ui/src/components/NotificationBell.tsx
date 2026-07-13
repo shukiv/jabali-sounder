@@ -93,7 +93,7 @@ export default function NotificationBell() {
   const panel = (
     <div
       style={{
-        width: 400, maxHeight: 460, overflowY: "auto",
+        width: "min(400px, calc(100vw - 16px))", maxHeight: "min(460px, 70vh)", overflowY: "auto",
         background: "var(--ant-color-bg-elevated, #fff)", borderRadius: 8,
         boxShadow: "0 6px 24px rgba(0,0,0,0.18)",
       }}

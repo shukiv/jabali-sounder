@@ -83,6 +83,7 @@ export default function Policy() {
           <Empty description="Fleet is compliant — no policy violations" />
         ) : (
           <Table<Violation>
+            scroll={{ x: "max-content" }}
             dataSource={data?.violations || []}
             columns={columns}
             rowKey={(r) => r.server_id + r.check}

@@ -117,6 +117,7 @@ export default function AlertRulesSettings() {
         duration opens an incident and notifies the configured channels.
       </Paragraph>
       <Table<AlertRule>
+        scroll={{ x: "max-content" }}
         dataSource={data || []}
         columns={columns}
         rowKey="metric"
