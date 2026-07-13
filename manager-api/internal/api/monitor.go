@@ -79,21 +79,23 @@ type monitorServerRef struct {
 }
 
 type monitorLiveEntry struct {
-	Server        monitorServerRef `json:"server"`
-	Available     bool             `json:"available"`
-	AsOf          string           `json:"as_of,omitempty"`
-	CPUPercent    *float64         `json:"cpu_percent,omitempty"`
-	RAMUsedBytes  *int64           `json:"ram_used_bytes,omitempty"`
-	RAMTotalBytes *int64           `json:"ram_total_bytes,omitempty"`
-	RAMPercent    *float64         `json:"ram_percent,omitempty"`
-	IOWaitPercent *float64         `json:"io_wait_percent,omitempty"`
-	IOReadBPS     *float64         `json:"io_read_bps,omitempty"`
-	IOWriteBPS    *float64         `json:"io_write_bps,omitempty"`
-	Load1         *float64         `json:"load1,omitempty"`
-	Load5         *float64         `json:"load5,omitempty"`
-	Load15        *float64         `json:"load15,omitempty"`
-	WarmingUp     bool             `json:"warming_up"`
-	Error         string           `json:"error,omitempty"`
+	Server         monitorServerRef `json:"server"`
+	Available      bool             `json:"available"`
+	AsOf           string           `json:"as_of,omitempty"`
+	CPUPercent     *float64         `json:"cpu_percent,omitempty"`
+	RAMUsedBytes   *int64           `json:"ram_used_bytes,omitempty"`
+	RAMTotalBytes  *int64           `json:"ram_total_bytes,omitempty"`
+	RAMPercent     *float64         `json:"ram_percent,omitempty"`
+	SwapUsedBytes  *int64           `json:"swap_used_bytes,omitempty"`
+	SwapTotalBytes *int64           `json:"swap_total_bytes,omitempty"`
+	IOWaitPercent  *float64         `json:"io_wait_percent,omitempty"`
+	IOReadBPS      *float64         `json:"io_read_bps,omitempty"`
+	IOWriteBPS     *float64         `json:"io_write_bps,omitempty"`
+	Load1          *float64         `json:"load1,omitempty"`
+	Load5          *float64         `json:"load5,omitempty"`
+	Load15         *float64         `json:"load15,omitempty"`
+	WarmingUp      bool             `json:"warming_up"`
+	Error          string           `json:"error,omitempty"`
 }
 
 type monitorSummaryEntry struct {
@@ -214,6 +216,10 @@ func (h *monitorHandler) fetchLive(ctx context.Context, s models.Server) monitor
 		entry.RAMUsedBytes = ptrInt64(used)
 		entry.RAMTotalBytes = ptrInt64(total)
 		entry.RAMPercent = percentPtr(used, total)
+		if host.SwapTotalKB > 0 {
+			entry.SwapUsedBytes = ptrInt64(host.SwapUsedKB * 1024)
+			entry.SwapTotalBytes = ptrInt64(host.SwapTotalKB * 1024)
+		}
 		if len(host.LoadAvg) > 0 {
 			entry.Load1 = ptrFloat(host.LoadAvg[0])
 		}

@@ -91,7 +91,7 @@ export default function Monitor() {
       render: (_: unknown, row: MonitorLiveEntry) => (
         <Space direction="vertical" size={4} style={{ minWidth: 160 }}>
           <Progress percent={pct(row.cpu_percent)} size="small" status={row.cpu_percent && row.cpu_percent > 90 ? "exception" : "normal"} />
-          <Text type="secondary">{pctText(row.cpu_percent)} · load {row.load1?.toFixed(2) ?? "n/a"}</Text>
+          <Text type="secondary">{pctText(row.cpu_percent)} · load {row.load1?.toFixed(2) ?? "n/a"} · {pctText(row.io_wait_percent)} iowait</Text>
         </Space>
       ),
     },
@@ -102,16 +102,9 @@ export default function Monitor() {
         <Space direction="vertical" size={4} style={{ minWidth: 160 }}>
           <Progress percent={pct(row.ram_percent)} size="small" status={row.ram_percent && row.ram_percent > 90 ? "exception" : "normal"} />
           <Text type="secondary">{bytes(row.ram_used_bytes)} / {bytes(row.ram_total_bytes)}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: "IO",
-      key: "io",
-      render: (_: unknown, row: MonitorLiveEntry) => (
-        <Space direction="vertical" size={0}>
-          <Text>{pctText(row.io_wait_percent)} iowait</Text>
-          <Text type="secondary">{bytes(row.io_read_bps)}/s read · {bytes(row.io_write_bps)}/s write</Text>
+          {row.swap_total_bytes ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>swap {bytes(row.swap_used_bytes)} / {bytes(row.swap_total_bytes)}</Text>
+          ) : null}
         </Space>
       ),
     },

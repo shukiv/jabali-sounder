@@ -62,6 +62,8 @@ export interface MonitorLiveEntry {
   ram_used_bytes?: number;
   ram_total_bytes?: number;
   ram_percent?: number;
+  swap_used_bytes?: number;
+  swap_total_bytes?: number;
   io_wait_percent?: number;
   io_read_bps?: number;
   io_write_bps?: number;
