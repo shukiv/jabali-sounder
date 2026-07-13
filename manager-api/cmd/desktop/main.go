@@ -46,12 +46,27 @@ func webviewGpuPolicy() application.WebviewGpuPolicy {
 		return application.WebviewGpuPolicyNever
 	case "ondemand":
 		return application.WebviewGpuPolicyOnDemand
-	default:
-		// Always (full acceleration) gives smooth, working wheel scrolling on
-		// the target NVIDIA/WebKitGTK box; override with =never if a machine's
-		// accelerated compositing breaks the wheel.
+	case "always":
 		return application.WebviewGpuPolicyAlways
 	}
+	// Auto: full acceleration (smooth, working wheel) when a GPU is present,
+	// otherwise software rendering so the webview still works on headless/VM/
+	// GPU-less hosts. Override with JABALI_SOUNDER_WEBVIEW_GPU.
+	if hasGPURenderNode() {
+		return application.WebviewGpuPolicyAlways
+	}
+	return application.WebviewGpuPolicyNever
+}
+
+// hasGPURenderNode reports whether the kernel exposes a GPU device (DRM render
+// node or an NVIDIA proprietary device), a proxy for accelerated rendering.
+func hasGPURenderNode() bool {
+	for _, pattern := range []string{"/dev/dri/renderD*", "/dev/dri/card*", "/dev/nvidia[0-9]*"} {
+		if m, _ := filepath.Glob(pattern); len(m) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func main() {
@@ -103,9 +118,8 @@ func main() {
 		StartState:       application.WindowStateMaximised,
 		BackgroundColour: application.NewRGBA(20, 20, 20, 255),
 		URL:              "/",
-		// Webview hardware-acceleration policy (Linux/WebKitGTK). Default
-		// Always for smooth, working scrolling; JABALI_SOUNDER_WEBVIEW_GPU=never
-		// falls back to software if a machine's accelerated wheel is broken.
+		// Webview hardware-acceleration policy (Linux/WebKitGTK): accelerated
+		// when a GPU is present, software otherwise; see webviewGpuPolicy().
 		Linux: application.LinuxWindow{
 			WebviewGpuPolicy: webviewGpuPolicy(),
 		},
