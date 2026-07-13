@@ -5,4 +5,5 @@
     <color name="wails_background">#1B2636</color>
     <color name="white">#FFFFFFFF</color>
     <color name="black">#FF000000</color>
+    <color name="ic_launcher_background">#141414</color>
 </resources>
