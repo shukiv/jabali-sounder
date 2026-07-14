@@ -1,7 +1,7 @@
 {
   "name": "jabali-sounder-ui",
   "private": true,
-  "version": "0.5.12",
+  "version": "0.5.13",
   "description": "Jabali Sounder SPA \u2014 React + TanStack Query + Ant Design",
   "type": "module",
   "scripts": {
