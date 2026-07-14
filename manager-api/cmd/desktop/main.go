@@ -109,7 +109,7 @@ func main() {
 	wailsApp := application.New(opts)
 	bridge.app = wailsApp
 
-	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "Jabali Sounder",
 		Width:  1280,
 		Height: 820,
@@ -124,6 +124,9 @@ func main() {
 			WebviewGpuPolicy: webviewGpuPolicy(),
 		},
 	})
+
+	// System-tray icon + close-to-tray lifecycle (desktop only; no-op on mobile).
+	setupTray(bridge, window)
 
 	if err := wailsApp.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
