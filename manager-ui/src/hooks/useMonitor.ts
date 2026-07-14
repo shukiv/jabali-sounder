@@ -10,7 +10,7 @@ import type {
 // useMonitorLive polls the real-time fleet metrics. Polling is gated by
 // `enabled` so historical Monitor views can stop the 5s live poll entirely
 // (SND-78: historical mode must not keep high-frequency polling).
-export function useMonitorLive(enabled = true) {
+export function useMonitorLive(enabled = true, intervalMs: number | false = 5000) {
   return useQuery({
     queryKey: ["monitor", "live"] as const,
     enabled,
@@ -18,19 +18,19 @@ export function useMonitorLive(enabled = true) {
       const resp = await apiClient.get<ListEnvelope<MonitorLiveEntry>>("/admin/monitor/live");
       return resp.data.data;
     },
-    refetchInterval: enabled ? 5000 : false,
+    refetchInterval: enabled ? intervalMs : false,
     refetchIntervalInBackground: false,
   });
 }
 
-export function useMonitorSummary() {
+export function useMonitorSummary(intervalMs: number | false = 60000) {
   return useQuery({
     queryKey: ["monitor", "summary"] as const,
     queryFn: async () => {
       const resp = await apiClient.get<ListEnvelope<MonitorSummaryEntry>>("/admin/monitor/summary");
       return resp.data.data;
     },
-    refetchInterval: 60000,
+    refetchInterval: intervalMs,
     refetchIntervalInBackground: false,
   });
 }

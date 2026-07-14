@@ -37,7 +37,7 @@ func TestServerStatusSharesProbe(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, code, err := h.serverStatus(context.Background(), s); err != nil || code != 200 {
+			if _, code, _, err := h.serverStatus(context.Background(), s); err != nil || code != 200 {
 				t.Errorf("serverStatus: code=%d err=%v", code, err)
 			}
 		}()
@@ -49,7 +49,7 @@ func TestServerStatusSharesProbe(t *testing.T) {
 	}
 
 	// Within TTL -> cache hit, no new probe.
-	if _, _, err := h.serverStatus(context.Background(), s); err != nil {
+	if _, _, _, err := h.serverStatus(context.Background(), s); err != nil {
 		t.Fatalf("cached call: %v", err)
 	}
 	if got := atomic.LoadInt32(&calls); got != 1 {

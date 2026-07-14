@@ -45,6 +45,12 @@ export interface CheckResult {
   status_error?: string;
 }
 
+export interface MonitorAlert {
+  level: string;
+  kind: string;
+  detail: string;
+}
+
 export interface MonitorServerRef {
   id: string;
   name: string;
@@ -52,6 +58,10 @@ export interface MonitorServerRef {
   status: "active" | "disabled" | "unreachable";
   credential_status: "valid" | "invalid" | "unknown";
   version: string;
+  environment?: string;
+  tags?: string[];
+  capabilities?: string[];
+  last_heartbeat_at?: string;
 }
 
 export interface MonitorLiveEntry {
@@ -70,6 +80,13 @@ export interface MonitorLiveEntry {
   load1?: number;
   load5?: number;
   load15?: number;
+  os?: string;
+  kernel?: string;
+  hostname?: string;
+  uptime_seconds?: number;
+  api_latency_ms?: number;
+  ntp_synced?: boolean;
+  alerts?: MonitorAlert[];
   warming_up: boolean;
   error?: string;
 }

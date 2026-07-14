@@ -59,23 +59,37 @@ type monitorHandler struct {
 }
 
 type cachedStatus struct {
-	resp *remote.ServerStatusResp
-	code int
-	at   time.Time
+	resp      *remote.ServerStatusResp
+	code      int
+	latencyMS int64
+	at        time.Time
 }
 
 type statusResult struct {
-	resp *remote.ServerStatusResp
-	code int
+	resp      *remote.ServerStatusResp
+	code      int
+	latencyMS int64
+}
+
+// monitorAlert is one panel-reported warning/critical row surfaced on the
+// Monitor overview so operators can see servers that need attention (SND-82).
+type monitorAlert struct {
+	Level  string `json:"level"`
+	Kind   string `json:"kind"`
+	Detail string `json:"detail"`
 }
 
 type monitorServerRef struct {
-	ID               string `json:"id"`
-	Name             string `json:"name"`
-	BaseURL          string `json:"base_url"`
-	Status           string `json:"status"`
-	CredentialStatus string `json:"credential_status"`
-	Version          string `json:"version"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	BaseURL          string   `json:"base_url"`
+	Status           string   `json:"status"`
+	CredentialStatus string   `json:"credential_status"`
+	Version          string   `json:"version"`
+	Environment      string   `json:"environment,omitempty"`
+	Tags             []string `json:"tags,omitempty"`
+	Capabilities     []string `json:"capabilities,omitempty"`
+	LastHeartbeatAt  string   `json:"last_heartbeat_at,omitempty"`
 }
 
 type monitorLiveEntry struct {
@@ -94,6 +108,13 @@ type monitorLiveEntry struct {
 	Load1          *float64         `json:"load1,omitempty"`
 	Load5          *float64         `json:"load5,omitempty"`
 	Load15         *float64         `json:"load15,omitempty"`
+	OS             string           `json:"os,omitempty"`
+	Kernel         string           `json:"kernel,omitempty"`
+	Hostname       string           `json:"hostname,omitempty"`
+	UptimeSeconds  *float64         `json:"uptime_seconds,omitempty"`
+	APILatencyMS   *int64           `json:"api_latency_ms,omitempty"`
+	NTPSynced      *bool            `json:"ntp_synced,omitempty"`
+	Alerts         []monitorAlert   `json:"alerts,omitempty"`
 	WarmingUp      bool             `json:"warming_up"`
 	Error          string           `json:"error,omitempty"`
 }
@@ -183,13 +204,17 @@ func (h *monitorHandler) summary(c *gin.Context) {
 
 func (h *monitorHandler) fetchLive(ctx context.Context, s models.Server) monitorLiveEntry {
 	entry := monitorLiveEntry{Server: serverRef(s)}
-	status, code, err := h.serverStatus(ctx, s)
+	status, code, latencyMS, err := h.serverStatus(ctx, s)
 	if err != nil {
 		entry.Error = safeRemoteError(h.cfg.Log, s.Name, "metrics", code, err)
 		return entry
 	}
 
 	entry.Available = true
+	entry.APILatencyMS = ptrInt64(latencyMS)
+	for _, a := range status.Alerts {
+		entry.Alerts = append(entry.Alerts, monitorAlert{Level: a.Level, Kind: a.Kind, Detail: a.Detail})
+	}
 	entry.AsOf = status.AsOf
 	if entry.AsOf == "" {
 		entry.AsOf = status.Time
@@ -229,6 +254,14 @@ func (h *monitorHandler) fetchLive(ctx context.Context, s models.Server) monitor
 		if len(host.LoadAvg) > 2 {
 			entry.Load15 = ptrFloat(host.LoadAvg[2])
 		}
+		entry.OS = host.OS
+		entry.Kernel = host.Kernel
+		entry.Hostname = host.Hostname
+		if host.UptimeSeconds > 0 {
+			entry.UptimeSeconds = ptrFloat(host.UptimeSeconds)
+		}
+		ntp := host.NTPSynced
+		entry.NTPSynced = &ntp
 	}
 	return entry
 }
@@ -256,7 +289,7 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 	g.SetLimit(4)
 
 	g.Go(func() error {
-		status, code, err := h.serverStatus(gctx, s)
+		status, code, _, err := h.serverStatus(gctx, s)
 		if err != nil {
 			addErr(safeRemoteError(h.cfg.Log, s.Name, "metrics", code, err))
 			return nil
@@ -335,41 +368,44 @@ func (h *monitorHandler) fetchSummary(ctx context.Context, s models.Server) moni
 // across concurrent/near-simultaneous callers via singleflight + a short TTL
 // cache keyed by server ID (SND-7). Live and summary both need status, and two
 // identical same-second HMAC requests would trip the panel's replay protection.
-func (h *monitorHandler) serverStatus(ctx context.Context, s models.Server) (*remote.ServerStatusResp, int, error) {
+func (h *monitorHandler) serverStatus(ctx context.Context, s models.Server) (*remote.ServerStatusResp, int, int64, error) {
 	h.statusMu.Lock()
 	if e, ok := h.statusCache[s.ID]; ok && h.now().Sub(e.at) < statusCacheTTL {
-		resp, code := e.resp, e.code
+		resp, code, latency := e.resp, e.code, e.latencyMS
 		h.statusMu.Unlock()
-		return resp, code, nil
+		return resp, code, latency, nil
 	}
 	h.statusMu.Unlock()
 
 	v, err, _ := h.sf.Do(s.ID, func() (any, error) {
-		resp, code, ferr := h.fetchStatus(ctx, s)
+		resp, code, latency, ferr := h.fetchStatus(ctx, s)
 		if ferr != nil {
-			return statusResult{code: code}, ferr
+			return statusResult{code: code, latencyMS: latency}, ferr
 		}
 		h.statusMu.Lock()
-		h.statusCache[s.ID] = cachedStatus{resp: resp, code: code, at: h.now()}
+		h.statusCache[s.ID] = cachedStatus{resp: resp, code: code, latencyMS: latency, at: h.now()}
 		h.statusMu.Unlock()
-		return statusResult{resp: resp, code: code}, nil
+		return statusResult{resp: resp, code: code, latencyMS: latency}, nil
 	})
 	res, _ := v.(statusResult)
-	return res.resp, res.code, err
+	return res.resp, res.code, res.latencyMS, err
 }
 
 // fetchStatus performs the actual /automation/status probe (or the test override).
-func (h *monitorHandler) fetchStatus(ctx context.Context, s models.Server) (*remote.ServerStatusResp, int, error) {
+func (h *monitorHandler) fetchStatus(ctx context.Context, s models.Server) (*remote.ServerStatusResp, int, int64, error) {
+	start := h.now()
 	if h.probe != nil {
-		return h.probe(ctx, s)
+		resp, code, err := h.probe(ctx, s)
+		return resp, code, h.now().Sub(start).Milliseconds(), err
 	}
 	client, err := h.clientForServer(&s)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	subCtx, cancel := context.WithTimeout(ctx, monitorTimeout)
 	defer cancel()
-	return client.ServerStatus(subCtx)
+	resp, code, err := client.ServerStatus(subCtx)
+	return resp, code, h.now().Sub(start).Milliseconds(), err
 }
 
 func (h *monitorHandler) clientForServer(s *models.Server) (*remote.Client, error) {
@@ -385,14 +421,21 @@ func (h *monitorHandler) decryptSecret(s *models.Server) (string, error) {
 }
 
 func serverRef(s models.Server) monitorServerRef {
-	return monitorServerRef{
+	ref := monitorServerRef{
 		ID:               s.ID,
 		Name:             s.Name,
 		BaseURL:          s.BaseURL,
 		Status:           string(s.Status),
 		CredentialStatus: string(s.CredentialStatus),
 		Version:          s.Version,
+		Environment:      s.Environment,
+		Tags:             []string(s.Tags),
+		Capabilities:     []string(s.Capabilities),
 	}
+	if s.LastHeartbeatAt.Valid {
+		ref.LastHeartbeatAt = s.LastHeartbeatAt.Time.UTC().Format(time.RFC3339)
+	}
+	return ref
 }
 
 func primaryDisk(partitions []remote.Partition) (int64, int64, bool) {
