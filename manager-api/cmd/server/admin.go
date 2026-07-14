@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"gorm.io/gorm"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/api"
@@ -90,7 +92,19 @@ func newAdminSetPasswordCmd() *cobra.Command {
 
 // readPassword reads a password from stdin (no echo if terminal).
 func readPassword() ([]byte, error) {
-	return os.ReadFile("/dev/tty")
+	// Read a single line from the controlling terminal with echo disabled. The
+	// previous os.ReadFile("/dev/tty") read to EOF (never returning on Enter) and
+	// echoed the password in the clear.
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		// No controlling terminal (piped input): read one line from stdin.
+		line, rerr := bufio.NewReader(os.Stdin).ReadString('\n')
+		return []byte(strings.TrimRight(line, "\r\n")), rerr
+	}
+	defer func() { _ = tty.Close() }()
+	pw, err := term.ReadPassword(int(tty.Fd()))
+	fmt.Fprintln(tty) // newline after the hidden input
+	return pw, err
 }
 
 // Ensure gorm import is used.

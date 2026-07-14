@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -100,6 +101,11 @@ func (c *Client) fetchLatest(ctx context.Context) (*Release, error) {
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "jabali-sounder")
+	// Authenticate when a token is present to lift GitHub's 60/hr
+	// unauthenticated rate limit (which yields 403s on shared IPs).
+	if tok := firstEnv("JABALI_SOUNDER_GITHUB_TOKEN", "GITHUB_TOKEN"); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("updater fetch: %w", err)
@@ -107,6 +113,12 @@ func (c *Client) fetchLatest(ctx context.Context) (*Release, error) {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("no releases published")
+	}
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+		if resp.Header.Get("X-RateLimit-Remaining") == "0" {
+			return nil, fmt.Errorf("GitHub API rate limit reached (unauthenticated 60/hr) — try again later, or set JABALI_SOUNDER_GITHUB_TOKEN")
+		}
+		return nil, fmt.Errorf("github returned HTTP %d (forbidden)", resp.StatusCode)
 	}
 	if resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("github returned HTTP %d", resp.StatusCode)
@@ -205,4 +217,14 @@ func AssetFor(assets []Asset, prefix, goos, goarch string) (Asset, bool) {
 		}
 	}
 	return Asset{}, false
+}
+
+// firstEnv returns the first non-empty value among the named environment vars.
+func firstEnv(names ...string) string {
+	for _, n := range names {
+		if v := os.Getenv(n); v != "" {
+			return v
+		}
+	}
+	return ""
 }

@@ -20,8 +20,9 @@ import (
 // replaced) binary until a restart, so we print that instruction.
 func newUpdateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "update",
-		Short: "Download and install the latest release, replacing this binary",
+		Use:          "update",
+		Short:        "Download and install the latest release, replacing this binary",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			exePath, err := os.Executable()
 			if err != nil {
