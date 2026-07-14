@@ -115,7 +115,11 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now "$SVC" >/dev/null 2>&1 || die "failed to start ${SVC} (journalctl -u ${SVC})"
+systemctl enable "$SVC" >/dev/null 2>&1 || true
+# Use restart, not `enable --now`: on a re-install the unit is already active, and
+# `--now` would leave the OLD process running the now-(deleted) binary on disk.
+# restart starts it if stopped and reloads the freshly installed binary if running.
+systemctl restart "$SVC" || die "failed to start ${SVC} (journalctl -u ${SVC})"
 
 port="${ADDR##*:}"
 for _ in $(seq 1 30); do
