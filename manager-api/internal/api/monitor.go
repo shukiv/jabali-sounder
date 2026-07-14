@@ -79,6 +79,22 @@ type monitorAlert struct {
 	Detail string `json:"detail"`
 }
 
+// monitorService / monitorNet pass through the managed Panel's per-service
+// health + network telemetry when present (JAB-150 / SND-80/81).
+type monitorService struct {
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	LastChecked string `json:"last_checked,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+}
+
+type monitorNet struct {
+	DownloadBPS   float64 `json:"download_bps"`
+	UploadBPS     float64 `json:"upload_bps"`
+	PacketLossPct float64 `json:"packet_loss_pct"`
+	WindowSeconds int     `json:"window_seconds"`
+}
+
 type monitorServerRef struct {
 	ID               string   `json:"id"`
 	Name             string   `json:"name"`
@@ -115,6 +131,8 @@ type monitorLiveEntry struct {
 	APILatencyMS   *int64           `json:"api_latency_ms,omitempty"`
 	NTPSynced      *bool            `json:"ntp_synced,omitempty"`
 	Alerts         []monitorAlert   `json:"alerts,omitempty"`
+	Services       []monitorService `json:"services,omitempty"`
+	Net            *monitorNet      `json:"net,omitempty"`
 	WarmingUp      bool             `json:"warming_up"`
 	Error          string           `json:"error,omitempty"`
 }
@@ -214,6 +232,12 @@ func (h *monitorHandler) fetchLive(ctx context.Context, s models.Server) monitor
 	entry.APILatencyMS = ptrInt64(latencyMS)
 	for _, a := range status.Alerts {
 		entry.Alerts = append(entry.Alerts, monitorAlert{Level: a.Level, Kind: a.Kind, Detail: a.Detail})
+	}
+	for _, sv := range status.Services {
+		entry.Services = append(entry.Services, monitorService{Name: sv.Name, Status: sv.Status, LastChecked: sv.LastChecked, Reason: sv.Reason})
+	}
+	if status.Net != nil {
+		entry.Net = &monitorNet{DownloadBPS: status.Net.DownloadBPS, UploadBPS: status.Net.UploadBPS, PacketLossPct: status.Net.PacketLossPct, WindowSeconds: status.Net.WindowSeconds}
 	}
 	entry.AsOf = status.AsOf
 	if entry.AsOf == "" {

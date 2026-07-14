@@ -22,6 +22,26 @@ type ServerStatusResp struct {
 	IO      *IOStatusSlice      `json:"io"`
 	Errors  map[string]string   `json:"errors,omitempty"`
 	Alerts  []ServerStatusAlert `json:"alerts,omitempty"`
+	// Services + Net are additive fields Sounder consumes when the managed Panel
+	// exposes them (JAB-150 / SND-80/81); absent today, rendered as unsupported.
+	Services []ServiceHealth `json:"services,omitempty"`
+	Net      *NetTelemetry   `json:"net,omitempty"`
+}
+
+// ServiceHealth is one workload's health as reported by the managed Panel.
+type ServiceHealth struct {
+	Name        string `json:"name"`
+	Status      string `json:"status"` // healthy | degraded | failed
+	LastChecked string `json:"last_checked,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+}
+
+// NetTelemetry is the managed server's network throughput + loss over a window.
+type NetTelemetry struct {
+	DownloadBPS   float64 `json:"download_bps"`
+	UploadBPS     float64 `json:"upload_bps"`
+	PacketLossPct float64 `json:"packet_loss_pct"`
+	WindowSeconds int     `json:"window_seconds"`
 }
 
 // HostStatusSlice mirrors the host slice used by jabali2's server-status page.

@@ -51,6 +51,20 @@ export interface MonitorAlert {
   detail: string;
 }
 
+export interface MonitorServiceHealth {
+  name: string;
+  status: string; // healthy | degraded | failed
+  last_checked?: string;
+  reason?: string;
+}
+
+export interface MonitorNet {
+  download_bps: number;
+  upload_bps: number;
+  packet_loss_pct: number;
+  window_seconds: number;
+}
+
 export interface MonitorServerRef {
   id: string;
   name: string;
@@ -87,6 +101,8 @@ export interface MonitorLiveEntry {
   api_latency_ms?: number;
   ntp_synced?: boolean;
   alerts?: MonitorAlert[];
+  services?: MonitorServiceHealth[];
+  net?: MonitorNet;
   warming_up: boolean;
   error?: string;
 }
