@@ -311,7 +311,7 @@ export default function Monitor() {
       title: "Actions",
       key: "actions",
       fixed: "right" as const,
-      width: 180,
+      width: 240,
       render: (_: unknown, row: MonitorLiveEntry) => (
         <RowActions
           actions={[
@@ -507,7 +507,7 @@ export default function Monitor() {
             rowKey={(row) => row.server.id}
             loading={live.isLoading || summary.isLoading}
             pagination={false}
-            scroll={{ x: 1500 }}
+            scroll={{ x: 1600 }}
             expandable={{
               expandedRowRender: (row) => <MonitorRowDetails entry={row} />,
               rowExpandable: (row) => row.server.status === "active",
