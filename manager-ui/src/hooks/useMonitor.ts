@@ -1,15 +1,24 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import apiClient from "../apiClient";
-import type { ListEnvelope, MonitorLiveEntry, MonitorSummaryEntry } from "../types";
+import type {
+  ListEnvelope,
+  MetricHistory,
+  MonitorLiveEntry,
+  MonitorSummaryEntry,
+} from "../types";
 
-export function useMonitorLive() {
+// useMonitorLive polls the real-time fleet metrics. Polling is gated by
+// `enabled` so historical Monitor views can stop the 5s live poll entirely
+// (SND-78: historical mode must not keep high-frequency polling).
+export function useMonitorLive(enabled = true) {
   return useQuery({
     queryKey: ["monitor", "live"] as const,
+    enabled,
     queryFn: async () => {
       const resp = await apiClient.get<ListEnvelope<MonitorLiveEntry>>("/admin/monitor/live");
       return resp.data.data;
     },
-    refetchInterval: 5000,
+    refetchInterval: enabled ? 5000 : false,
     refetchIntervalInBackground: false,
   });
 }
@@ -23,5 +32,24 @@ export function useMonitorSummary() {
     },
     refetchInterval: 60000,
     refetchIntervalInBackground: false,
+  });
+}
+
+// useMonitorHistory fetches stored metric samples per server for the selected
+// range, so the Monitor overview can show trends and range averages without
+// the live poll (SND-78). Results align to the `ids` order.
+export function useMonitorHistory(ids: string[], range: string, enabled: boolean) {
+  return useQueries({
+    queries: ids.map((id) => ({
+      queryKey: ["server-metrics", id, range] as const,
+      enabled: enabled && !!id,
+      staleTime: 30000,
+      queryFn: async () => {
+        const resp = await apiClient.get<MetricHistory>(
+          `/admin/servers/${id}/metrics?range=${range}`,
+        );
+        return resp.data;
+      },
+    })),
   });
 }

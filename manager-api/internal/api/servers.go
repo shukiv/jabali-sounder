@@ -585,7 +585,7 @@ func (h *serverHandler) metrics(c *gin.Context) {
 		return
 	}
 
-	// A `range` (6h|24h|7d|30d) selects a time window and downsamples to a
+	// A `range` (1h|6h|24h|7d|30d) selects a time window and downsamples to a
 	// chart-friendly point count; otherwise fall back to the most-recent N.
 	if window, ok := parseRange(c.Query("range")); ok {
 		since := time.Now().Add(-window)
@@ -610,6 +610,8 @@ func (h *serverHandler) metrics(c *gin.Context) {
 // parseRange maps a range token to a duration.
 func parseRange(r string) (time.Duration, bool) {
 	switch r {
+	case "1h":
+		return time.Hour, true
 	case "6h":
 		return 6 * time.Hour, true
 	case "24h":
