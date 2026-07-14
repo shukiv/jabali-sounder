@@ -27,7 +27,7 @@ portable binaries. All are covered by `checksums.txt`.
 |----|----------|---------|
 | Windows 10/11 (x64) | `jabali-sounder-setup-<ver>-amd64.exe` | Run it. Per-user install (no admin) to `%LOCALAPPDATA%\Programs\JabaliSounder`; adds a Start-menu entry (desktop shortcut optional) and an Apps & Features entry. |
 | Debian/Ubuntu (amd64) | `jabali-sounder_<ver>_amd64.deb` | `sudo apt install ./jabali-sounder_<ver>_amd64.deb` — pulls WebKitGTK/GTK deps. |
-| Fedora/RHEL/openSUSE (x86_64) | `jabali-sounder-<ver>-1.x86_64.rpm` | `sudo dnf install ./jabali-sounder-<ver>-1.x86_64.rpm` (or `zypper`/`rpm -i`). |
+| Fedora (x86_64) | `jabali-sounder-<ver>-1.x86_64.rpm` | `sudo dnf install ./jabali-sounder-<ver>-1.x86_64.rpm` |
 
 Portable binaries (`jabali-sounder-<os>-amd64-<ver>[.exe]`) remain published for
 users who prefer to place and launch them manually, plus the macOS `.dmg`.
@@ -35,8 +35,15 @@ users who prefer to place and launch them manually, plus the macOS `.dmg`.
 ### Prerequisites
 
 - **Windows:** WebView2 runtime (present on current Windows 10/11).
-- **Linux:** `libwebkit2gtk-4.1-0` + `libgtk-3-0`. The `.deb`/`.rpm` **declare
-  these as dependencies**, so the package manager installs them for you.
+- **Linux:** **WebKitGTK 4.1** + GTK 3. The `.deb` (Debian/Ubuntu) declares
+  `libwebkit2gtk-4.1-0` + `libgtk-3-0`; the `.rpm` (Fedora) declares
+  `webkit2gtk4.1` + `gtk3`. The package manager installs them for you.
+
+  > **Supported RPM distro:** Fedora. RHEL/AlmaLinux/Rocky 9 ship only WebKitGTK
+  > **4.0** (`webkit2gtk3`), and openSUSE names the package differently
+  > (`libwebkit2gtk-4_1-0`), so the current `.rpm` does not resolve there. Use the
+  > portable binary on those distros (with a WebKitGTK 4.1 runtime), or track the
+  > follow-up for a 4.0 build variant.
 
 ### Upgrade
 
