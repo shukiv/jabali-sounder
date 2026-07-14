@@ -339,3 +339,55 @@ section[id] { scroll-margin-top: 72px; }
 }
 .monitor-expand-btn:hover { background: rgba(140, 140, 140, 0.15); }
 .monitor-expand-btn:focus-visible { outline: 2px solid #1677ff; outline-offset: 1px; }
+
+/* ===== Responsive tables + filters + nav (SND-97..106) ===== */
+
+/* Visible horizontal-scroll affordance on phones: a persistent slim scrollbar
+   plus a right-edge fade so clipped table columns signal "swipe for more"
+   (SND-102/103/104/105/106 and the affordance half of 97/98). */
+@media (max-width: 768px) {
+  .ant-table-content,
+  .ant-table-body {
+    scrollbar-width: thin;
+  }
+  .ant-table-content::-webkit-scrollbar,
+  .ant-table-body::-webkit-scrollbar {
+    height: 8px;
+    -webkit-appearance: none;
+  }
+  .ant-table-content::-webkit-scrollbar-thumb,
+  .ant-table-body::-webkit-scrollbar-thumb {
+    background: rgba(140, 140, 140, 0.6);
+    border-radius: 4px;
+  }
+  .ant-table-wrapper { position: relative; }
+  .ant-table-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 8px;
+    right: 0;
+    bottom: 14px;
+    width: 22px;
+    background: linear-gradient(to right, rgba(127, 127, 127, 0), rgba(127, 127, 127, 0.18));
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+/* SND-97: the server tag/environment filters fill the toolbar width on phones
+   instead of collapsing to a sliver beside the title (each on its own row). */
+@media (max-width: 575px) {
+  .servers-filters { width: 100%; }
+  .servers-filters .ant-space-item { flex: 1 1 100%; }
+  .servers-filters .ant-select { width: 100% !important; min-width: 0 !important; }
+}
+
+/* SND-101: the Settings section nav wraps so every pill stays discoverable,
+   instead of clipping at the card edge with no scroll hint. */
+@media (max-width: 768px) {
+  .settings-section-nav {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    row-gap: 6px;
+  }
+}

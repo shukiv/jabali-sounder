@@ -346,7 +346,6 @@ export default function Servers() {
     {
       title: "Actions",
       key: "actions",
-      fixed: "right" as const,
       width: 130,
       render: (_: unknown, record: Server) => (
         <RowActions

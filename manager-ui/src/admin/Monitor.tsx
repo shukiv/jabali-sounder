@@ -310,7 +310,6 @@ export default function Monitor() {
     {
       title: "Actions",
       key: "actions",
-      fixed: "right" as const,
       width: 240,
       render: (_: unknown, row: MonitorLiveEntry) => (
         <RowActions
