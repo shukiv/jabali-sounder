@@ -1,14 +1,21 @@
 import { Descriptions, Space, Tag, Tooltip, Typography } from "antd";
+import {
+  CheckCircleFilled,
+  CloseCircleFilled,
+  ExclamationCircleFilled,
+  MinusCircleFilled,
+  QuestionCircleFilled,
+} from "@ant-design/icons";
+import type { ComponentType } from "react";
 import type { MonitorLiveEntry } from "../types";
 import { fmtAbs, fmtAge } from "./monitorFormat";
 
 const { Text } = Typography;
 
-// The workloads we surface service health for (SND-80). Each `id` matches the
-// name the managed Panel reports in `services[]` (JAB-150). Until the Panel
-// exposes real status, each is shown capability-aware: "unknown" when the
-// enrolled server advertises the capability, "unsupported" otherwise. Nothing is
-// ever reported healthy without a real probe.
+// Workloads we surface service health for (SND-80). Each `id` matches the name
+// the managed Panel reports in service_health (JAB-150). Until real status is
+// available a service is shown capability-aware: "unknown" when the enrolled
+// server advertises the capability, "unsupported" otherwise — never healthy.
 const SERVICES: { id: string; label: string; caps: string[] }[] = [
   { id: "web", label: "Web server", caps: ["web", "nginx", "apache"] },
   { id: "php-fpm", label: "PHP-FPM", caps: ["php", "php-fpm"] },
@@ -22,13 +29,13 @@ const SERVICES: { id: string; label: string; caps: string[] }[] = [
 
 type ServiceState = "healthy" | "degraded" | "failed" | "stopped" | "unknown" | "unsupported";
 
-const STATE_COLOR: Record<ServiceState, string> = {
-  healthy: "green",
-  degraded: "gold",
-  failed: "red",
-  stopped: "default",
-  unknown: "default",
-  unsupported: "default",
+const STATE_STYLE: Record<ServiceState, { color: string; Icon: ComponentType<{ style?: React.CSSProperties }> }> = {
+  healthy: { color: "#52c41a", Icon: CheckCircleFilled },
+  degraded: { color: "#faad14", Icon: ExclamationCircleFilled },
+  failed: { color: "#ff4d4f", Icon: CloseCircleFilled },
+  stopped: { color: "#8c8c8c", Icon: MinusCircleFilled },
+  unknown: { color: "#8c8c8c", Icon: QuestionCircleFilled },
+  unsupported: { color: "#bfbfbf", Icon: MinusCircleFilled },
 };
 
 function normStatus(s: string): ServiceState {
@@ -45,31 +52,49 @@ function prettyName(name: string): string {
   return up.has(name.toLowerCase()) ? name.toUpperCase() : name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-function fmtRate(bps?: number): string {
-  if (typeof bps !== "number" || Number.isNaN(bps) || bps < 0) return "n/a";
-  const units = ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"];
-  let v = bps;
-  let u = 0;
-  while (v >= 1000 && u < units.length - 1) {
-    v /= 1000;
-    u += 1;
-  }
-  return `${v >= 10 || u === 0 ? v.toFixed(0) : v.toFixed(1)} ${units[u]}`;
+function label(st: ServiceState): string {
+  return st.charAt(0).toUpperCase() + st.slice(1);
+}
+
+// ServiceChip renders one service as a status card: a coloured status icon, the
+// service name, and its status word (matches the Monitor service-health design).
+function ServiceChip({ name, state, tip }: { name: string; state: ServiceState; tip: string }) {
+  const { color, Icon } = STATE_STYLE[state];
+  return (
+    <Tooltip title={tip}>
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "5px 12px",
+          borderRadius: 8,
+          background: `${color}1f`,
+          border: `1px solid ${color}55`,
+        }}
+      >
+        <Icon style={{ color, fontSize: 16 }} />
+        <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+          <Text strong style={{ fontSize: 13 }}>{name}</Text>
+          <Text style={{ fontSize: 11, color }}>{label(state)}</Text>
+        </span>
+      </div>
+    </Tooltip>
+  );
 }
 
 interface Props {
   entry: MonitorLiveEntry;
 }
 
-// MonitorRowDetails is the expandable detail panel for a Monitor row: it shows
-// per-service health (SND-80) and connection/network telemetry (SND-81). Real
-// values are rendered when the managed Panel reports them (JAB-150); otherwise
-// fields stay explicitly unknown/unsupported.
+// MonitorRowDetails is the expandable detail panel for a Monitor row: per-service
+// health (SND-80) and connection/network telemetry (SND-81). Real values render
+// when the managed Panel reports them (JAB-150); otherwise fields stay explicitly
+// unknown/unsupported.
 export default function MonitorRowDetails({ entry }: Props) {
   const serverCaps = entry.server.capabilities;
   const latency = entry.api_latency_ms;
   const lastHb = entry.server.last_heartbeat_at;
-
   const reported = entry.services || [];
   const net = entry.net;
   const unsupportedTag = <Tag>unsupported</Tag>;
@@ -80,33 +105,32 @@ export default function MonitorRowDetails({ entry }: Props) {
         <Text strong>Service health</Text>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           {reported.length > 0
-            ? reported.map((sv) => {
-                const st = normStatus(sv.status);
-                const tip =
-                  [sv.reason, sv.last_checked ? `checked ${fmtAge(sv.last_checked)}` : ""]
-                    .filter(Boolean)
-                    .join(" · ") || "Reported by the managed Panel.";
-                return (
-                  <Tooltip key={sv.name} title={tip}>
-                    <Tag color={STATE_COLOR[st]}>
-                      {prettyName(sv.name)}: {st === "unknown" ? sv.status : st}
-                    </Tag>
-                  </Tooltip>
-                );
-              })
+            ? reported.map((sv) => (
+                <ServiceChip
+                  key={sv.name}
+                  name={prettyName(sv.name)}
+                  state={normStatus(sv.status)}
+                  tip={
+                    [sv.reason, sv.last_checked ? `checked ${fmtAge(sv.last_checked)}` : ""]
+                      .filter(Boolean)
+                      .join(" · ") || "Reported by the managed Panel."
+                  }
+                />
+              ))
             : SERVICES.map((svc) => {
-                const st: ServiceState =
+                const state: ServiceState =
                   serverCaps && svc.caps.some((c) => serverCaps.includes(c)) ? "unknown" : "unsupported";
-                const tip =
-                  st === "unknown"
-                    ? "Supported, but the Panel API does not yet report a live status."
-                    : "Not reported by this server's capabilities.";
                 return (
-                  <Tooltip key={svc.id} title={tip}>
-                    <Tag color={STATE_COLOR[st]}>
-                      {svc.label}: {st}
-                    </Tag>
-                  </Tooltip>
+                  <ServiceChip
+                    key={svc.id}
+                    name={svc.label}
+                    state={state}
+                    tip={
+                      state === "unknown"
+                        ? "Supported, but the Panel API does not yet report a live status."
+                        : "Not reported by this server's capabilities."
+                    }
+                  />
                 );
               })}
         </div>
@@ -143,16 +167,8 @@ export default function MonitorRowDetails({ entry }: Props) {
                 <Text type="secondary">never</Text>
               ),
             },
-            {
-              key: "down",
-              label: "Download rate",
-              children: net ? <Text>{fmtRate(net.download_bps)}</Text> : unsupportedTag,
-            },
-            {
-              key: "up",
-              label: "Upload rate",
-              children: net ? <Text>{fmtRate(net.upload_bps)}</Text> : unsupportedTag,
-            },
+            { key: "down", label: "Download rate", children: net ? <Text>{fmtRate(net.download_bps)}</Text> : unsupportedTag },
+            { key: "up", label: "Upload rate", children: net ? <Text>{fmtRate(net.upload_bps)}</Text> : unsupportedTag },
             {
               key: "loss",
               label: "Packet loss",
@@ -184,4 +200,16 @@ export default function MonitorRowDetails({ entry }: Props) {
       </div>
     </Space>
   );
+}
+
+function fmtRate(bps?: number): string {
+  if (typeof bps !== "number" || Number.isNaN(bps) || bps < 0) return "n/a";
+  const units = ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"];
+  let v = bps;
+  let u = 0;
+  while (v >= 1000 && u < units.length - 1) {
+    v /= 1000;
+    u += 1;
+  }
+  return `${v >= 10 || u === 0 ? v.toFixed(0) : v.toFixed(1)} ${units[u]}`;
 }

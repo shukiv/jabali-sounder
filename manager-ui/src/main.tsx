@@ -38,6 +38,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </React.StrictMode>,
 );
 
+// The Wails runtime (imported for Call/System) installs a global contextmenu
+// handler that hides the browser menu except on selected text — wanted in the
+// desktop app, but not in the browser-served web build. Re-enable the normal
+// right-click menu there via Wails' documented --default-contextmenu: show.
+if (!isNativeApp()) {
+  document.documentElement.style.setProperty("--default-contextmenu", "show");
+}
+
 // Register the PWA service worker for the web/server build only. Skip it inside
 // the Wails desktop/mobile apps (they serve via the WebViewAssetLoader) and in
 // dev. Failures are non-fatal.
