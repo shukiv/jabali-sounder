@@ -54,7 +54,7 @@ export function StatCard({ label, value, subtitle, iconColor, iconBg, Icon, icon
         </div>
         <div style={{ minWidth: 0, overflowWrap: "break-word", wordBreak: "normal" }}>
           <div style={{ color: iconColor, fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{label}</div>
-          <div style={{ fontSize: narrow ? 18 : compact ? 20 : 26, fontWeight: 700, lineHeight: 1.1, whiteSpace: "nowrap" }}>{value}</div>
+          <div style={{ fontSize: narrow ? 18 : compact ? 20 : 26, fontWeight: 700, lineHeight: 1.15, whiteSpace: "normal" }}>{value}</div>
           {subtitle != null && (
             <Typography.Text type="secondary" style={{ fontSize: 12, display: "block" }}>
               {subtitle}

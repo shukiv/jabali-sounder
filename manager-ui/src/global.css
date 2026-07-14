@@ -303,3 +303,39 @@ section[id] { scroll-margin-top: 72px; }
     white-space: nowrap;
   }
 }
+
+/* SND-87: Monitor summary uses intentional, balanced breakpoints (6 / 3 / 2 / 1)
+   instead of content-dependent auto-fit that produced a 5+1 orphan on wide
+   desktops. Six-across only when wide enough to stay legible. */
+.monitor-summary-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (min-width: 620px) {
+  .monitor-summary-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1600px) {
+  .monitor-summary-grid { grid-template-columns: repeat(6, 1fr); }
+}
+@media (max-width: 400px) {
+  .monitor-summary-grid { grid-template-columns: 1fr; }
+}
+
+/* SND-90: Monitor row disclosure control — a familiar chevron with a >=32px
+   pointer target, aligned with the row, keyboard-focusable. */
+.monitor-expand-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: inherit;
+}
+.monitor-expand-btn:hover { background: rgba(140, 140, 140, 0.15); }
+.monitor-expand-btn:focus-visible { outline: 2px solid #1677ff; outline-offset: 1px; }

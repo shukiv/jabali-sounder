@@ -23,8 +23,10 @@ import { fmtAbs, fmtAge, fmtUptime } from "../components/monitorFormat";
 import {
   CloudServerOutlined,
   DashboardOutlined,
+  GlobalOutlined,
   HddOutlined,
   LinkOutlined,
+  RightOutlined,
   PoweroffOutlined,
   ProfileOutlined,
   ReloadOutlined,
@@ -203,6 +205,7 @@ export default function Monitor() {
     {
       title: "Server",
       key: "server",
+      width: 280,
       render: (_: unknown, row: MonitorLiveEntry) => {
         const reasons = issues(row);
         return (
@@ -221,7 +224,7 @@ export default function Monitor() {
                 </Tooltip>
               ) : null}
             </Space>
-            <Text type="secondary" style={{ fontSize: 12 }}>{row.server.base_url}</Text>
+            <Text type="secondary" title={row.server.base_url} style={{ fontSize: 12, display: "block", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.server.base_url}</Text>
             <Space size={4} wrap>
               {row.os ? <Tooltip title={row.kernel}><Tag style={{ margin: 0 }}>{row.os}</Tag></Tooltip> : null}
               {row.server.environment ? <Tag color="blue" style={{ margin: 0 }}>{row.server.environment}</Tag> : null}
@@ -234,6 +237,7 @@ export default function Monitor() {
     {
       title: "State",
       key: "state",
+      width: 120,
       render: (_: unknown, row: MonitorLiveEntry) => (
         <Space direction="vertical" size={2}>
           {statusTag(row)}
@@ -284,12 +288,14 @@ export default function Monitor() {
     {
       title: "Uptime",
       key: "uptime",
+      width: 100,
       render: (_: unknown, row: MonitorLiveEntry) =>
         row.available ? <Text>{fmtUptime(row.uptime_seconds)}</Text> : <Text type="secondary">—</Text>,
     },
     {
       title: "Connection",
       key: "connection",
+      width: 170,
       render: (_: unknown, row: MonitorLiveEntry) => (
         <Space direction="vertical" size={2} style={{ minWidth: 120 }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
@@ -305,7 +311,7 @@ export default function Monitor() {
       title: "Actions",
       key: "actions",
       fixed: "right" as const,
-      width: 130,
+      width: 180,
       render: (_: unknown, row: MonitorLiveEntry) => (
         <RowActions
           actions={[
@@ -355,7 +361,7 @@ export default function Monitor() {
       render: (_: unknown, row: HistoryRow) => (
         <Space direction="vertical" size={0}>
           <Text strong>{row.server.name}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>{row.server.base_url}</Text>
+          <Text type="secondary" title={row.server.base_url} style={{ fontSize: 12, display: "block", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.server.base_url}</Text>
         </Space>
       ),
     },
@@ -417,12 +423,6 @@ export default function Monitor() {
   const fleetRam = mean(histServerRam);
   const withData = historyRows.filter((r) => r.samples.length > 0).length;
 
-  const cardGrid: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: 16,
-  };
-
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
       <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
@@ -474,13 +474,13 @@ export default function Monitor() {
       )}
 
       {isLive ? (
-        <div style={cardGrid}>
+        <div className="monitor-summary-grid">
           <StatCard label="Server health" value={`${healthyRows.length} healthy · ${Math.max(issueCount, 0)} issues`} Icon={DashboardOutlined} iconColor={issueCount > 0 ? "#faad14" : "#52c41a"} />
           <StatCard label={`Avg CPU (${cpuSamples.length}/${activeRows.length})`} value={pctText(avgCpu)} Icon={ThunderboltOutlined} iconColor="#fa8c16" />
           <StatCard label={`Avg RAM (${ramSamples.length}/${activeRows.length})`} value={pctText(avgRam)} Icon={HddOutlined} iconColor="#9254de" />
           <StatCard label="Storage used" value={`${bytes(storageUsed)} / ${bytes(storageTotal)}`} Icon={CloudServerOutlined} iconColor="#1677ff" />
           <StatCard label="Accounts" value={accountsTotal.toLocaleString()} Icon={TeamOutlined} iconColor="#13c2c2" />
-          <StatCard label="Domains" value={domainsTotal.toLocaleString()} Icon={CloudServerOutlined} iconColor="#eb2f96" />
+          <StatCard label="Domains" value={domainsTotal.toLocaleString()} Icon={GlobalOutlined} iconColor="#eb2f96" />
         </div>
       ) : (
         <Row gutter={[16, 16]}>
@@ -507,10 +507,25 @@ export default function Monitor() {
             rowKey={(row) => row.server.id}
             loading={live.isLoading || summary.isLoading}
             pagination={false}
-            scroll={{ x: 1300 }}
+            scroll={{ x: 1500 }}
             expandable={{
               expandedRowRender: (row) => <MonitorRowDetails entry={row} />,
               rowExpandable: (row) => row.server.status === "active",
+              columnWidth: 44,
+              expandIcon: ({ expanded, onExpand, record, expandable }) =>
+                expandable ? (
+                  <button
+                    type="button"
+                    className="monitor-expand-btn"
+                    aria-label={`${expanded ? "Collapse" : "Expand"} details for ${record.server.name}`}
+                    aria-expanded={expanded}
+                    onClick={(e) => onExpand(record, e)}
+                  >
+                    <RightOutlined style={{ transition: "transform .2s", transform: expanded ? "rotate(90deg)" : "none" }} />
+                  </button>
+                ) : (
+                  <span style={{ display: "inline-block", width: 32 }} aria-hidden="true" />
+                ),
             }}
           />
         ) : (
