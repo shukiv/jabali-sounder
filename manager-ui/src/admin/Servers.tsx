@@ -346,6 +346,8 @@ export default function Servers() {
     {
       title: "Actions",
       key: "actions",
+      fixed: "right" as const,
+      width: 130,
       render: (_: unknown, record: Server) => (
         <RowActions
           actions={[
@@ -433,7 +435,7 @@ export default function Servers() {
   return (
     <div>
       <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
-        <Space wrap>
+        <Space wrap className="servers-filters">
           <h3 style={{ margin: 0 }}>Managed Servers</h3>
           <Select
             mode="multiple"

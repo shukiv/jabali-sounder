@@ -48,8 +48,14 @@ export default function SessionsSettings() {
       dataIndex: "user_agent",
       key: "user_agent",
       render: (ua: string, r: Session) => (
-        <span>
-          {ua || "unknown"} {r.is_current ? <Tag color="green">this device</Tag> : null}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, maxWidth: "100%" }}>
+          <span
+            title={ua || "unknown"}
+            style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {ua || "unknown"}
+          </span>
+          {r.is_current ? <Tag color="green">this device</Tag> : null}
         </span>
       ),
     },
@@ -90,7 +96,7 @@ export default function SessionsSettings() {
         columns={columns}
         rowKey="id"
         loading={isLoading}
-        pagination={false}
+        pagination={{ pageSize: 5, hideOnSinglePage: true, size: "small" }}
         size="small"
         scroll={{ x: "max-content" }}
       />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Drawer, Statistic, List, Badge, Tag, Empty, Spin, Row, Col, Segmented } from "antd";
+import { Drawer, Statistic, List, Badge, Tag, Empty, Spin, Row, Col, Segmented, Button } from "antd";
 import { useServerHeartbeats, useServerMetrics } from "../hooks/useServers";
 import MetricChart from "./MetricChart";
 import type { Server } from "../types";
@@ -35,12 +35,16 @@ function uptimeColor(pct: number): string {
 
 export default function ServerHistoryDrawer({ server, onClose }: Props) {
   const [range, setRange] = useState("live");
+  const [showAllHb, setShowAllHb] = useState(false);
   const { data, isLoading } = useServerHeartbeats(server?.id ?? null);
   const { data: metrics } = useServerMetrics(server?.id ?? null, range === "live" ? undefined : range);
 
   const uptimePct = data ? Math.round(data.uptime.ratio * 1000) / 10 : 0;
   const slaPct = data?.uptime_window ? Math.round(data.uptime_window.ratio * 1000) / 10 : null;
   const cert = certInfo(server?.cert_expires_at);
+  // When SLA is absent the two remaining stats share the row instead of
+  // leaving an empty third and wrapping their values (SND-71).
+  const statSpan = slaPct !== null ? 8 : 12;
 
   // Ensure chronological order regardless of endpoint (Recent is DESC).
   const samples = [...(metrics?.data ?? [])].sort(
@@ -69,7 +73,7 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
       ) : (
         <>
           <Row gutter={16} style={{ marginBottom: 16 }}>
-            <Col span={8}>
+            <Col xs={12} sm={statSpan}>
               <Statistic
                 title={`Uptime (last ${data.uptime.total})`}
                 value={uptimePct}
@@ -79,7 +83,7 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
               />
             </Col>
             {slaPct !== null ? (
-              <Col span={8}>
+              <Col xs={12} sm={statSpan}>
                 <Statistic
                   title={`SLA (${data.uptime_window?.window_days}d)`}
                   value={slaPct}
@@ -89,7 +93,7 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
                 />
               </Col>
             ) : null}
-            <Col span={8}>
+            <Col xs={12} sm={statSpan}>
               <Statistic title="Healthy checks" value={data.uptime.healthy} suffix={`/ ${data.uptime.total}`} />
             </Col>
           </Row>
@@ -118,7 +122,7 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
 
           <List
             size="small"
-            dataSource={data.data}
+            dataSource={showAllHb ? data.data : data.data.slice(0, 10)}
             renderItem={(hb) => (
               <List.Item>
                 <Badge status={hb.healthy ? "success" : "error"} text={hb.healthy ? "healthy" : "unhealthy"} />
@@ -127,6 +131,13 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
               </List.Item>
             )}
           />
+          {data.data.length > 10 ? (
+            <div style={{ textAlign: "center", marginTop: 8 }}>
+              <Button type="link" size="small" onClick={() => setShowAllHb((v) => !v)}>
+                {showAllHb ? "Show fewer" : `Show all ${data.data.length} checks`}
+              </Button>
+            </div>
+          ) : null}
         </>
       )}
     </Drawer>

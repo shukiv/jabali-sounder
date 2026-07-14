@@ -179,6 +179,18 @@ export default function Settings() {
         <Title level={3} style={{ margin: 0 }}>Settings</Title>
       </Space>
 
+      <nav className="settings-section-nav" aria-label="Settings sections">
+        <a href="#sec-import">Import / Export</a>
+        <a href="#sec-password">Password</a>
+        <a href="#sec-2fa">Two-factor</a>
+        <a href="#sec-sessions">Sessions</a>
+        {roleAtLeast("operator") ? <a href="#sec-tokens">API tokens</a> : null}
+        <a href="#sec-alerts">Alerts</a>
+        {roleAtLeast("operator") ? <a href="#sec-maintenance">Maintenance</a> : null}
+        <a href="#sec-about">About</a>
+      </nav>
+
+      <section id="sec-import">
       <Card title="Import / Export">
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
           <Paragraph type="secondary" style={{ margin: 0 }}>
@@ -252,7 +264,9 @@ export default function Settings() {
           )}
         </Space>
       </Card>
+      </section>
 
+      <section id="sec-password">
       <Card title="Change Password" style={{ marginTop: 16 }}>
         <Form
           form={pwForm}
@@ -300,18 +314,21 @@ export default function Settings() {
           </Button>
         </Form>
       </Card>
+      </section>
 
-      <TwoFactorSettings />
+      <section id="sec-2fa"><TwoFactorSettings /></section>
 
-      <SessionsSettings />
+      <section id="sec-sessions"><SessionsSettings /></section>
 
-      {roleAtLeast("operator") ? <ApiTokensSettings /> : null}
+      {roleAtLeast("operator") ? <section id="sec-tokens"><ApiTokensSettings /></section> : null}
 
-      <AlertRulesSettings />
-      {roleAtLeast("operator") ? <AlertChannelsSettings /> : null}
-      {roleAtLeast("operator") ? <MaintenanceSettings /> : null}
+      <section id="sec-alerts">
+        <AlertRulesSettings />
+        {roleAtLeast("operator") ? <AlertChannelsSettings /> : null}
+      </section>
+      {roleAtLeast("operator") ? <section id="sec-maintenance"><MaintenanceSettings /></section> : null}
 
-      <AboutSettings />
+      <section id="sec-about"><AboutSettings /></section>
     </div>
   );
 }

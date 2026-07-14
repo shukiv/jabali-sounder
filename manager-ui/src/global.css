@@ -162,6 +162,9 @@ pre {
    phones so it can't overrun the 76px header or collide with controls (SND-41).
    The drawer/login wordmarks are unaffected. */
 .ant-layout-header .brand-wordmark { white-space: nowrap; }
+/* SND-67: the mobile navigation drawer title wordmark must not overrun the
+   drawer width; keep it on one line and cap its size. */
+.ant-drawer-header .brand-wordmark { white-space: nowrap; font-size: 20px !important; }
 @media (max-width: 640px) {
   .ant-layout-header .brand-wordmark { font-size: 20px !important; }
 }
@@ -197,9 +200,10 @@ pre {
 .ant-dropdown-menu,
 .ant-popover-inner { max-width: calc(100vw - 12px); overflow-x: hidden; }
 
-/* SND-52: long dialogs stay usable in short (landscape) viewports — bounded
-   height, scrollable body, always-visible footer actions. */
-@media (max-height: 560px) {
+/* SND-52/74: long dialogs stay usable in short landscape AND common phone
+   portrait viewports (e.g. 320x568) — bounded height, scrollable body,
+   always-visible footer actions. */
+@media (max-height: 740px) {
   .ant-modal { top: 8px !important; padding-bottom: 8px; }
   .ant-modal-content {
     max-height: calc(100vh - 16px);
@@ -259,4 +263,43 @@ pre {
 .ant-table-body:focus-visible {
   outline: 2px solid #1677ff;
   outline-offset: -2px;
+}
+
+/* SND-70: hostname enrollment addons (https:// and :8443) shrink on phones so
+   the editable hostname keeps a usable, legible width at 320px. */
+@media (max-width: 480px) {
+  .ant-input-group-addon { padding: 0 7px !important; font-size: 12px !important; }
+}
+
+/* SND-75: server tag/environment filters fill the toolbar width on phones
+   instead of keeping ragged desktop min-widths (240px/160px). */
+@media (max-width: 575px) {
+  .servers-filters .ant-select { min-width: 100% !important; width: 100% !important; }
+}
+
+/* SND-73: a horizontally scrollable jump-nav for the long Settings page on
+   phones; hidden on desktop where the whole page is easy to scan. */
+section[id] { scroll-margin-top: 72px; }
+.settings-section-nav { display: none; }
+@media (max-width: 768px) {
+  .settings-section-nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 0;
+    margin-bottom: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--ant-color-bg-layout, #141414);
+  }
+  .settings-section-nav a {
+    flex: 0 0 auto;
+    padding: 4px 12px;
+    border: 1px solid rgba(140, 140, 140, 0.35);
+    border-radius: 16px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
 }

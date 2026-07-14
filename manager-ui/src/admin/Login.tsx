@@ -62,7 +62,7 @@ export default function Login() {
       <div style={{ position: "absolute", top: 20, right: 20 }}>
         <ThemeToggle />
       </div>
-      <Card style={{ width: 400, boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)" }}>
+      <Card style={{ width: "min(400px, calc(100vw - 32px))", boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)" }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
             <BrandLogo mode={mode} size="login" />

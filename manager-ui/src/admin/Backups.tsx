@@ -68,7 +68,7 @@ export default function Backups() {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>Backups</Title>
         <Space>
