@@ -7,6 +7,73 @@ same process, and stores local state in SQLite.
 This keeps the server deployment intact while adding a Windows/macOS/Linux
 runtime.
 
+## Installers vs. the headless server
+
+There are **two different downloads** — do not confuse them:
+
+| You want | Download | Docs |
+|----------|----------|------|
+| The **desktop app** (GUI, own local database) | a desktop **installer** or portable binary below | this file |
+| A **headless server** on a box (the `curl \| bash` one-liner) | `jabali-sounder-server-linux-amd64` | [DOCKER.md](DOCKER.md) / install.sh |
+
+The `install.sh` one-liner installs the **server**, not this desktop app.
+
+## Desktop installers (SND-95)
+
+Each tagged release publishes OS-integrated installers alongside the raw
+portable binaries. All are covered by `checksums.txt`.
+
+| OS | Artifact | Install |
+|----|----------|---------|
+| Windows 10/11 (x64) | `jabali-sounder-setup-<ver>-amd64.exe` | Run it. Per-user install (no admin) to `%LOCALAPPDATA%\Programs\JabaliSounder`; adds a Start-menu entry (desktop shortcut optional) and an Apps & Features entry. |
+| Debian/Ubuntu (amd64) | `jabali-sounder_<ver>_amd64.deb` | `sudo apt install ./jabali-sounder_<ver>_amd64.deb` — pulls WebKitGTK/GTK deps. |
+| Fedora/RHEL/openSUSE (x86_64) | `jabali-sounder-<ver>-1.x86_64.rpm` | `sudo dnf install ./jabali-sounder-<ver>-1.x86_64.rpm` (or `zypper`/`rpm -i`). |
+
+Portable binaries (`jabali-sounder-<os>-amd64-<ver>[.exe]`) remain published for
+users who prefer to place and launch them manually, plus the macOS `.dmg`.
+
+### Prerequisites
+
+- **Windows:** WebView2 runtime (present on current Windows 10/11).
+- **Linux:** `libwebkit2gtk-4.1-0` + `libgtk-3-0`. The `.deb`/`.rpm` **declare
+  these as dependencies**, so the package manager installs them for you.
+
+### Upgrade
+
+Install the newer package/installer over the old one. Program files are replaced
+in place; your **data directory is untouched**, so the database, `secrets.key`,
+`jwt.secret`, enrolled servers, preferences, and login state are preserved. The
+desktop self-updater continues to update the installed binary in place.
+
+### Uninstall
+
+- **Windows:** Apps & Features → Jabali Sounder → Uninstall (or run
+  `uninstall.exe` in the install dir).
+- **Linux:** `sudo apt remove jabali-sounder` / `sudo dnf remove jabali-sounder`.
+
+Uninstall removes program files, shortcuts, and OS registrations but **keeps your
+user data by default** (see [Local Data](#local-data)). To also remove data,
+delete the `Jabali Sounder/` directory under your OS user-config directory
+yourself — that step is deliberately manual.
+
+### Reinstall / repair
+
+Reinstalling restores missing program files and shortcuts. It reuses the same
+install location and the same per-user data directory, so it never creates a
+second database or a duplicate application registration.
+
+### Reproducibility & security
+
+Installers are built in the release workflow from a clean checkout, tied to the
+release version, and published with checksums. They ship **no** default
+credentials, pre-created database, API keys, or machine-specific secrets — all of
+that is generated on first launch (see First-Run Setup). Code signing and macOS
+notarization are out of scope.
+
+> Package builds are exercised locally (deb/rpm layout + NSIS compile); on-device
+> clean-install/upgrade/repair/uninstall smoke tests on Windows 10/11, Debian/
+> Ubuntu, and an RPM distro still require dedicated runners/VMs.
+
 ## Architecture
 
 ```text

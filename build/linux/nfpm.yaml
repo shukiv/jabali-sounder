@@ -1,0 +1,52 @@
+# nfpm config for the Jabali Sounder desktop app (.deb + .rpm). Build with:
+#   SND_VERSION=0.5.11 nfpm pkg -f build/linux/nfpm.yaml -p deb --target out/
+#   SND_VERSION=0.5.11 nfpm pkg -f build/linux/nfpm.yaml -p rpm --target out/
+# Expects the desktop binary staged at ./bin/jabali-sounder-desktop.
+name: jabali-sounder
+arch: amd64
+platform: linux
+version: ${SND_VERSION}
+version_schema: none
+section: net
+priority: optional
+maintainer: Jabali Panel <noreply@jabali-panel.com>
+description: |
+  Jabali Sounder — standalone desktop control plane for Jabali Panel servers.
+  Enroll panels, monitor fleet health and resources, manage domains/mail, and
+  run maintenance from a self-contained local application (own SQLite database).
+vendor: Jabali Panel
+homepage: https://github.com/shukiv/jabali-sounder
+license: Proprietary
+
+# Runtime webview dependencies are declared so they resolve at install time
+# rather than failing only at first launch.
+depends:
+  - libwebkit2gtk-4.1-0
+  - libgtk-3-0
+overrides:
+  rpm:
+    depends:
+      - webkit2gtk4.1
+      - gtk3
+
+contents:
+  - src: ./bin/jabali-sounder-desktop
+    dst: /usr/bin/jabali-sounder-desktop
+    file_info:
+      mode: 0755
+  - src: ./build/linux/jabali-sounder.desktop
+    dst: /usr/share/applications/jabali-sounder.desktop
+  - src: ./build/linux/icons/jabali-sounder-16.png
+    dst: /usr/share/icons/hicolor/16x16/apps/jabali-sounder.png
+  - src: ./build/linux/icons/jabali-sounder-32.png
+    dst: /usr/share/icons/hicolor/32x32/apps/jabali-sounder.png
+  - src: ./build/linux/icons/jabali-sounder-48.png
+    dst: /usr/share/icons/hicolor/48x48/apps/jabali-sounder.png
+  - src: ./build/linux/icons/jabali-sounder-64.png
+    dst: /usr/share/icons/hicolor/64x64/apps/jabali-sounder.png
+  - src: ./build/linux/icons/jabali-sounder-128.png
+    dst: /usr/share/icons/hicolor/128x128/apps/jabali-sounder.png
+  - src: ./build/linux/icons/jabali-sounder-256.png
+    dst: /usr/share/icons/hicolor/256x256/apps/jabali-sounder.png
+  - src: ./build/linux/icons/jabali-sounder-512.png
+    dst: /usr/share/icons/hicolor/512x512/apps/jabali-sounder.png

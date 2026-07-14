@@ -299,9 +299,70 @@ jobs:
           files: out/*
           fail_on_unmatched_files: true
 
+  # Desktop installers (SND-95): Linux .deb/.rpm via nfpm + a per-user Windows
+  # NSIS setup .exe. Built from the raw desktop binaries produced by the `build`
+  # matrix; the portable binaries stay published alongside these.
+  installers:
+    name: build (desktop-installers)
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install packaging tools (nfpm + NSIS)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nsis
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+      - name: Download desktop binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dl
+      - name: Build installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          V="${GITHUB_REF_NAME#v}"; case "$V" in [0-9]*) ;; *) V="0.0.0" ;; esac
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          mkdir -p bin out
+
+          # --- Linux .deb + .rpm (nfpm) ---
+          lin="$(find dl -type f -name 'jabali-sounder-linux-amd64*' ! -name '*.deb' ! -name '*.rpm' | head -1)"
+          test -n "$lin"
+          cp "$lin" bin/jabali-sounder-desktop
+          chmod +x bin/jabali-sounder-desktop
+          SND_VERSION="$V" nfpm pkg -f build/linux/nfpm.yaml -p deb --target out/
+          SND_VERSION="$V" nfpm pkg -f build/linux/nfpm.yaml -p rpm --target out/
+
+          # --- Windows per-user NSIS installer ---
+          win="$(find dl -type f -name 'jabali-sounder-windows-amd64*.exe' | head -1)"
+          test -n "$win"
+          cp "$win" build/windows/jabali-sounder-desktop.exe
+          cp manager-api/cmd/desktop/app.ico build/windows/app.ico
+          ( cd build/windows && makensis -DVERSION="$V" -DOUTFILE="../../out/jabali-sounder-setup-${V}-amd64.exe" installer.nsi )
+          rm -f build/windows/jabali-sounder-desktop.exe build/windows/app.ico
+
+          echo "----- installers -----"; ls -la out/
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-installers
+          path: out/*
+          if-no-files-found: error
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
   checksums:
     name: checksums
-    needs: [build, server, android]
+    needs: [build, server, android, installers]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

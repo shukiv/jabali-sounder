@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Jabali Sounder
+GenericName=Server Control Plane
+Comment=Central control plane for Jabali Panel servers
+Exec=jabali-sounder-desktop
+Icon=jabali-sounder
+Terminal=false
+Categories=Network;System;Monitor;
+Keywords=jabali;panel;sounder;server;monitoring;
+StartupWMClass=Jabali Sounder
