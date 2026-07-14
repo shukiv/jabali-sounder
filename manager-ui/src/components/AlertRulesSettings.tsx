@@ -20,6 +20,7 @@ const METRIC_LABEL: Record<string, string> = {
   ram: "RAM %",
   disk: "Disk %",
   load1: "Load (1m)",
+  service_down: "Service down",
 };
 
 const SEV_COLOR: Record<string, string> = {
@@ -62,7 +63,7 @@ export default function AlertRulesSettings() {
     setBusy(true);
     try {
       await apiClient.put(`/admin/alert-rules/${editing.metric}`, {
-        threshold: values.threshold,
+        threshold: editing.metric === "service_down" ? 0 : values.threshold,
         duration_seconds: values.duration_seconds,
         severity: values.severity,
         enabled: values.enabled,
@@ -83,9 +84,11 @@ export default function AlertRulesSettings() {
       title: "Fires when",
       key: "cond",
       render: (_: unknown, r: AlertRule) =>
-        r.metric === "load1"
-          ? `> ${r.threshold} for ${r.duration_seconds}s`
-          : `> ${r.threshold}% for ${r.duration_seconds}s`,
+        r.metric === "service_down"
+          ? `Any service not healthy for ${r.duration_seconds}s`
+          : r.metric === "load1"
+            ? `> ${r.threshold} for ${r.duration_seconds}s`
+            : `> ${r.threshold}% for ${r.duration_seconds}s`,
     },
     { title: "Severity", dataIndex: "severity", key: "severity", render: (s: string) => <SeverityTag severity={s} /> },
     {
@@ -135,9 +138,16 @@ export default function AlertRulesSettings() {
         okText="Save"
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="threshold" label="Threshold" rules={[{ required: true }]}>
-            <InputNumber min={0} style={{ width: "100%" }} />
-          </Form.Item>
+          {editing?.metric === "service_down" ? (
+            <Paragraph type="secondary" style={{ marginTop: 0 }}>
+              Fires when any managed-server service reports a non-healthy status
+              (stopped, failed, or degraded) for the duration below.
+            </Paragraph>
+          ) : (
+            <Form.Item name="threshold" label="Threshold" rules={[{ required: true }]}>
+              <InputNumber min={0} style={{ width: "100%" }} />
+            </Form.Item>
+          )}
           <Form.Item name="duration_seconds" label="Sustained for (seconds)" rules={[{ required: true }]}>
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>

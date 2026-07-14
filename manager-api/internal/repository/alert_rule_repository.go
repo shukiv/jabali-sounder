@@ -78,6 +78,8 @@ func defaultRules(now time.Time) []models.AlertRule {
 		mk("ram", 90, 120, models.SeverityWarning, true),
 		mk("disk", 90, 0, models.SeverityWarning, true),
 		mk("load1", 8, 120, models.SeverityWarning, false),
+		// Any managed-server service reported not-healthy for 2 min (SND: service-down).
+		mk("service_down", 0, 120, models.SeverityCritical, true),
 	}
 }
 

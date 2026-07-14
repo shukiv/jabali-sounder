@@ -465,7 +465,122 @@ func (p *Poller) pollServer(ctx context.Context, s models.Server) {
 	p.maybeAlert(ctx, s, status, cred, message)
 	p.checkCert(ctx, s)
 	p.recordMetrics(ctx, s, metrics)
+	p.evaluateServiceRules(ctx, s, metrics, p.cfg.Now())
 	p.maybeRemediate(ctx, s, healthy, secret)
+}
+
+// serviceBad reports whether a panel-reported service status is a problem worth
+// alerting on. "unknown"/"healthy" (and empty) never alert; everything else
+// (stopped, failed, degraded, critical, down, inactive) does.
+func serviceBad(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "", "healthy", "ok", "running", "unknown":
+		return false
+	default:
+		return true
+	}
+}
+
+// evaluateServiceRules opens/resolves one incident per managed-server service
+// whose panel-reported health is not healthy, gated by the enabled
+// "service_down" alert rule and its sustained duration (SND: service-down
+// notifications). Deduped per (server, service); dispatched to alert channels.
+func (p *Poller) evaluateServiceRules(ctx context.Context, s models.Server, st *remote.ServerStatusResp, now time.Time) {
+	if p.cfg.Notifications == nil || st == nil || len(st.Services) == 0 {
+		return
+	}
+	var rule *models.AlertRule
+	for _, r := range p.enabledRules(ctx) {
+		if r.Metric == "service_down" {
+			rc := r
+			rule = &rc
+			break
+		}
+	}
+	if rule == nil {
+		return // rule disabled — no service alerting
+	}
+
+	for _, svc := range st.Services {
+		if svc.Name == "" {
+			continue
+		}
+		kind := "service_down:" + svc.Name
+		key := s.ID + "|svc:" + svc.Name
+
+		if serviceBad(svc.Status) {
+			p.breachMu.Lock()
+			since, tracking := p.breachSince[key]
+			if !tracking {
+				p.breachSince[key] = now
+				since = now
+			}
+			p.breachMu.Unlock()
+			if now.Sub(since) < time.Duration(rule.DurationSeconds)*time.Second {
+				continue // down, but not yet for the required duration
+			}
+			if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, kind); exists {
+				continue
+			}
+			if p.suppressed(ctx, s, now) {
+				continue
+			}
+			if muted, _ := p.isMuted(ctx, s.ID, kind); muted {
+				continue
+			}
+			msg := serviceMessage(svc.Name, svc.Status, svc.Reason)
+			_ = p.cfg.Notifications.Create(ctx, &models.Notification{
+				ID:         ids.NewULID(),
+				Kind:       kind,
+				ServerID:   s.ID,
+				ServerName: s.Name,
+				Metric:     "service_down",
+				Severity:   rule.Severity,
+				Message:    msg,
+				CreatedAt:  now.UTC(),
+			})
+			p.cfg.Log.Info("poller: service incident", "server", s.Name, "service", svc.Name, "status", svc.Status)
+			p.dispatch(ctx, alert.Event{
+				Kind:       alert.KindDown,
+				ServerID:   s.ID,
+				ServerName: s.Name,
+				BaseURL:    s.BaseURL,
+				Status:     string(s.Status),
+				Message:    msg,
+				At:         now.UTC(),
+			}, rule.Severity, &s, now)
+			continue
+		}
+
+		// Healthy again: clear tracking and resolve any open incident.
+		p.breachMu.Lock()
+		_, was := p.breachSince[key]
+		delete(p.breachSince, key)
+		p.breachMu.Unlock()
+		if !was {
+			continue
+		}
+		if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, kind); exists {
+			_ = p.cfg.Notifications.ResolveActive(ctx, s.ID, kind)
+			p.dispatch(ctx, alert.Event{
+				Kind:       alert.KindRecovered,
+				ServerID:   s.ID,
+				ServerName: s.Name,
+				BaseURL:    s.BaseURL,
+				Status:     string(s.Status),
+				Message:    svc.Name + " is healthy again",
+				At:         now.UTC(),
+			}, models.SeverityInfo, &s, now)
+		}
+	}
+}
+
+func serviceMessage(name, status, reason string) string {
+	msg := fmt.Sprintf("service %s is %s", name, strings.ToLower(status))
+	if reason != "" {
+		msg += " (" + reason + ")"
+	}
+	return msg
 }
 
 // recordMetrics stores a compact resource-usage sample when the panel reported
