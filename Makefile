@@ -1,6 +1,6 @@
 .PHONY: help build run test test-short test-coverage lint fmt vet tidy clean \
 	test-ui test-e2e test-all ui-install ui-build migrate-up migrate-down \
-	desktop-stage desktop-build server-stage server-build \
+	desktop-stage desktop-build windows-resource server-stage server-build \
 	android-stage android-lib android-apk docker-build docker-run
 
 GO         := go
@@ -81,6 +81,9 @@ desktop-stage: ui-build ## Stage built SPA assets for the Wails desktop entrypoi
 	rm -rf manager-api/cmd/desktop/dist
 	mkdir -p manager-api/cmd/desktop/dist
 	cp -R manager-ui/dist/. manager-api/cmd/desktop/dist/
+
+windows-resource: ## Regenerate the embedded Windows icon + version resource (.syso) from app.ico. Requires goversioninfo + a VERSION like 0.5.11.
+	cd manager-api/cmd/desktop && goversioninfo -o resource_windows_amd64.syso -platform-specific=false versioninfo.json
 
 desktop-build: desktop-stage ## Build the local standalone desktop binary for the current OS
 	mkdir -p bin

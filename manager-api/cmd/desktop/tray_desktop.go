@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -43,6 +44,19 @@ func trayHostAvailable() bool {
 
 //go:embed tray_icon.png
 var trayIcon []byte
+
+// Windows notification-area icons need an opaque light background to stay legible
+// against light/dark taskbar themes (SND-93); Linux/macOS keep the standard asset.
+//
+//go:embed tray_icon_windows.png
+var trayIconWindows []byte
+
+func trayIconBytes() []byte {
+	if runtime.GOOS == "windows" {
+		return trayIconWindows
+	}
+	return trayIcon
+}
 
 // desktopPrefs persists desktop-only UI preferences next to the database.
 type desktopPrefs struct {
@@ -108,7 +122,7 @@ func setupTray(b *Bridge, window *application.WebviewWindow) {
 	}
 
 	tray := app.SystemTray.New()
-	tray.SetIcon(trayIcon)
+	tray.SetIcon(trayIconBytes())
 	tray.SetTooltip("Jabali Sounder")
 
 	menu := app.NewMenu()
