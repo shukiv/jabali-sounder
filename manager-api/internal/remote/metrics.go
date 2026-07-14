@@ -24,16 +24,18 @@ type ServerStatusResp struct {
 	Alerts  []ServerStatusAlert `json:"alerts,omitempty"`
 	// Services + Net are additive fields Sounder consumes when the managed Panel
 	// exposes them (JAB-150 / SND-80/81); absent today, rendered as unsupported.
-	Services []ServiceHealth `json:"services,omitempty"`
+	Services []ServiceHealth `json:"service_health,omitempty"`
 	Net      *NetTelemetry   `json:"net,omitempty"`
 }
 
 // ServiceHealth is one workload's health as reported by the managed Panel.
 type ServiceHealth struct {
-	Name        string `json:"name"`
-	Status      string `json:"status"` // healthy | degraded | failed
-	LastChecked string `json:"last_checked,omitempty"`
-	Reason      string `json:"reason,omitempty"`
+	Name          string `json:"name"`
+	Unit          string `json:"unit,omitempty"`
+	Status        string `json:"status"` // healthy | degraded | failed | stopped
+	Reason        string `json:"reason,omitempty"`
+	UptimeSeconds int64  `json:"uptime_seconds,omitempty"`
+	LastChecked   string `json:"last_checked,omitempty"`
 }
 
 // NetTelemetry is the managed server's network throughput + loss over a window.

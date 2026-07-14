@@ -20,12 +20,13 @@ const SERVICES: { id: string; label: string; caps: string[] }[] = [
   { id: "backup", label: "Backup agent", caps: ["backup"] },
 ];
 
-type ServiceState = "healthy" | "degraded" | "failed" | "unknown" | "unsupported";
+type ServiceState = "healthy" | "degraded" | "failed" | "stopped" | "unknown" | "unsupported";
 
 const STATE_COLOR: Record<ServiceState, string> = {
   healthy: "green",
   degraded: "gold",
   failed: "red",
+  stopped: "default",
   unknown: "default",
   unsupported: "default",
 };
@@ -34,8 +35,14 @@ function normStatus(s: string): ServiceState {
   const v = s.toLowerCase();
   if (v === "healthy" || v === "ok" || v === "running") return "healthy";
   if (v === "degraded" || v === "warning") return "degraded";
-  if (v === "failed" || v === "critical" || v === "stopped" || v === "down") return "failed";
+  if (v === "failed" || v === "critical" || v === "down") return "failed";
+  if (v === "stopped" || v === "inactive") return "stopped";
   return "unknown";
+}
+
+function prettyName(name: string): string {
+  const up = new Set(["dns", "ssh", "api", "php"]);
+  return up.has(name.toLowerCase()) ? name.toUpperCase() : name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 function fmtRate(bps?: number): string {
@@ -63,7 +70,7 @@ export default function MonitorRowDetails({ entry }: Props) {
   const latency = entry.api_latency_ms;
   const lastHb = entry.server.last_heartbeat_at;
 
-  const svcByName = new Map((entry.services || []).map((s) => [s.name.toLowerCase(), s]));
+  const reported = entry.services || [];
   const net = entry.net;
   const unsupportedTag = <Tag>unsupported</Tag>;
 
@@ -72,32 +79,38 @@ export default function MonitorRowDetails({ entry }: Props) {
       <div>
         <Text strong>Service health</Text>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-          {SERVICES.map((svc) => {
-            const real = svcByName.get(svc.id);
-            let st: ServiceState;
-            let tip: string;
-            if (real) {
-              st = normStatus(real.status);
-              tip = [real.reason, real.last_checked ? `checked ${fmtAge(real.last_checked)}` : ""]
-                .filter(Boolean)
-                .join(" · ") || "Reported by the managed Panel.";
-            } else if (serverCaps && svc.caps.some((c) => serverCaps.includes(c))) {
-              st = "unknown";
-              tip = "Supported, but the Panel API does not yet report a live status.";
-            } else {
-              st = "unsupported";
-              tip = "Not reported by this server's capabilities.";
-            }
-            return (
-              <Tooltip key={svc.id} title={tip}>
-                <Tag color={STATE_COLOR[st]}>
-                  {svc.label}: {st}
-                </Tag>
-              </Tooltip>
-            );
-          })}
+          {reported.length > 0
+            ? reported.map((sv) => {
+                const st = normStatus(sv.status);
+                const tip =
+                  [sv.reason, sv.last_checked ? `checked ${fmtAge(sv.last_checked)}` : ""]
+                    .filter(Boolean)
+                    .join(" · ") || "Reported by the managed Panel.";
+                return (
+                  <Tooltip key={sv.name} title={tip}>
+                    <Tag color={STATE_COLOR[st]}>
+                      {prettyName(sv.name)}: {st === "unknown" ? sv.status : st}
+                    </Tag>
+                  </Tooltip>
+                );
+              })
+            : SERVICES.map((svc) => {
+                const st: ServiceState =
+                  serverCaps && svc.caps.some((c) => serverCaps.includes(c)) ? "unknown" : "unsupported";
+                const tip =
+                  st === "unknown"
+                    ? "Supported, but the Panel API does not yet report a live status."
+                    : "Not reported by this server's capabilities.";
+                return (
+                  <Tooltip key={svc.id} title={tip}>
+                    <Tag color={STATE_COLOR[st]}>
+                      {svc.label}: {st}
+                    </Tag>
+                  </Tooltip>
+                );
+              })}
         </div>
-        {entry.services && entry.services.length > 0 ? null : (
+        {reported.length > 0 ? null : (
           <Text type="secondary" style={{ fontSize: 12 }}>
             Per-service health is capability-aware. Live service status arrives once the managed Panel API exposes it.
           </Text>
