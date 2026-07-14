@@ -118,6 +118,10 @@ func main() {
 		StartState:       application.WindowStateMaximised,
 		BackgroundColour: application.NewRGBA(20, 20, 20, 255),
 		URL:              "/",
+		// Disable the native webview right-click menu (Reload/Inspect/Back) so the
+		// desktop app feels native. This is a desktop-only Wails option — the web
+		// build served by cmd/server is plain Chrome and keeps its normal menu.
+		DefaultContextMenuDisabled: true,
 		// Webview hardware-acceleration policy (Linux/WebKitGTK): accelerated
 		// when a GPU is present, software otherwise; see webviewGpuPolicy().
 		Linux: application.LinuxWindow{
