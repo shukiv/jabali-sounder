@@ -334,6 +334,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: dl
+          pattern: "*-amd64"
       - name: Build installers
         shell: bash
         run: |
@@ -410,6 +411,9 @@ jobs:
           fi
       - name: Build and push image
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           push: ${{ steps.meta.outputs.push }}
