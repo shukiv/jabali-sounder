@@ -1,16 +1,22 @@
 # Jabali Sounder — single-container deployment (SQLite on a named volume).
 #
-#   JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d --build
+# Download this file and start it (no source checkout needed):
+#   curl -fsSL -O https://raw.githubusercontent.com/shukiv/jabali-sounder/main/docker-compose.yml
+#   JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d
 #
-# Then open http://localhost:8484 and log in as `admin`. Put a TLS reverse
-# proxy in front for anything public — the app serves plain HTTP.
+# Then open http://localhost:8484 and log in as `admin`. Put a TLS reverse proxy
+# in front for anything public — the app serves plain HTTP.
 services:
   sounder:
-    build:
-      context: .
-      args:
-        VERSION: compose
-    image: jabali-sounder:latest
+    image: ghcr.io/shukiv/jabali-sounder:latest
+    # Prefer a specific release? Use ghcr.io/shukiv/jabali-sounder:0.5.16
+    #
+    # To build from a source checkout instead of pulling the image, comment out
+    # the `image:` line above and uncomment:
+    # build:
+    #   context: .
+    #   args:
+    #     VERSION: compose
     restart: unless-stopped
     ports:
       - "8484:8484"

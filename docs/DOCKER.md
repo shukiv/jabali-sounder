@@ -5,24 +5,43 @@ one port, backed by SQLite on a persistent volume — no external database
 required. This is the same headless server binary the `install.sh` one-liner
 installs, packaged for containers.
 
-## Quick start
+## Quick start (prebuilt image — no source checkout)
+
+Each release publishes an image to GitHub Container Registry. Just run it:
 
 ```bash
-JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d --build
+docker run -d --name jabali-sounder -p 8484:8484 -v sounder-data:/data \
+  -e JABALI_SOUNDER_ADMIN_PASSWORD=change-me \
+  ghcr.io/shukiv/jabali-sounder:latest
 ```
 
-Or with plain Docker:
+Or with Docker Compose — download the compose file, then start it:
 
 ```bash
+curl -fsSL -O https://raw.githubusercontent.com/shukiv/jabali-sounder/main/docker-compose.yml
+JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d
+```
+
+Open `http://localhost:8484` and log in as `admin` with that password.
+
+Image tags: `ghcr.io/shukiv/jabali-sounder:latest` (newest release) and
+`:X.Y.Z` (pinned to a release, e.g. `:0.5.16`).
+
+## Build from source (optional)
+
+To build the image yourself from a checkout instead of pulling it:
+
+```bash
+git clone https://github.com/shukiv/jabali-sounder.git
+cd jabali-sounder
 docker build -t jabali-sounder .
 docker run -d --name jabali-sounder -p 8484:8484 -v sounder-data:/data \
   -e JABALI_SOUNDER_ADMIN_PASSWORD=change-me jabali-sounder
 ```
 
-Open `http://localhost:8484` and log in as `admin` with that password.
-
-`make docker-build` / `make docker-run` wrap the same flow with git-derived
-version stamping.
+`make docker-build` / `make docker-run` wrap this with git-derived version
+stamping. (The committed `docker-compose.yml` pulls the published image by
+default; uncomment its `build:` block to build from source instead.)
 
 ## Image layout
 
