@@ -54,14 +54,14 @@ jobs:
             cgo_ldflags: "-framework UniformTypeIdentifiers"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -161,7 +161,7 @@ jobs:
       # Always publish artifacts — makes manual (workflow_dispatch) runs useful
       # for testing without cutting a Release.
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.label }}
           path: out/*
@@ -170,7 +170,7 @@ jobs:
       # Only publish to a GitHub Release on a version-tag push.
       - name: Attach to Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: out/*
           fail_on_unmatched_files: true
@@ -184,12 +184,12 @@ jobs:
     name: build (server-linux-amd64)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -222,14 +222,14 @@ jobs:
           echo "server raw size: $(stat -c%s out/jabali-sounder-server-linux-amd64) bytes"
           ls -la out/
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: server-linux-amd64
           path: out/jabali-sounder-server-linux-amd64*
           if-no-files-found: error
       - name: Attach to Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: out/jabali-sounder-server-linux-amd64*
           fail_on_unmatched_files: true
@@ -245,20 +245,20 @@ jobs:
     name: build (android)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: manager-ui/package-lock.json
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -295,14 +295,14 @@ jobs:
           echo "apk size: $(stat -c%s out/*.apk) bytes"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android
           path: out/*
 
       - name: Attach to Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: out/*
           fail_on_unmatched_files: true
@@ -315,8 +315,8 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -326,7 +326,7 @@ jobs:
           sudo apt-get install -y nsis
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
       - name: Download desktop binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dl
       - name: Build installers
@@ -360,14 +360,14 @@ jobs:
 
           echo "----- installers -----"; ls -la out/
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-installers
           path: out/*
           if-no-files-found: error
       - name: Attach to Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: out/*
           fail_on_unmatched_files: true
@@ -380,7 +380,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dl
       - name: Compute checksums
@@ -396,7 +396,7 @@ jobs:
           echo "----- checksums.txt -----"
           cat checksums.txt
       - name: Attach checksums to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: checksums.txt
           fail_on_unmatched_files: true
