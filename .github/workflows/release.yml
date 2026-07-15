@@ -409,14 +409,48 @@ jobs:
             echo "tags=${img}:ci" >> "$GITHUB_OUTPUT"
             echo "push=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Build and push image
+      # Build once into the local daemon so we can smoke-test the actual
+      # image before publishing (JAB-151 acceptance: build AND smoke-test).
+      - name: Build image (load for smoke test)
         uses: docker/build-push-action@v6
         env:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
-          push: ${{ steps.meta.outputs.push }}
+          load: true
+          tags: jabali-sounder:smoke
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+      - name: Smoke-test the image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name sounder-smoke -p 8484:8484 jabali-sounder:smoke
+          echo "waiting for /health to come up..."
+          ok=false
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8484/health >/dev/null 2>&1; then ok=true; break; fi
+            sleep 2
+          done
+          docker logs sounder-smoke || true
+          docker rm -f sounder-smoke >/dev/null 2>&1 || true
+          if [ "$ok" != true ]; then
+            echo "::error::sounder container never became healthy on /health"
+            exit 1
+          fi
+          echo "smoke test passed: /health responded"
+      # Publish the verified image (cache hit → fast) on a version tag.
+      - name: Push image
+        if: steps.meta.outputs.push == 'true'
+        uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: .
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             VERSION=${{ github.ref_name }}
