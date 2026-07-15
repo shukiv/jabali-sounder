@@ -21,7 +21,8 @@ android {
         // Parse only the leading digits of each part so non-numeric suffixes
         // (e.g. a "0.0.0-dev" dispatch build) still yield a valid versionCode.
         def numPart = { s -> def m = (s =~ /^\d+/); m.find() ? m.group().toInteger() : 0 }
-        versionCode (vp.size() >= 3 ? numPart(vp[0])*10000 + numPart(vp[1])*100 + numPart(vp[2]) : 1)
+        def vCode = vp.size() >= 3 ? numPart(vp[0])*10000 + numPart(vp[1])*100 + numPart(vp[2]) : 1
+        versionCode Math.max(1, vCode)
         versionName vName
 
         // Configure supported ABIs
