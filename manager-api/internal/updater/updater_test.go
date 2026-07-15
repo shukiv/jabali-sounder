@@ -56,9 +56,10 @@ func TestAssetFor(t *testing.T) {
 
 func githubStub(t *testing.T, tag string) *Client {
 	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"tag_name":"` + tag + `","html_url":"https://x/releases/` + tag + `","published_at":"2026-07-11T00:00:00Z","assets":[{"name":"jabali-sounder-linux-amd64-` + tag[1:] + `","browser_download_url":"https://x/a","size":100}]}`))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The updater resolves the latest tag from the releases/latest redirect.
+		w.Header().Set("Location", "https://github.com/owner/repo/releases/tag/"+tag)
+		w.WriteHeader(http.StatusFound)
 	}))
 	t.Cleanup(srv.Close)
 	c := New("owner/repo")
@@ -84,9 +85,6 @@ func TestCheckUpdateAvailable(t *testing.T) {
 	}
 	if !st.UpdateAvailable || st.Latest != "v0.5.0" {
 		t.Fatalf("want update to v0.5.0, got %+v", st)
-	}
-	if len(st.Assets) != 1 {
-		t.Fatalf("assets not surfaced: %+v", st.Assets)
 	}
 }
 
@@ -116,7 +114,8 @@ func TestCheckCaches(t *testing.T) {
 	var hits int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits++
-		_, _ = w.Write([]byte(`{"tag_name":"v0.5.0"}`))
+		w.Header().Set("Location", "https://github.com/owner/repo/releases/tag/v0.5.0")
+		w.WriteHeader(http.StatusFound)
 	}))
 	defer srv.Close()
 	c := New("owner/repo")

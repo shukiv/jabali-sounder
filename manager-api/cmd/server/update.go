@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -19,7 +20,8 @@ import (
 // NOT restart the service — the running process keeps executing the old (now
 // replaced) binary until a restart, so we print that instruction.
 func newUpdateCmd() *cobra.Command {
-	return &cobra.Command{
+	var noRestart bool
+	cmd := &cobra.Command{
 		Use:          "update",
 		Short:        "Download and install the latest release, replacing this binary",
 		SilenceUsage: true,
@@ -48,8 +50,31 @@ func newUpdateCmd() *cobra.Command {
 				_ = os.Remove(staged.Path)
 				return fmt.Errorf("install failed (need write access to %s? try sudo): %w", exePath, err)
 			}
-			cmd.Printf("Updated %s to %s.\nRestart the service to load it:  systemctl restart jabali-sounder\n", exePath, staged.Version)
+			// A replaced binary only takes effect once the running process
+			// restarts (until then it serves the old, now-deleted inode). Restart
+			// the systemd unit automatically when one manages this install.
+			if !noRestart && restartService() {
+				cmd.Printf("Updated %s to %s and restarted the jabali-sounder service.\n", exePath, staged.Version)
+			} else {
+				cmd.Printf("Updated %s to %s.\nRestart the service to load it:  systemctl restart jabali-sounder\n", exePath, staged.Version)
+			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&noRestart, "no-restart", false, "do not restart the systemd service after updating")
+	return cmd
+}
+
+// restartService restarts the jabali-sounder systemd unit when systemd manages
+// an active install, so the freshly installed binary is loaded. Returns false
+// (leaving the caller to print the manual instruction) when there is no active
+// unit or systemctl is unavailable.
+func restartService() bool {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		return false
+	}
+	if err := exec.Command("systemctl", "is-active", "--quiet", "jabali-sounder").Run(); err != nil {
+		return false // not managed by an active unit here
+	}
+	return exec.Command("systemctl", "restart", "jabali-sounder").Run() == nil
 }

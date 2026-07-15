@@ -50,14 +50,12 @@ func TestDownloadAndStageVerifiesChecksum(t *testing.T) {
 	assetName := "jabali-sounder-linux-amd64-0.6.0"
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/repos/o/r/releases/latest", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"tag_name":"v0.6.0","assets":[
-			{"name":"` + assetName + `","browser_download_url":"http://REPL/asset"},
-			{"name":"checksums.txt","browser_download_url":"http://REPL/sums"}
-		]}`))
+	mux.HandleFunc("/o/r/releases/latest", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "https://github.com/o/r/releases/tag/v0.6.0")
+		w.WriteHeader(http.StatusFound)
 	})
-	mux.HandleFunc("/asset", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(payload) })
-	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/o/r/releases/latest/download/"+assetName, func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(payload) })
+	mux.HandleFunc("/o/r/releases/latest/download/checksums.txt", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(sumHex + "  " + assetName + "\n"))
 	})
 	srv := httptest.NewServer(mux)
@@ -87,14 +85,12 @@ func TestDownloadAndStageVerifiesChecksum(t *testing.T) {
 func TestDownloadAndStageRejectsBadChecksum(t *testing.T) {
 	assetName := "jabali-sounder-linux-amd64-0.6.0"
 	mux := http.NewServeMux()
-	mux.HandleFunc("/repos/o/r/releases/latest", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"tag_name":"v0.6.0","assets":[
-			{"name":"` + assetName + `","browser_download_url":"http://REPL/asset"},
-			{"name":"checksums.txt","browser_download_url":"http://REPL/sums"}
-		]}`))
+	mux.HandleFunc("/o/r/releases/latest", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "https://github.com/o/r/releases/tag/v0.6.0")
+		w.WriteHeader(http.StatusFound)
 	})
-	mux.HandleFunc("/asset", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("tampered")) })
-	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/o/r/releases/latest/download/"+assetName, func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("tampered")) })
+	mux.HandleFunc("/o/r/releases/latest/download/checksums.txt", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("0000000000000000000000000000000000000000000000000000000000000000  " + assetName + "\n"))
 	})
 	srv := httptest.NewServer(mux)

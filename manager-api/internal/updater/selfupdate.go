@@ -39,48 +39,53 @@ func (c *Client) DownloadAndStage(ctx context.Context, current, prefix, goos, go
 	if !isDev(current) && Compare(current, rel.TagName) >= 0 {
 		return StagedUpdate{}, fmt.Errorf("already up to date (%s)", current)
 	}
-	asset, ok := AssetFor(rel.Assets, prefix, goos, goarch)
-	if !ok {
-		return StagedUpdate{}, fmt.Errorf("no release asset for %s/%s", goos, goarch)
-	}
-	sums, err := c.fetchChecksums(ctx, rel.Assets)
+	assetName := DownloadAssetName(prefix, goos, goarch, rel.TagName)
+	base := "https://github.com/" + c.Repo + "/releases/latest/download"
+
+	sums, err := c.fetchChecksums(ctx, base+"/checksums.txt")
 	if err != nil {
 		return StagedUpdate{}, err
 	}
-	want := sums[asset.Name]
+	want := sums[assetName]
 	if want == "" {
-		return StagedUpdate{}, fmt.Errorf("no checksum published for %s", asset.Name)
+		return StagedUpdate{}, fmt.Errorf("no checksum published for %s", assetName)
 	}
 
-	staged := filepath.Join(stageDir, ".jabali-sounder-update-"+asset.Name)
-	sum, err := c.downloadTo(ctx, asset.URL, staged)
+	staged := filepath.Join(stageDir, ".jabali-sounder-update-"+assetName)
+	sum, err := c.downloadTo(ctx, base+"/"+assetName, staged)
 	if err != nil {
 		return StagedUpdate{}, err
 	}
 	if !strings.EqualFold(sum, want) {
 		_ = os.Remove(staged)
-		return StagedUpdate{}, fmt.Errorf("checksum mismatch for %s (got %s, want %s)", asset.Name, sum, want)
+		return StagedUpdate{}, fmt.Errorf("checksum mismatch for %s (got %s, want %s)", assetName, sum, want)
 	}
 	if err := os.Chmod(staged, 0o755); err != nil {
 		_ = os.Remove(staged)
 		return StagedUpdate{}, fmt.Errorf("chmod staged: %w", err)
 	}
-	return StagedUpdate{Path: staged, Version: rel.TagName, AssetName: asset.Name}, nil
+	return StagedUpdate{Path: staged, Version: rel.TagName, AssetName: assetName}, nil
 }
 
-// fetchChecksums downloads and parses the release's checksums.txt asset into a
-// map of filename -> sha256 hex. Lines are "<sha256>  <filename>".
-func (c *Client) fetchChecksums(ctx context.Context, assets []Asset) (map[string]string, error) {
-	var url string
-	for _, a := range assets {
-		if a.Name == "checksums.txt" {
-			url = a.URL
-			break
-		}
+// DownloadAssetName returns the release-asset filename for goos/goarch at the
+// given release tag, matching the release-workflow naming
+// (<prefix>-<os>-<arch>-<version>[.exe]). Every platform publishes a
+// version-suffixed asset, so this works via releases/latest/download/<name>.
+func DownloadAssetName(prefix, goos, goarch, tag string) string {
+	osTag := map[string]string{"darwin": "macos", "windows": "windows", "linux": "linux"}[goos]
+	if osTag == "" {
+		osTag = goos
 	}
-	if url == "" {
-		return nil, fmt.Errorf("release has no checksums.txt")
+	name := prefix + "-" + osTag + "-" + goarch + "-" + strings.TrimPrefix(tag, "v")
+	if goos == "windows" {
+		name += ".exe"
 	}
+	return name
+}
+
+// fetchChecksums downloads and parses the release's checksums.txt (from a
+// download-path URL) into a map of filename -> sha256 hex.
+func (c *Client) fetchChecksums(ctx context.Context, url string) (map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("checksums request: %w", err)

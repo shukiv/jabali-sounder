@@ -5,10 +5,8 @@ package updater
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -94,40 +92,48 @@ func (c *Client) latest(ctx context.Context, now time.Time) (*Release, error) {
 }
 
 func (c *Client) fetchLatest(ctx context.Context) (*Release, error) {
-	url := "https://api.github.com/repos/" + c.Repo + "/releases/latest"
+	tag, err := c.resolveLatestTag(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &Release{
+		TagName: tag,
+		HTMLURL: "https://github.com/" + c.Repo + "/releases/tag/" + tag,
+	}, nil
+}
+
+// resolveLatestTag reads the latest release tag from the public
+// github.com/<repo>/releases/latest redirect (Location: .../releases/tag/<tag>).
+// This deliberately avoids api.github.com, whose unauthenticated 60/hr rate limit
+// yields 403s on shared IPs — the same non-API path install.sh uses.
+func (c *Client) resolveLatestTag(ctx context.Context) (string, error) {
+	url := "https://github.com/" + c.Repo + "/releases/latest"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("updater request: %w", err)
+		return "", fmt.Errorf("updater request: %w", err)
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "jabali-sounder")
-	// Authenticate when a token is present to lift GitHub's 60/hr
-	// unauthenticated rate limit (which yields 403s on shared IPs).
-	if tok := firstEnv("JABALI_SOUNDER_GITHUB_TOKEN", "GITHUB_TOKEN"); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
-	resp, err := c.HTTPClient.Do(req)
+	// Don't follow the redirect; the tag is in the Location header. Copy the
+	// client so the (test-injectable) transport is preserved.
+	cl := *c.HTTPClient
+	cl.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := cl.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("updater fetch: %w", err)
+		return "", fmt.Errorf("updater fetch: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("no releases published")
+		return "", fmt.Errorf("no releases published")
 	}
-	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
-		if resp.Header.Get("X-RateLimit-Remaining") == "0" {
-			return nil, fmt.Errorf("GitHub API rate limit reached (unauthenticated 60/hr) — try again later, or set JABALI_SOUNDER_GITHUB_TOKEN")
-		}
-		return nil, fmt.Errorf("github returned HTTP %d (forbidden)", resp.StatusCode)
+	loc := resp.Header.Get("Location")
+	if resp.StatusCode < 300 || resp.StatusCode >= 400 || loc == "" {
+		return "", fmt.Errorf("could not resolve latest release (HTTP %d)", resp.StatusCode)
 	}
-	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("github returned HTTP %d", resp.StatusCode)
+	tag := loc[strings.LastIndex(loc, "/")+1:]
+	if !strings.HasPrefix(tag, "v") {
+		return "", fmt.Errorf("unexpected release tag %q", tag)
 	}
-	var rel Release
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return nil, fmt.Errorf("updater decode: %w", err)
-	}
-	return &rel, nil
+	return tag, nil
 }
 
 // Check compares the current build against the latest release. A dev/un-stamped
@@ -141,8 +147,6 @@ func (c *Client) Check(ctx context.Context, current string, now time.Time) (Stat
 	}
 	st.Latest = rel.TagName
 	st.ReleaseURL = rel.HTMLURL
-	st.PublishedAt = rel.PublishedAt
-	st.Assets = rel.Assets
 	if isDev(current) || rel.Draft {
 		return st, nil
 	}
@@ -217,14 +221,4 @@ func AssetFor(assets []Asset, prefix, goos, goarch string) (Asset, bool) {
 		}
 	}
 	return Asset{}, false
-}
-
-// firstEnv returns the first non-empty value among the named environment vars.
-func firstEnv(names ...string) string {
-	for _, n := range names {
-		if v := os.Getenv(n); v != "" {
-			return v
-		}
-	}
-	return ""
 }
