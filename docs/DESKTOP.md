@@ -18,6 +18,30 @@ There are **two different downloads** — do not confuse them:
 
 The `install.sh` one-liner installs the **server**, not this desktop app.
 
+## Always-latest download links
+
+Every release also publishes stable `-latest` aliases, so these URLs always
+resolve to the newest release (no need to bump the version in the link):
+
+```
+# Android
+https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-android-latest.apk
+# Desktop (Linux / Windows / macOS)
+https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-linux-amd64-latest
+https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-windows-amd64-latest.exe
+https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-macos-arm64-latest.dmg
+# Installers
+https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-setup-latest-amd64.exe
+https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-latest_amd64.deb
+https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-latest.x86_64.rpm
+# Headless server
+https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-server-linux-amd64
+```
+
+The `/releases/latest/download/` path is what makes it auto-update — GitHub
+redirects `latest` to the newest release. (A `/releases/download/<tag>/` link is
+pinned to that tag.)
+
 ## Desktop installers (SND-95)
 
 Each tagged release publishes OS-integrated installers alongside the raw

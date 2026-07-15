@@ -113,7 +113,10 @@ jobs:
           # Insert the version before any extension: name-<ver>[.exe].
           name="$(printf '%s' "${{ matrix.asset }}" | sed -E "s/(\.exe)?$/-${V}\1/")"
           cp "bin/${{ matrix.asset }}" "out/$name"
-          echo "packaged out/$name"
+          # Stable "latest" alias so releases/latest/download/<name>-latest[.exe] always resolves.
+          latest="$(printf '%s' "${{ matrix.asset }}" | sed -E "s/(\.exe)?$/-latest\1/")"
+          cp "bin/${{ matrix.asset }}" "out/$latest"
+          echo "packaged out/$name and out/$latest"
 
       # macOS: wrap the binary in a .app bundle (Info.plist + .icns) and a
       # drag-to-install .dmg. Also keep the raw binary for CLI users.
@@ -149,8 +152,10 @@ jobs:
           hdiutil create -volname "Jabali Sounder" -srcfolder dmgroot \
             -ov -format UDZO "out/jabali-sounder-macos-arm64-${VER}.dmg"
 
-          # Keep the raw binary too (versioned).
+          # Keep the raw binary too (versioned) + a stable "latest" alias.
           cp "bin/${{ matrix.asset }}" "out/${{ matrix.asset }}-${VER}"
+          cp "bin/${{ matrix.asset }}" "out/${{ matrix.asset }}-latest"
+          cp "out/jabali-sounder-macos-arm64-${VER}.dmg" "out/jabali-sounder-macos-arm64-latest.dmg"
           ls -la out/
 
       # Always publish artifacts — makes manual (workflow_dispatch) runs useful
@@ -213,6 +218,7 @@ jobs:
             -o "out/$NAME" ./manager-api/cmd/server
           # Keep the legacy unversioned name too (the installer references it).
           cp "out/$NAME" out/jabali-sounder-server-linux-amd64
+          cp "out/$NAME" out/jabali-sounder-server-linux-amd64-latest
           echo "server raw size: $(stat -c%s out/jabali-sounder-server-linux-amd64) bytes"
           ls -la out/
       - name: Upload build artifact
@@ -284,6 +290,8 @@ jobs:
           mkdir -p out
           cp build/android/app/build/outputs/apk/release/app-release.apk "out/jabali-sounder-android-${VER}.apk"
           cp build/android/app/build/outputs/bundle/release/app-release.aab "out/jabali-sounder-android-${VER}.aab"
+          cp "out/jabali-sounder-android-${VER}.apk" "out/jabali-sounder-android-latest.apk"
+          cp "out/jabali-sounder-android-${VER}.aab" "out/jabali-sounder-android-latest.aab"
           echo "apk size: $(stat -c%s out/*.apk) bytes"
 
       - name: Upload build artifacts
@@ -344,6 +352,11 @@ jobs:
           cp manager-api/cmd/desktop/app.ico build/windows/app.ico
           ( cd build/windows && makensis -DVERSION="$V" -DOUTFILE="../../out/jabali-sounder-setup-${V}-amd64.exe" installer.nsi )
           rm -f build/windows/jabali-sounder-desktop.exe build/windows/app.ico
+
+          # Stable "latest" aliases for all installers.
+          cp "out/jabali-sounder_${V}_amd64.deb" "out/jabali-sounder-latest_amd64.deb"
+          cp "out/jabali-sounder-${V}-1.x86_64.rpm" "out/jabali-sounder-latest.x86_64.rpm"
+          cp "out/jabali-sounder-setup-${V}-amd64.exe" "out/jabali-sounder-setup-latest-amd64.exe"
 
           echo "----- installers -----"; ls -la out/
       - name: Upload build artifacts
