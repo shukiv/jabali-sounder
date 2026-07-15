@@ -86,12 +86,15 @@ Grab the standalone desktop app for your platform from the
 [latest release](https://github.com/shukiv/jabali-sounder/releases/latest) — each
 file is version-stamped:
 
-| Platform | File on the release page |
-|----------|--------------------------|
-| Linux (x86-64) | `jabali-sounder-linux-amd64-<version>` |
-| Windows (x86-64) | `jabali-sounder-windows-amd64-<version>.exe` |
-| macOS (Apple Silicon) | `jabali-sounder-macos-arm64-<version>.dmg` |
-| Android (arm64 + x86-64) | `jabali-sounder-android-<version>.apk` |
+| Platform | Download (always the latest release) |
+|----------|--------------------------------------|
+| Linux (x86-64) | [`jabali-sounder-linux-amd64-latest`](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-linux-amd64-latest) |
+| Windows (x86-64) | [installer `.exe`](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-setup-latest-amd64.exe) · [portable](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-windows-amd64-latest.exe) |
+| macOS (Apple Silicon) | [`.dmg`](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-macos-arm64-latest.dmg) |
+| Android (arm64 + x86-64) | [`.apk`](https://github.com/shukiv/jabali-sounder/releases/latest/download/jabali-sounder-android-latest.apk) |
+
+These links always resolve to the newest release. Pinned per-version files are on
+the [releases page](https://github.com/shukiv/jabali-sounder/releases).
 
 All versions: [Releases](https://github.com/shukiv/jabali-sounder/releases).
 
@@ -138,34 +141,35 @@ For desktop use instead, grab a build from [Downloads](#downloads).
 
 ## Run with Docker
 
-A single container serves the API and the UI on one port, backed by SQLite on a
-persistent volume (no external database required):
+Each release publishes a container image to GitHub Container Registry — run it
+**without a source checkout**:
 
 ```bash
-JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d --build
+docker run -d --name jabali-sounder -p 8484:8484 -v sounder-data:/data \
+  -e JABALI_SOUNDER_ADMIN_PASSWORD=change-me \
+  ghcr.io/shukiv/jabali-sounder:latest
 ```
 
-Or with plain Docker:
+Or with Docker Compose — download the compose file, then start it:
 
 ```bash
-docker build -t jabali-sounder .
-docker run -d -p 8484:8484 -v sounder-data:/data \
-  -e JABALI_SOUNDER_ADMIN_PASSWORD=change-me jabali-sounder
+curl -fsSL -O https://raw.githubusercontent.com/shukiv/jabali-sounder/main/docker-compose.yml
+JABALI_SOUNDER_ADMIN_PASSWORD=change-me docker compose up -d
 ```
 
 Open `http://localhost:8484` and log in as `admin`. The entrypoint generates the
 encryption key + JWT secret on first run (persisted under `/data`), applies
 migrations, and bootstraps the admin from `JABALI_SOUNDER_ADMIN_PASSWORD`.
 
+- Image tags: `ghcr.io/shukiv/jabali-sounder:latest` (newest release) and
+  `:X.Y.Z` (pinned, e.g. `:0.5.16`).
 - Data (SQLite DB, `secrets.key`, `jwt.secret`) lives in the `/data` volume —
   back it up. Losing `secrets.key` makes sealed panel tokens unrecoverable.
 - Serves plain HTTP; front it with a TLS reverse proxy for anything public.
-- To use MariaDB instead of SQLite, see the commented service in
-  `docker-compose.yml` and set `JABALI_SOUNDER_DATABASE_DRIVER`/`_URL`.
-- `make docker-build` / `make docker-run` wrap the same flow with version stamping.
+- MariaDB instead of SQLite: see the commented service in `docker-compose.yml`.
+- Build from source instead of pulling: `docker build -t jabali-sounder .`
+  (or `make docker-build` / `make docker-run`, which add version stamping).
 
-The image is a ~33 MB Alpine build of the static server; it was verified
-end-to-end (provisioning, migrations, admin bootstrap, `/health`, login, SPA).
 Full guide — env vars, volumes/backup, MariaDB, TLS, health checks, rootless
 Podman — in [Docker](docs/DOCKER.md).
 
