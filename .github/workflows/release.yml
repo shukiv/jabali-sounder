@@ -324,7 +324,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y nsis
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+          # Install nfpm from a pinned prebuilt binary — `go install nfpm@latest`
+          # now requires a newer Go toolchain than go.mod pins.
+          NFPM_VERSION=2.47.0
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin nfpm
+          nfpm --version
       - name: Download desktop binaries
         uses: actions/download-artifact@v8
         with:
