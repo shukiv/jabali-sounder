@@ -20,6 +20,7 @@ import {
   useDeleteAdmin,
 } from "../hooks/useAdmins";
 import type { Admin } from "../types";
+import { sortable } from "../lib/tableSort";
 
 const ROLE_OPTIONS = [
   { label: "Viewer (read-only)", value: "viewer" },
@@ -127,7 +128,7 @@ export default function Team() {
       <Card>
         <Table<Admin>
           dataSource={admins || []}
-          columns={columns}
+          columns={sortable(columns)}
           rowKey="id"
           loading={isLoading}
           pagination={false}

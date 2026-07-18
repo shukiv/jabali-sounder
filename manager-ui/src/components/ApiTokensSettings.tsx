@@ -18,6 +18,7 @@ import {
 import { KeyOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -206,7 +207,7 @@ export default function ApiTokensSettings() {
       <Table<ApiToken>
         scroll={{ x: "max-content" }}
         dataSource={data || []}
-        columns={columns}
+        columns={sortable(columns)}
         rowKey="id"
         loading={isLoading}
         pagination={false}

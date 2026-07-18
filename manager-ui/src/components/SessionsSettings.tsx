@@ -1,6 +1,7 @@
 import { Card, Table, Button, Tag, Typography, App, Popconfirm } from "antd";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Paragraph } = Typography;
 
@@ -93,7 +94,7 @@ export default function SessionsSettings() {
       </Paragraph>
       <Table<Session>
         dataSource={data || []}
-        columns={columns}
+        columns={sortable(columns)}
         rowKey="id"
         loading={isLoading}
         pagination={{ pageSize: 5, hideOnSinglePage: true, size: "small" }}

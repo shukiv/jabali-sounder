@@ -4,6 +4,7 @@ import { AlertOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
 import { roleAtLeast } from "../hooks/useAuth";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Paragraph } = Typography;
 
@@ -122,7 +123,7 @@ export default function AlertRulesSettings() {
       <Table<AlertRule>
         scroll={{ x: "max-content" }}
         dataSource={data || []}
-        columns={columns}
+        columns={sortable(columns)}
         rowKey="metric"
         loading={isLoading}
         pagination={false}

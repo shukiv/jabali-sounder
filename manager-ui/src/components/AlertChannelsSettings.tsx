@@ -6,6 +6,7 @@ import { SendOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
 import { SeverityTag } from "./AlertRulesSettings";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -150,7 +151,7 @@ export default function AlertChannelsSettings() {
       <Table<Channel>
         scroll={{ x: "max-content" }}
         dataSource={data || []}
-        columns={columns}
+        columns={sortable(columns)}
         rowKey="id"
         loading={isLoading}
         pagination={false}

@@ -3,6 +3,7 @@ import { ReloadOutlined, SafetyOutlined, WarningOutlined, FileTextOutlined } fro
 import { StatCard } from "../components/StatCard";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../apiClient";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Text } = Typography;
 
@@ -85,7 +86,7 @@ export default function Policy() {
           <Table<Violation>
             scroll={{ x: "max-content" }}
             dataSource={data?.violations || []}
-            columns={columns}
+            columns={sortable(columns)}
             rowKey={(r) => r.server_id + r.check}
             loading={isLoading}
             size="small"

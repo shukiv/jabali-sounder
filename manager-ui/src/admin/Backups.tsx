@@ -2,6 +2,7 @@ import { Card, Table, Typography, Tag, Button, Space } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../apiClient";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Text } = Typography;
 
@@ -87,7 +88,7 @@ export default function Backups() {
           scroll={{ x: "max-content" }}
           style={{ marginTop: 16 }}
           dataSource={data || []}
-          columns={columns}
+          columns={sortable(columns)}
           rowKey="id"
           loading={isLoading}
           size="small"

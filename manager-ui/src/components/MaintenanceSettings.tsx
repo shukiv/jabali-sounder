@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs, { Dayjs } from "dayjs";
 import apiClient from "../apiClient";
 import { useServers } from "../hooks/useServers";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
@@ -131,7 +132,7 @@ export default function MaintenanceSettings() {
       <Table<Window>
         scroll={{ x: "max-content" }}
         dataSource={data || []}
-        columns={columns}
+        columns={sortable(columns)}
         rowKey="id"
         loading={isLoading}
         pagination={false}

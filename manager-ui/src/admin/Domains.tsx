@@ -6,6 +6,7 @@ import { useDomains } from "../hooks/useInventory";
 import { useServerAction } from "../hooks/useServers";
 import { roleAtLeast } from "../hooks/useAuth";
 import type { DomainRow } from "../hooks/useInventory";
+import { sortable } from "../lib/tableSort";
 
 const { Title } = Typography;
 
@@ -96,7 +97,7 @@ export default function Domains() {
         </Space>
         <Table<DomainRow>
           dataSource={filtered}
-          columns={canWrite ? [...columns, domainActionsCol] : columns}
+          columns={sortable(canWrite ? [...columns, domainActionsCol] : columns)}
           rowKey={(r) => r.server_id + ":" + r.id}
           loading={isLoading}
           pagination={{ pageSize: 50, showSizeChanger: true }}

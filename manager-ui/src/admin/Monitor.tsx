@@ -39,6 +39,7 @@ import { useMonitorHistory, useMonitorLive, useMonitorSummary } from "../hooks/u
 import { useCheckHealth, useDisableServer, useServers } from "../hooks/useServers";
 import { roleAtLeast } from "../hooks/useAuth";
 import { desktopBridge } from "../lib/desktop";
+import { compareValues } from "../lib/tableSort";
 import type {
   MetricSample,
   MonitorLiveEntry,
@@ -206,6 +207,7 @@ export default function Monitor() {
       title: "Server",
       key: "server",
       width: 280,
+      sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.server.name, b.server.name),
       render: (_: unknown, row: MonitorLiveEntry) => {
         const reasons = issues(row);
         return (
@@ -238,6 +240,8 @@ export default function Monitor() {
       title: "State",
       key: "state",
       width: 120,
+      sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) =>
+        compareValues(a.available, b.available) || compareValues(a.server.status, b.server.status),
       render: (_: unknown, row: MonitorLiveEntry) => (
         <Space direction="vertical" size={2}>
           {statusTag(row)}
@@ -252,6 +256,7 @@ export default function Monitor() {
     {
       title: "CPU",
       key: "cpu",
+      sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.cpu_percent, b.cpu_percent),
       render: (_: unknown, row: MonitorLiveEntry) => (
         <Space direction="vertical" size={4} style={{ minWidth: 150 }}>
           <Progress percent={pct(row.cpu_percent)} size="small" status={row.cpu_percent && row.cpu_percent > 90 ? "exception" : "normal"} />
@@ -262,6 +267,7 @@ export default function Monitor() {
     {
       title: "RAM",
       key: "ram",
+      sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.ram_percent, b.ram_percent),
       render: (_: unknown, row: MonitorLiveEntry) => (
         <Space direction="vertical" size={4} style={{ minWidth: 150 }}>
           <Progress percent={pct(row.ram_percent)} size="small" status={row.ram_percent && row.ram_percent > 90 ? "exception" : "normal"} />
@@ -275,6 +281,8 @@ export default function Monitor() {
     {
       title: "Disk",
       key: "disk",
+      sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) =>
+        compareValues(summaryByID.get(a.server.id)?.disk_percent, summaryByID.get(b.server.id)?.disk_percent),
       render: (_: unknown, row: MonitorLiveEntry) => {
         const s = summaryByID.get(row.server.id);
         return (
@@ -289,6 +297,7 @@ export default function Monitor() {
       title: "Uptime",
       key: "uptime",
       width: 100,
+      sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.uptime_seconds, b.uptime_seconds),
       render: (_: unknown, row: MonitorLiveEntry) =>
         row.available ? <Text>{fmtUptime(row.uptime_seconds)}</Text> : <Text type="secondary">—</Text>,
     },
@@ -296,6 +305,7 @@ export default function Monitor() {
       title: "Connection",
       key: "connection",
       width: 170,
+      sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.api_latency_ms, b.api_latency_ms),
       render: (_: unknown, row: MonitorLiveEntry) => (
         <Space direction="vertical" size={2} style={{ minWidth: 120 }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
@@ -357,6 +367,7 @@ export default function Monitor() {
     {
       title: "Server",
       key: "server",
+      sorter: (a: HistoryRow, b: HistoryRow) => compareValues(a.server.name, b.server.name),
       render: (_: unknown, row: HistoryRow) => (
         <Space direction="vertical" size={0}>
           <Text strong>{row.server.name}</Text>
@@ -386,12 +397,13 @@ export default function Monitor() {
         );
       },
     },
-    { title: "CPU avg / peak", key: "cpu", render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.cpu_percent)) },
-    { title: "RAM avg / peak", key: "ram", render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.ram_percent)) },
-    { title: "Disk avg / peak", key: "disk", render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.disk_percent)) },
+    { title: "CPU avg / peak", key: "cpu", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.cpu_percent)), mean(b.samples.map((s) => s.cpu_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.cpu_percent)) },
+    { title: "RAM avg / peak", key: "ram", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.ram_percent)), mean(b.samples.map((s) => s.ram_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.ram_percent)) },
+    { title: "Disk avg / peak", key: "disk", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.disk_percent)), mean(b.samples.map((s) => s.disk_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.disk_percent)) },
     {
       title: "Load avg",
       key: "load",
+      sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.load1)), mean(b.samples.map((s) => s.load1))),
       render: (_: unknown, row: HistoryRow) => {
         if (row.isLoading) return <Spin size="small" />;
         if (row.isError) return <Text type="danger">failed</Text>;
@@ -399,7 +411,7 @@ export default function Monitor() {
         return <Text type="secondary">{typeof m === "number" ? m.toFixed(2) : "n/a"}</Text>;
       },
     },
-    { title: "Samples", key: "samples", render: (_: unknown, row: HistoryRow) => row.isError ? <Text type="secondary">—</Text> : <Text type="secondary">{row.samples.length}</Text> },
+    { title: "Samples", key: "samples", sorter: (a: HistoryRow, b: HistoryRow) => a.samples.length - b.samples.length, render: (_: unknown, row: HistoryRow) => row.isError ? <Text type="secondary">—</Text> : <Text type="secondary">{row.samples.length}</Text> },
   ];
 
   // ---- Fleet summary cards (SND-84, live mode: six focused values) ----

@@ -6,6 +6,7 @@ import { DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../apiClient";
 import { desktopBridge } from "../lib/desktop";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Text } = Typography;
 
@@ -142,7 +143,7 @@ export default function Audit() {
         <Table<AuditRow>
           scroll={{ x: "max-content" }}
           dataSource={data?.data || []}
-          columns={columns}
+          columns={sortable(columns)}
           rowKey="id"
           loading={isLoading}
           size="small"

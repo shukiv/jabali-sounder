@@ -15,6 +15,7 @@ import { useDomains, useUsers } from "../hooks/useInventory";
 import type { DomainRow, UserRow } from "../hooks/useInventory";
 import { StatCard } from "../components/StatCard";
 import type { DashboardEntry } from "../types";
+import { sortable } from "../lib/tableSort";
 
 const { Title, Text } = Typography;
 const RECENT = 5;
@@ -174,7 +175,7 @@ export default function Dashboard() {
               loading={isLoading}
               pagination={false}
               dataSource={serverRows.slice(0, RECENT)}
-              columns={[
+              columns={sortable([
                 { title: "Name", dataIndex: "name", key: "name" },
                 { title: "Status", dataIndex: "status", key: "status", render: (s: string) => statusTag(s) },
                 {
@@ -183,7 +184,7 @@ export default function Dashboard() {
                   key: "credential_status",
                   render: (c: string) => credTag(c),
                 },
-              ]}
+              ])}
               onRow={() => ({
                 onClick: () => navigate("/servers"),
                 style: { cursor: "pointer" },
@@ -194,16 +195,16 @@ export default function Dashboard() {
 
         <Col xs={24} lg={12}>
           <Card title="Environments" size="small">
-            <Table
+            <Table<{ env: string; total: number; healthy: number }>
               size="small"
               rowKey="env"
               pagination={false}
               dataSource={envBreakdown}
-              columns={[
+              columns={sortable([
                 { title: "Environment", dataIndex: "env", key: "env", render: (e: string) => <Tag color="geekblue">{e}</Tag> },
                 { title: "Servers", dataIndex: "total", key: "total" },
                 { title: "Healthy", key: "healthy", render: (_: unknown, r: { total: number; healthy: number }) => `${r.healthy} / ${r.total}` },
-              ]}
+              ])}
             />
           </Card>
         </Col>
@@ -225,7 +226,7 @@ export default function Dashboard() {
               rowKey="version"
               pagination={false}
               dataSource={versionDrift.rows}
-              columns={[
+              columns={sortable([
                 {
                   title: "Version",
                   dataIndex: "version",
@@ -238,7 +239,7 @@ export default function Dashboard() {
                   ),
                 },
                 { title: "Servers", dataIndex: "count", key: "count" },
-              ]}
+              ])}
             />
           </Card>
         </Col>
@@ -261,10 +262,10 @@ export default function Dashboard() {
               loading={domains.isLoading}
               pagination={false}
               dataSource={(domains.data || []).slice(0, RECENT)}
-              columns={[
+              columns={sortable([
                 { title: "Domain", dataIndex: "name", key: "name" },
                 { title: "Server", dataIndex: "server_name", key: "server_name" },
-              ]}
+              ])}
             />
           </Card>
         </Col>
@@ -287,7 +288,7 @@ export default function Dashboard() {
               loading={users.isLoading}
               pagination={false}
               dataSource={(users.data || []).slice(0, RECENT)}
-              columns={[
+              columns={sortable([
                 {
                   title: "User",
                   dataIndex: "username",
@@ -295,7 +296,7 @@ export default function Dashboard() {
                   render: (u: string, r: UserRow) => u || r.email,
                 },
                 { title: "Server", dataIndex: "server_name", key: "server_name" },
-              ]}
+              ])}
             />
           </Card>
         </Col>

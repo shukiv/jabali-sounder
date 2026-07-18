@@ -38,6 +38,7 @@ import ServerHistoryDrawer from "../components/ServerHistoryDrawer";
 import type { Server } from "../types";
 import { roleAtLeast } from "../hooks/useAuth";
 import apiClient from "../apiClient";
+import { sortable } from "../lib/tableSort";
 
 const scopeOptions = [
   { label: "read:* (all read access)", value: "read:*" },
@@ -497,7 +498,7 @@ export default function Servers() {
             onChange: (keys) => setSelectedIds(keys as string[]),
           }}
           dataSource={filteredServers}
-          columns={columns}
+          columns={sortable(columns)}
           rowKey="id"
           loading={isLoading}
           scroll={{ x: "max-content" }}

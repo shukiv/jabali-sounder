@@ -33,6 +33,7 @@ import type {
   MailSnapshotEntry,
   Mailbox,
 } from "../types";
+import { sortable } from "../lib/tableSort";
 
 const { Text, Title } = Typography;
 
@@ -277,7 +278,7 @@ export default function Mail() {
                 <Table<ServerStamped<Mailbox>>
                   {...tableProps}
                   dataSource={filteredMailboxes}
-                  columns={mailboxColumns}
+                  columns={sortable(mailboxColumns)}
                   rowKey="row_key"
                 />
               ),
@@ -289,7 +290,7 @@ export default function Mail() {
                 <Table<ServerStamped<MailForwarder>>
                   {...tableProps}
                   dataSource={filteredForwarders}
-                  columns={forwarderColumns}
+                  columns={sortable(forwarderColumns)}
                   rowKey="row_key"
                 />
               ),
@@ -301,7 +302,7 @@ export default function Mail() {
                 <Table<ServerStamped<DomainForwarder>>
                   {...tableProps}
                   dataSource={filteredDomainForwarders}
-                  columns={domainForwarderColumns}
+                  columns={sortable(domainForwarderColumns)}
                   rowKey="row_key"
                 />
               ),
@@ -313,7 +314,7 @@ export default function Mail() {
                 <Table<ServerStamped<MailGroup>>
                   {...tableProps}
                   dataSource={filteredGroups}
-                  columns={groupColumns}
+                  columns={sortable(groupColumns)}
                   rowKey="row_key"
                 />
               ),
@@ -325,7 +326,7 @@ export default function Mail() {
                 <Table<ServerStamped<MailAutoresponder>>
                   {...tableProps}
                   dataSource={filteredAutoresponders}
-                  columns={autoresponderColumns}
+                  columns={sortable(autoresponderColumns)}
                   rowKey="row_key"
                 />
               ),
