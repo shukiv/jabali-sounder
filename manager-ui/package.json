@@ -2,7 +2,7 @@
   "name": "jabali-sounder-ui",
   "private": true,
   "version": "0.5.18",
-  "description": "Jabali Sounder SPA \u2014 React + TanStack Query + Ant Design",
+  "description": "Jabali Sounder SPA — React + TanStack Query + Ant Design",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,9 +19,11 @@
     "@wailsio/runtime": "^3.0.0-alpha.97",
     "antd": "^6.3.6",
     "axios": "^1.7.9",
+    "i18next": "^26.3.6",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.10",
     "react-router": "^7.1.1"
   },
   "devDependencies": {

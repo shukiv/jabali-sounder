@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router";
 import { ConfigProvider } from "antd";
+import { useTranslation } from "react-i18next";
+import { antdLocale, isRTL } from "./i18n";
 import AdminLayout from "./shells/AdminLayout";
 import Dashboard from "./admin/Dashboard";
 import Servers from "./admin/Servers";
@@ -23,6 +25,8 @@ export default function App() {
   const { auth } = useAuth();
   const { mode } = useThemeMode();
   const cfg = useTheme(mode);
+  // Re-renders on language change so AntD's locale + direction follow.
+  const { i18n } = useTranslation();
 
   // Desktop: open external links in the system browser (the webview ignores
   // target="_blank"). No-op in the browser build.
@@ -65,7 +69,11 @@ export default function App() {
   }, []);
 
   return (
-    <ConfigProvider {...cfg}>
+    <ConfigProvider
+      {...cfg}
+      locale={antdLocale(i18n.resolvedLanguage)}
+      direction={isRTL(i18n.resolvedLanguage) ? "rtl" : "ltr"}
+    >
       {!auth.token ? (
         <Routes>
           <Route path="*" element={<Login />} />

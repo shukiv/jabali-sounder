@@ -1,0 +1,34 @@
+{
+  "login": {
+    "admin_created": "Admin account created",
+    "auth_code": "Authenticator code",
+    "create_admin": "Create Admin",
+    "create_first_admin": "Create the first admin account",
+    "enter_2fa": "Enter the code from your authenticator app",
+    "enter_code": "Enter your 6-digit code",
+    "enter_password": "Enter password",
+    "enter_username": "Enter username",
+    "log_in": "Log in",
+    "logged_in": "Logged in",
+    "password": "Password",
+    "tagline": "Central Sounding Plane",
+    "username": "Username"
+  },
+  "menu": {
+    "language": "Language",
+    "logout": "Logout"
+  },
+  "nav": {
+    "audit": "Audit",
+    "backups": "Backups",
+    "compliance": "Compliance",
+    "dashboard": "Dashboard",
+    "domains": "Domains",
+    "mail": "Mail",
+    "monitor": "Monitor",
+    "servers": "Servers",
+    "settings": "Settings",
+    "team": "Team",
+    "users": "Users"
+  }
+}

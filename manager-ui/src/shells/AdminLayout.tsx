@@ -15,6 +15,7 @@ import {
   LeftOutlined,
   RightOutlined,
   LogoutOutlined,
+  CheckOutlined,
   MenuOutlined,
   UserOutlined,
   HomeOutlined,
@@ -40,23 +41,25 @@ import { useThemeMode } from "../theme/ThemeModeContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import NotificationBell from "../components/NotificationBell";
 import UpdatePill from "../components/UpdatePill";
+import { useTranslation } from "react-i18next";
 import { BrandLogo } from "../components/BrandLogo";
+import { LANGUAGE_LABELS, SUPPORTED, setLanguage } from "../i18n";
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Text, Link } = Typography;
 
 const navItems = [
-  { key: "/", label: "Dashboard", icon: <HomeOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/servers", label: "Servers", icon: <CloudServerOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/monitor", label: "Monitor", icon: <DashboardOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/users", label: "Users", icon: <TeamOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/domains", label: "Domains", icon: <GlobalOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/mail", label: "Mail", icon: <MailOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/backups", label: "Backups", icon: <DatabaseOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/policy", label: "Compliance", icon: <SafetyOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "operator" },
-  { key: "/audit", label: "Audit", icon: <AuditOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "operator" },
-  { key: "/settings", label: "Settings", icon: <SettingOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
-  { key: "/team", label: "Team", icon: <UsergroupAddOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "owner" },
+  { key: "/", label: "nav.dashboard", icon: <HomeOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/servers", label: "nav.servers", icon: <CloudServerOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/monitor", label: "nav.monitor", icon: <DashboardOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/users", label: "nav.users", icon: <TeamOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/domains", label: "nav.domains", icon: <GlobalOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/mail", label: "nav.mail", icon: <MailOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/backups", label: "nav.backups", icon: <DatabaseOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/policy", label: "nav.compliance", icon: <SafetyOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "operator" },
+  { key: "/audit", label: "nav.audit", icon: <AuditOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "operator" },
+  { key: "/settings", label: "nav.settings", icon: <SettingOutlined style={{ fontSize: 20, color: "#6b7280" }} /> },
+  { key: "/team", label: "nav.team", icon: <UsergroupAddOutlined style={{ fontSize: 20, color: "#6b7280" }} />, minRole: "owner" },
 ];
 
 export default function AdminLayout() {
@@ -86,6 +89,7 @@ export default function AdminLayout() {
     document.title = (item ? item.label + " · " : "") + "Jabali Sounder";
   }, [location.pathname]);
   const { token } = theme.useToken();
+  const { t, i18n } = useTranslation();
   const screens = Grid.useBreakpoint();
   const isDesktop = screens.lg ?? (typeof window !== "undefined" ? window.innerWidth >= 992 : true);
 
@@ -102,7 +106,7 @@ export default function AdminLayout() {
         .map((n) => ({
         key: n.key,
         icon: n.icon,
-        label: n.label,
+        label: t(n.label),
         onClick: () => {
           navigate(n.key);
           setDrawerOpen(false);
@@ -114,8 +118,31 @@ export default function AdminLayout() {
   const userMenu = {
     items: [
       {
+        key: "language",
+        icon: <GlobalOutlined />,
+        label: t("menu.language"),
+        // Each entry is named in its own language so it stays recognisable to
+        // someone who cannot read the language the UI is currently in. The
+        // checkmark marks the active one; the others get an equal-width spacer
+        // so the labels keep a single left edge.
+        children: SUPPORTED.map((lng) => ({
+          key: `lang:${lng}`,
+          label: LANGUAGE_LABELS[lng],
+          icon:
+            lng === i18n.resolvedLanguage ? (
+              <CheckOutlined />
+            ) : (
+              <span style={{ display: "inline-block", width: "1em" }} />
+            ),
+          onClick: () => {
+            void setLanguage(lng);
+          },
+        })),
+      },
+      { type: "divider" as const },
+      {
         key: "logout",
-        label: "Logout",
+        label: t("menu.logout"),
         icon: <LogoutOutlined />,
         onClick: async () => {
           try {
