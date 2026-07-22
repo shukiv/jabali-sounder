@@ -1,5 +1,6 @@
 import axios, { type AxiosAdapter, type AxiosResponse } from "axios";
 import { Call, System } from "@wailsio/runtime";
+import { translateApiError } from "./lib/apiErrors";
 
 const client = axios.create({
   baseURL: "/api/v1",
@@ -127,9 +128,9 @@ client.interceptors.response.use(
       }
     }
     if (error.response?.data?.error) {
-      return Promise.reject(
-        new Error(error.response.data.error + (error.response.data.detail ? ": " + error.response.data.detail : "")),
-      );
+      const msg = translateApiError(error.response.data.error);
+      const detail = translateApiError(error.response.data.detail);
+      return Promise.reject(new Error(msg + (detail ? ": " + detail : "")));
     }
     return Promise.reject(error);
   },
