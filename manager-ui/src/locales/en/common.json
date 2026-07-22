@@ -315,9 +315,21 @@
   },
   "notifications": {
     "acknowledged": "Acknowledged",
+    "auto_restart": "Auto-restarted \"{{service}}\" after {{count}} failed checks",
+    "backup_stale": "No successful backup in over {{days}} days",
+    "backup_stale_generic": "No successful backup recorded",
+    "cert_expired": "TLS certificate has expired",
+    "cert_expiring": "TLS certificate expires in {{days}} days",
+    "credential_invalid": "Automation credential invalid",
+    "escalation": "ESCALATION (unacknowledged): {{message}}",
+    "metric_high": "{{metric}} at {{value}} (threshold {{threshold}})",
+    "metric_recovered": "{{metric}} back to {{value}}",
     "no_notifications": "No notifications",
     "notifications": "Notifications",
-    "snoozed_for_1h": "Snoozed for 1h"
+    "server_unreachable": "Server unreachable",
+    "service_down": "Service {{service}} is {{status}}",
+    "snoozed_for_1h": "Snoozed for 1h",
+    "token_expiring": "API token \"{{name}}\" expires in {{days}} days"
   },
   "search": {
     "global_search": "Global search",

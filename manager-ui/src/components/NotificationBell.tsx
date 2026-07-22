@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import apiClient from "../apiClient";
 import { roleAtLeast } from "../hooks/useAuth";
+import { notificationMessage } from "../lib/notificationMessage";
 
 const { Text } = Typography;
 
@@ -115,7 +116,7 @@ export default function NotificationBell() {
             <List.Item
               role="button"
               tabIndex={0}
-              aria-label={`${n.severity} alert on ${n.server_name}: ${n.message} — open Monitor`}
+              aria-label={`${n.severity} alert on ${n.server_name}: ${notificationMessage(n)} — open Monitor`}
               style={{ cursor: "pointer", padding: "10px 14px", background: n.read ? undefined : "rgba(24,144,255,0.06)", display: "block" }}
               onClick={() => openItem(n)}
               onKeyDown={(e) => {
@@ -132,7 +133,7 @@ export default function NotificationBell() {
                   {n.resolved ? <Tag color="success">resolved</Tag> : n.acked ? <Tag color="blue">acked</Tag> : <Tag color="error">active</Tag>}
                 </Space>
               </div>
-              <Text type="secondary">{n.message}</Text>
+              <Text type="secondary">{notificationMessage(n)}</Text>
               <br />
               <Text type="secondary" style={{ fontSize: 12 }}>{new Date(n.created_at).toLocaleString()}</Text>
               {canAct && !n.resolved ? (
