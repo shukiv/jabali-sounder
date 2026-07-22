@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Drawer, Statistic, List, Badge, Tag, Empty, Spin, Row, Col, Segmented, Button } from "antd";
 import { useServerHeartbeats, useServerMetrics } from "../hooks/useServers";
@@ -34,6 +35,7 @@ function uptimeColor(pct: number): string {
 }
 
 export default function ServerHistoryDrawer({ server, onClose }: Props) {
+  const { t } = useTranslation();
   const [range, setRange] = useState("live");
   const [showAllHb, setShowAllHb] = useState(false);
   const { data, isLoading } = useServerHeartbeats(server?.id ?? null);
@@ -52,11 +54,11 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
   );
   const timestamps = samples.map((s) => s.sampled_at);
   const percentSeries = [
-    { label: "CPU %", color: "#1677ff", values: samples.map((s) => s.cpu_percent ?? 0) },
-    { label: "RAM %", color: "#722ed1", values: samples.map((s) => s.ram_percent ?? 0) },
-    { label: "Disk %", color: "#d48806", values: samples.map((s) => s.disk_percent ?? 0) },
+    { label: t("history.cpu"), color: "#1677ff", values: samples.map((s) => s.cpu_percent ?? 0) },
+    { label: t("history.ram"), color: "#722ed1", values: samples.map((s) => s.ram_percent ?? 0) },
+    { label: t("history.disk"), color: "#d48806", values: samples.map((s) => s.disk_percent ?? 0) },
   ];
-  const loadSeries = [{ label: "Load 1m", color: "#3f8600", values: samples.map((s) => s.load1 ?? 0) }];
+  const loadSeries = [{ label: t("history.load_1m"), color: "#3f8600", values: samples.map((s) => s.load1 ?? 0) }];
 
   return (
     <Drawer
@@ -69,7 +71,7 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
       {isLoading ? (
         <Spin />
       ) : !data || data.total === 0 ? (
-        <Empty description="No health checks recorded yet" />
+        <Empty description={t("history.no_health_checks_recorded_yet")} />
       ) : (
         <>
           <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -94,7 +96,7 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
               </Col>
             ) : null}
             <Col xs={12} sm={statSpan}>
-              <Statistic title="Healthy checks" value={data.uptime.healthy} suffix={`/ ${data.uptime.total}`} />
+              <Statistic title={t("history.healthy_checks")} value={data.uptime.healthy} suffix={`/ ${data.uptime.total}`} />
             </Col>
           </Row>
           {cert ? (
@@ -117,7 +119,7 @@ export default function ServerHistoryDrawer({ server, onClose }: Props) {
               <MetricChart series={loadSeries} timestamps={timestamps} yMax={1} height={110} />
             </div>
           ) : (
-            <Empty description="No samples in this range" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <Empty description={t("history.no_samples_in_this_range")} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           )}
 
           <List

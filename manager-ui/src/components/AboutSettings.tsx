@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Card, Typography, Button, Tag, Space, Alert, App, Descriptions } from "antd";
 import { CloudDownloadOutlined, ReloadOutlined, RocketOutlined } from "@ant-design/icons";
@@ -10,6 +11,7 @@ const { Title, Paragraph, Text } = Typography;
 // AboutSettings shows the running build and the update status, with a "check
 // now", a link to the release, and (desktop only) a one-click self-update.
 export default function AboutSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { data, isFetching, refetch } = useVersion();
@@ -48,14 +50,14 @@ export default function AboutSettings() {
         <RocketOutlined /> About &amp; updates {status()}
       </Title>
       <Descriptions size="small" column={1} style={{ maxWidth: 480, marginBottom: 12 }}>
-        <Descriptions.Item label="Version">
+        <Descriptions.Item label={t("about.version")}>
           <Text code>{data?.version ?? "…"}</Text>
         </Descriptions.Item>
-        <Descriptions.Item label="Commit">
+        <Descriptions.Item label={t("about.commit")}>
           <Text type="secondary">{data?.commit ?? "—"}</Text>
         </Descriptions.Item>
-        <Descriptions.Item label="Built">{data?.date ?? "—"}</Descriptions.Item>
-        {data?.latest ? <Descriptions.Item label="Latest release">{data.latest}</Descriptions.Item> : null}
+        <Descriptions.Item label={t("about.built")}>{data?.date ?? "—"}</Descriptions.Item>
+        {data?.latest ? <Descriptions.Item label={t("about.latest_release")}>{data.latest}</Descriptions.Item> : null}
       </Descriptions>
 
       {data?.update_available ? (

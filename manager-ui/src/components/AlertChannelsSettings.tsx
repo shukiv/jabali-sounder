@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
   Card, Table, Button, Modal, Form, Input, Select, Switch, Typography, App, Popconfirm, Tag,
@@ -41,6 +42,7 @@ const CONFIG_FIELDS: Record<string, { key: string; label: string; secret?: boole
 
 // AlertChannelsSettings manages alert delivery destinations (SND-20, operator+).
 export default function AlertChannelsSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { data, isLoading } = useQuery({
@@ -74,7 +76,7 @@ export default function AlertChannelsSettings() {
         enabled: values.enabled ?? true,
         config,
       });
-      message.success("Channel created");
+      message.success(t("alert_channels.channel_created"));
       setOpen(false);
       form.resetFields();
       invalidate();
@@ -88,7 +90,7 @@ export default function AlertChannelsSettings() {
   const test = async (id: string) => {
     try {
       await apiClient.post(`/admin/alert-channels/${id}/test`);
-      message.success("Test alert sent");
+      message.success(t("alert_channels.test_alert_sent"));
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
@@ -97,7 +99,7 @@ export default function AlertChannelsSettings() {
   const remove = async (id: string) => {
     try {
       await apiClient.delete(`/admin/alert-channels/${id}`);
-      message.success("Channel deleted");
+      message.success(t("alert_channels.channel_deleted"));
       invalidate();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -105,29 +107,29 @@ export default function AlertChannelsSettings() {
   };
 
   const columns = [
-    { title: "Name", dataIndex: "name", key: "name" },
-    { title: "Type", dataIndex: "type", key: "type", render: (t: string) => <Tag>{t}</Tag> },
+    { title: t("alert_channels.name"), dataIndex: "name", key: "name" },
+    { title: t("alert_channels.type"), dataIndex: "type", key: "type", render: (t: string) => <Tag>{t}</Tag> },
     {
-      title: "Min severity",
+      title: t("alert_channels.min_severity"),
       dataIndex: "min_severity",
       key: "min_severity",
       render: (s: string) => <SeverityTag severity={s} />,
     },
     {
-      title: "Enabled",
+      title: t("alert_channels.enabled"),
       dataIndex: "enabled",
       key: "enabled",
       render: (e: boolean) => (e ? <Tag color="green">on</Tag> : <Tag>off</Tag>),
     },
     {
-      title: "Actions",
+      title: t("alert_channels.actions"),
       key: "actions",
       render: (_: unknown, r: Channel) => (
         <>
           <Button size="small" icon={<SendOutlined />} onClick={() => test(r.id)}>
             Test
           </Button>{" "}
-          <Popconfirm title={`Delete "${r.name}"?`} okText="Delete" okButtonProps={{ danger: true }} onConfirm={() => remove(r.id)}>
+          <Popconfirm title={`Delete "${r.name}"?`} okText={t("alert_channels.delete")} okButtonProps={{ danger: true }} onConfirm={() => remove(r.id)}>
             <Button size="small" danger>
               Delete
             </Button>
@@ -159,7 +161,7 @@ export default function AlertChannelsSettings() {
       />
 
       <Modal
-        title="Add alert channel"
+        title={t("alert_channels.add_alert_channel")}
         open={open}
         onOk={create}
         confirmLoading={busy}
@@ -167,7 +169,7 @@ export default function AlertChannelsSettings() {
           setOpen(false);
           form.resetFields();
         }}
-        okText="Create"
+        okText={t("alert_channels.create")}
       >
         <Form
           form={form}
@@ -175,25 +177,25 @@ export default function AlertChannelsSettings() {
           initialValues={{ type: "webhook", min_severity: "warning", enabled: true }}
           onValuesChange={(chg) => chg.type && setType(chg.type)}
         >
-          <Form.Item name="name" label="Name" rules={[{ required: true, message: "Name is required" }]}>
-            <Input placeholder="ops-slack" />
+          <Form.Item name="name" label={t("alert_channels.name")} rules={[{ required: true, message: t("alert_channels.name_is_required") }]}>
+            <Input placeholder={t("alert_channels.ops_slack")} />
           </Form.Item>
-          <Form.Item name="type" label="Type" rules={[{ required: true }]}>
+          <Form.Item name="type" label={t("alert_channels.type")} rules={[{ required: true }]}>
             <Select
               options={[
-                { value: "webhook", label: "Webhook (Slack/Discord/Mattermost)" },
-                { value: "ntfy", label: "ntfy (push)" },
-                { value: "smtp", label: "Email (SMTP)" },
-                { value: "pagerduty", label: "PagerDuty" },
+                { value: "webhook", label: t("alert_channels.webhook_slack_discord_mattermost") },
+                { value: "ntfy", label: t("alert_channels.ntfy_push") },
+                { value: "smtp", label: t("alert_channels.email_smtp") },
+                { value: "pagerduty", label: t("alert_channels.pagerduty") },
               ]}
             />
           </Form.Item>
-          <Form.Item name="min_severity" label="Minimum severity" rules={[{ required: true }]}>
+          <Form.Item name="min_severity" label={t("alert_channels.minimum_severity")} rules={[{ required: true }]}>
             <Select
               options={[
-                { value: "info", label: "info (all)" },
-                { value: "warning", label: "warning+" },
-                { value: "critical", label: "critical only" },
+                { value: "info", label: t("alert_channels.info_all") },
+                { value: "warning", label: t("alert_channels.warning") },
+                { value: "critical", label: t("alert_channels.critical_only") },
               ]}
             />
           </Form.Item>
@@ -203,7 +205,7 @@ export default function AlertChannelsSettings() {
               {f.secret ? <Input.Password placeholder={f.placeholder} /> : <Input placeholder={f.placeholder} />}
             </Form.Item>
           ))}
-          <Form.Item name="enabled" label="Enabled" valuePropName="checked">
+          <Form.Item name="enabled" label={t("alert_channels.enabled")} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

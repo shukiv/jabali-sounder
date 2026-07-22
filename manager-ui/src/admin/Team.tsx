@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
   Card,
@@ -37,6 +38,7 @@ const ROLE_COLOR: Record<string, string> = {
 // Team is the operator-management page (M3: RBAC). Owner-only — the API enforces
 // it and the nav entry only shows for owners.
 export default function Team() {
+  const { t } = useTranslation();
   const { data: admins, isLoading } = useAdmins();
   const createMut = useCreateAdmin();
   const updateMut = useUpdateAdmin();
@@ -60,7 +62,7 @@ export default function Team() {
   const changeRole = async (id: string, role: string) => {
     try {
       await updateMut.mutateAsync({ id, role });
-      message.success("Role updated");
+      message.success(t("team.role_updated"));
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
@@ -76,9 +78,9 @@ export default function Team() {
   };
 
   const columns = [
-    { title: "Username", dataIndex: "username", key: "username" },
+    { title: t("team.username"), dataIndex: "username", key: "username" },
     {
-      title: "Role",
+      title: t("team.role"),
       dataIndex: "role",
       key: "role",
       render: (role: string, record: Admin) => (
@@ -93,19 +95,19 @@ export default function Team() {
       ),
     },
     {
-      title: "Current",
+      title: t("team.current"),
       key: "tag",
       render: (_: unknown, record: Admin) => (
         <Tag color={ROLE_COLOR[record.role]}>{record.role}</Tag>
       ),
     },
     {
-      title: "Actions",
+      title: t("team.actions"),
       key: "actions",
       render: (_: unknown, record: Admin) => (
         <Popconfirm
           title={`Remove "${record.username}"?`}
-          okText="Remove"
+          okText={t("team.remove")}
           okButtonProps={{ danger: true }}
           onConfirm={() => handleDelete(record.id, record.username)}
         >
@@ -137,7 +139,7 @@ export default function Team() {
       </Card>
 
       <Modal
-        title="Add operator"
+        title={t("team.add_operator")}
         open={open}
         onOk={handleCreate}
         confirmLoading={createMut.isPending}
@@ -145,26 +147,26 @@ export default function Team() {
           setOpen(false);
           form.resetFields();
         }}
-        okText="Create"
+        okText={t("team.create")}
       >
         <Form form={form} layout="vertical">
           <Form.Item
             name="username"
-            label="Username"
-            rules={[{ required: true, message: "Username is required" }]}
+            label={t("team.username")}
+            rules={[{ required: true, message: t("team.username_is_required") }]}
           >
             <Input autoComplete="off" />
           </Form.Item>
           <Form.Item
             name="password"
-            label="Password"
-            rules={[{ required: true, min: 8, message: "At least 8 characters" }]}
+            label={t("team.password")}
+            rules={[{ required: true, min: 8, message: t("team.at_least_8_characters") }]}
           >
             <Input.Password autoComplete="new-password" />
           </Form.Item>
           <Form.Item
             name="role"
-            label="Role"
+            label={t("team.role")}
             initialValue="viewer"
             rules={[{ required: true }]}
           >

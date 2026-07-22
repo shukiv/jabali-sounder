@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Card, Table, Tag, Input, Space, Typography, Button, Popconfirm, App } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
@@ -10,6 +11,7 @@ import { sortable } from "../lib/tableSort";
 const { Title } = Typography;
 
 export default function Users() {
+  const { t } = useTranslation();
   const { data: users, isLoading } = useUsers();
   const { message } = App.useApp();
   const canWrite = roleAtLeast("operator");
@@ -30,17 +32,17 @@ export default function Users() {
   );
 
   const columns = [
-    { title: "Email", dataIndex: "email", key: "email" },
-    { title: "Username", dataIndex: "username", key: "username", render: (u: string) => u || "—" },
+    { title: t("users.email"), dataIndex: "email", key: "email" },
+    { title: t("users.username"), dataIndex: "username", key: "username", render: (u: string) => u || "—" },
     {
-      title: "Admin",
+      title: t("users.admin"),
       dataIndex: "is_admin",
       key: "is_admin",
       render: (admin: boolean) => admin ? <Tag color="gold">admin</Tag> : null,
     },
-    { title: "Package", dataIndex: "package_id", key: "package_id", render: (p: string) => p ? p.slice(0, 10) + "…" : "—" },
+    { title: t("users.package"), dataIndex: "package_id", key: "package_id", render: (p: string) => p ? p.slice(0, 10) + "…" : "—" },
     {
-      title: "Server",
+      title: t("users.server"),
       dataIndex: "server_name",
       key: "server_name",
       render: (name: string) => <Tag color="blue">{name}</Tag>,
@@ -48,13 +50,13 @@ export default function Users() {
   ];
 
   const userActionsCol = {
-    title: "Actions",
+    title: t("users.actions"),
     key: "actions",
     render: (_: unknown, r: UserRow) => (
       <Space>
         <Popconfirm
           title={`Disable ${r.email || r.username}?`}
-          okText="Disable"
+          okText={t("users.disable")}
           okButtonProps={{ danger: true }}
           onConfirm={() => userAction(r, false)}
         >
@@ -71,8 +73,8 @@ export default function Users() {
       <Card>
         <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
-            placeholder="Search by email or username…"
-            aria-label="Search users"
+            placeholder={t("users.search_by_email_or_username")}
+            aria-label={t("users.search_users")}
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}

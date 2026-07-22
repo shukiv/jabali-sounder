@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Modal, Input, List, Tag, Typography, Empty, Spin } from "antd";
 import {
@@ -29,6 +30,7 @@ interface Hit {
 // cross-server domain and user inventories, and jumps to the relevant page (M4).
 // Mounted only while open so the inventory fan-out runs on demand.
 export default function GlobalSearch({ open, onClose }: Props) {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const [q, setQ] = useState("");
   const { data: servers } = useServers();
@@ -87,14 +89,14 @@ export default function GlobalSearch({ open, onClose }: Props) {
         setQ("");
         onClose();
       }}
-      title="Global search"
+      title={t("search.global_search")}
       footer={null}
       destroyOnClose
     >
       <Input
         autoFocus
         size="large"
-        placeholder="Search servers, domains, users…"
+        placeholder={t("search.search_servers_domains_users")}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         allowClear
@@ -105,7 +107,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
         ) : dLoading || uLoading ? (
           <Spin style={{ display: "block", margin: "24px auto" }} />
         ) : hits.length === 0 ? (
-          <Empty description="No matches" />
+          <Empty description={t("search.no_matches")} />
         ) : (
           <List
             size="small"

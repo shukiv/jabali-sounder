@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
   Card, Table, Button, Modal, Form, Input, Select, DatePicker, Typography, App, Popconfirm, Tag,
@@ -23,6 +24,7 @@ interface Window {
 
 // MaintenanceSettings schedules alert-suppression windows (SND-22, operator+).
 export default function MaintenanceSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { data: servers } = useServers();
@@ -58,7 +60,7 @@ export default function MaintenanceSettings() {
         ends_at: end.toISOString(),
         reason: values.reason || "",
       });
-      message.success("Maintenance window scheduled");
+      message.success(t("maintenance.maintenance_window_scheduled"));
       setOpen(false);
       form.resetFields();
       invalidate();
@@ -72,7 +74,7 @@ export default function MaintenanceSettings() {
   const remove = async (id: string) => {
     try {
       await apiClient.delete(`/admin/maintenance/${id}`);
-      message.success("Window removed");
+      message.success(t("maintenance.window_removed"));
       invalidate();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -82,7 +84,7 @@ export default function MaintenanceSettings() {
   const now = dayjs();
   const columns = [
     {
-      title: "Scope",
+      title: t("maintenance.scope"),
       key: "scope",
       render: (_: unknown, r: Window) =>
         r.scope_type === "global" ? <Tag color="volcano">whole fleet</Tag> : (
@@ -93,7 +95,7 @@ export default function MaintenanceSettings() {
         ),
     },
     {
-      title: "Window",
+      title: t("maintenance.window"),
       key: "window",
       render: (_: unknown, r: Window) => {
         const active = now.isAfter(dayjs(r.starts_at)) && now.isBefore(dayjs(r.ends_at));
@@ -105,12 +107,12 @@ export default function MaintenanceSettings() {
         );
       },
     },
-    { title: "Reason", dataIndex: "reason", key: "reason" },
+    { title: t("maintenance.reason"), dataIndex: "reason", key: "reason" },
     {
-      title: "Actions",
+      title: t("maintenance.actions"),
       key: "actions",
       render: (_: unknown, r: Window) => (
-        <Popconfirm title="Remove window?" okText="Remove" okButtonProps={{ danger: true }} onConfirm={() => remove(r.id)}>
+        <Popconfirm title={t("maintenance.remove_window")} okText={t("maintenance.remove")} okButtonProps={{ danger: true }} onConfirm={() => remove(r.id)}>
           <Button size="small" danger>
             Remove
           </Button>
@@ -140,7 +142,7 @@ export default function MaintenanceSettings() {
       />
 
       <Modal
-        title="Schedule maintenance window"
+        title={t("maintenance.schedule_maintenance_window")}
         open={open}
         onOk={create}
         confirmLoading={busy}
@@ -148,7 +150,7 @@ export default function MaintenanceSettings() {
           setOpen(false);
           form.resetFields();
         }}
-        okText="Schedule"
+        okText={t("maintenance.schedule")}
       >
         <Form
           form={form}
@@ -156,22 +158,22 @@ export default function MaintenanceSettings() {
           initialValues={{ scope_type: "global" }}
           onValuesChange={(chg) => chg.scope_type && setScope(chg.scope_type)}
         >
-          <Form.Item name="scope_type" label="Scope" rules={[{ required: true }]}>
+          <Form.Item name="scope_type" label={t("maintenance.scope")} rules={[{ required: true }]}>
             <Select
               options={[
-                { value: "global", label: "Whole fleet" },
-                { value: "environment", label: "Environment" },
-                { value: "server", label: "Single server" },
+                { value: "global", label: t("maintenance.whole_fleet") },
+                { value: "environment", label: t("maintenance.environment") },
+                { value: "server", label: t("maintenance.single_server") },
               ]}
             />
           </Form.Item>
           {scope === "environment" ? (
-            <Form.Item name="scope_value" label="Environment" rules={[{ required: true }]}>
+            <Form.Item name="scope_value" label={t("maintenance.environment")} rules={[{ required: true }]}>
               <Select options={environments.map((e) => ({ value: e, label: e }))} placeholder="prod" />
             </Form.Item>
           ) : null}
           {scope === "server" ? (
-            <Form.Item name="scope_value" label="Server" rules={[{ required: true }]}>
+            <Form.Item name="scope_value" label={t("maintenance.server")} rules={[{ required: true }]}>
               <Select
                 showSearch
                 optionFilterProp="label"
@@ -179,11 +181,11 @@ export default function MaintenanceSettings() {
               />
             </Form.Item>
           ) : null}
-          <Form.Item name="range" label="From → to" rules={[{ required: true, message: "Pick a window" }]}>
+          <Form.Item name="range" label={t("maintenance.from_to")} rules={[{ required: true, message: t("maintenance.pick_a_window") }]}>
             <RangePicker showTime style={{ width: "100%" }} />
           </Form.Item>
-          <Form.Item name="reason" label="Reason">
-            <Input placeholder="kernel upgrade" />
+          <Form.Item name="reason" label={t("maintenance.reason")}>
+            <Input placeholder={t("maintenance.kernel_upgrade")} />
           </Form.Item>
         </Form>
       </Modal>

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Card, Table, Tag, Input, Space, Typography, Row, Col, Button, Popconfirm, App } from "antd";
 import { SearchOutlined, GlobalOutlined, CheckCircleOutlined, CloudServerOutlined } from "@ant-design/icons";
@@ -11,6 +12,7 @@ import { sortable } from "../lib/tableSort";
 const { Title } = Typography;
 
 export default function Domains() {
+  const { t } = useTranslation();
   const { data: domains, isLoading } = useDomains();
   const { message } = App.useApp();
   const canWrite = roleAtLeast("operator");
@@ -33,17 +35,17 @@ export default function Domains() {
   const enabled = (domains || []).filter((d) => d.is_enabled).length;
 
   const columns = [
-    { title: "Domain", dataIndex: "name", key: "name", sorter: (a: DomainRow, b: DomainRow) => a.name.localeCompare(b.name) },
+    { title: t("domains.domain"), dataIndex: "name", key: "name", sorter: (a: DomainRow, b: DomainRow) => a.name.localeCompare(b.name) },
     {
-      title: "Status",
+      title: t("domains.status"),
       dataIndex: "is_enabled",
       key: "is_enabled",
       render: (enabled: boolean) =>
         enabled ? <Tag color="green">enabled</Tag> : <Tag color="default">disabled</Tag>,
     },
-    { title: "Owner", dataIndex: "user_id", key: "user_id", render: (id: string) => id ? id.slice(0, 10) + "…" : "—" },
+    { title: t("domains.owner"), dataIndex: "user_id", key: "user_id", render: (id: string) => id ? id.slice(0, 10) + "…" : "—" },
     {
-      title: "Server",
+      title: t("domains.server"),
       dataIndex: "server_name",
       key: "server_name",
       render: (name: string) => <Tag color="blue">{name}</Tag>,
@@ -51,13 +53,13 @@ export default function Domains() {
   ];
 
   const domainActionsCol = {
-    title: "Actions",
+    title: t("domains.actions"),
     key: "actions",
     render: (_: unknown, r: DomainRow) =>
       r.is_enabled ? (
         <Popconfirm
           title={`Suspend ${r.name}?`}
-          okText="Suspend"
+          okText={t("domains.suspend")}
           okButtonProps={{ danger: true }}
           onConfirm={() => domainAction(r, true)}
         >
@@ -73,20 +75,20 @@ export default function Domains() {
       <Title level={3} style={{ marginBottom: 16 }}>Domains</Title>
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} lg={8}>
-          <StatCard label="Total Domains" value={domains?.length || 0} Icon={GlobalOutlined} iconColor="#1677ff" />
+          <StatCard label={t("domains.total_domains")} value={domains?.length || 0} Icon={GlobalOutlined} iconColor="#1677ff" />
         </Col>
         <Col xs={24} sm={12} lg={8}>
-          <StatCard label="Enabled" value={enabled} Icon={CheckCircleOutlined} iconColor="#3f8600" />
+          <StatCard label={t("domains.enabled")} value={enabled} Icon={CheckCircleOutlined} iconColor="#3f8600" />
         </Col>
         <Col xs={24} sm={12} lg={8}>
-          <StatCard label="Servers" value={servers.size} Icon={CloudServerOutlined} iconColor="#9254de" />
+          <StatCard label={t("domains.servers")} value={servers.size} Icon={CloudServerOutlined} iconColor="#9254de" />
         </Col>
       </Row>
       <Card>
         <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
-            placeholder="Search domains…"
-            aria-label="Search domains"
+            placeholder={t("domains.search_domains")}
+            aria-label={t("domains.search_domains_2")}
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}

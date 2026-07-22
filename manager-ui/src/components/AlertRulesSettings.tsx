@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Card, Table, Button, Modal, Form, InputNumber, Select, Switch, Tag, Typography, App } from "antd";
 import { AlertOutlined } from "@ant-design/icons";
@@ -37,6 +38,7 @@ export function SeverityTag({ severity }: { severity: string }) {
 // AlertRulesSettings edits the fleet-wide metric thresholds (SND-20). Reads are
 // open; editing requires operator+.
 export default function AlertRulesSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const canEdit = roleAtLeast("operator");
@@ -80,9 +82,9 @@ export default function AlertRulesSettings() {
   };
 
   const columns = [
-    { title: "Metric", dataIndex: "metric", key: "metric", render: (m: string) => METRIC_LABEL[m] || m },
+    { title: t("alert_rules.metric"), dataIndex: "metric", key: "metric", render: (m: string) => METRIC_LABEL[m] || m },
     {
-      title: "Fires when",
+      title: t("alert_rules.fires_when"),
       key: "cond",
       render: (_: unknown, r: AlertRule) =>
         r.metric === "service_down"
@@ -91,9 +93,9 @@ export default function AlertRulesSettings() {
             ? `> ${r.threshold} for ${r.duration_seconds}s`
             : `> ${r.threshold}% for ${r.duration_seconds}s`,
     },
-    { title: "Severity", dataIndex: "severity", key: "severity", render: (s: string) => <SeverityTag severity={s} /> },
+    { title: t("alert_rules.severity"), dataIndex: "severity", key: "severity", render: (s: string) => <SeverityTag severity={s} /> },
     {
-      title: "Enabled",
+      title: t("alert_rules.enabled"),
       dataIndex: "enabled",
       key: "enabled",
       render: (e: boolean) => (e ? <Tag color="green">on</Tag> : <Tag>off</Tag>),
@@ -136,7 +138,7 @@ export default function AlertRulesSettings() {
         onOk={save}
         confirmLoading={busy}
         onCancel={() => setEditing(null)}
-        okText="Save"
+        okText={t("alert_rules.save")}
       >
         <Form form={form} layout="vertical">
           {editing?.metric === "service_down" ? (
@@ -145,14 +147,14 @@ export default function AlertRulesSettings() {
               (stopped, failed, or degraded) for the duration below.
             </Paragraph>
           ) : (
-            <Form.Item name="threshold" label="Threshold" rules={[{ required: true }]}>
+            <Form.Item name="threshold" label={t("alert_rules.threshold")} rules={[{ required: true }]}>
               <InputNumber min={0} style={{ width: "100%" }} />
             </Form.Item>
           )}
-          <Form.Item name="duration_seconds" label="Sustained for (seconds)" rules={[{ required: true }]}>
+          <Form.Item name="duration_seconds" label={t("alert_rules.sustained_for_seconds")} rules={[{ required: true }]}>
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>
-          <Form.Item name="severity" label="Severity" rules={[{ required: true }]}>
+          <Form.Item name="severity" label={t("alert_rules.severity")} rules={[{ required: true }]}>
             <Select
               options={[
                 { value: "info", label: "info" },
@@ -161,7 +163,7 @@ export default function AlertRulesSettings() {
               ]}
             />
           </Form.Item>
-          <Form.Item name="enabled" label="Enabled" valuePropName="checked">
+          <Form.Item name="enabled" label={t("alert_rules.enabled")} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

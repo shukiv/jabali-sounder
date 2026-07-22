@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useMemo } from "react";
 import { Card, Col, Row, Space, Table, Tag, Typography, Button } from "antd";
 import { Link, useNavigate } from "react-router";
@@ -32,6 +33,7 @@ function credTag(cred: string) {
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { data: servers, isLoading, refetch, isFetching } = useDashboard();
   const { data: sla } = useFleetSLA();
   const { data: policy } = useQuery({
@@ -98,21 +100,21 @@ export default function Dashboard() {
         }}
       >
         <StatCard
-          label="Active Servers"
+          label={t("dashboard.active_servers")}
           value={`${healthy} / ${total}`}
           icon={<CloudServerOutlined />}
           iconColor="#1677ff"
           to="/servers"
         />
         <StatCard
-          label="Domains"
+          label={t("dashboard.domains")}
           value={fmt(domains.data?.length)}
           icon={<GlobalOutlined />}
           iconColor="#9254de"
           to="/domains"
         />
         <StatCard
-          label="Users"
+          label={t("dashboard.users")}
           value={fmt(users.data?.length)}
           icon={<TeamOutlined />}
           iconColor="#fa8c16"
@@ -126,7 +128,7 @@ export default function Dashboard() {
           to="/monitor"
         />
         <StatCard
-          label="Policy issues"
+          label={t("dashboard.policy_issues")}
           value={policy ? `${policy.servers_at_risk} server${policy.servers_at_risk === 1 ? "" : "s"}` : "—"}
           icon={<DashboardOutlined />}
           iconColor={policy && policy.servers_at_risk > 0 ? "#cf1322" : "#3f8600"}
@@ -159,7 +161,7 @@ export default function Dashboard() {
 
         <Col xs={24} lg={12}>
           <Card
-            title="Servers"
+            title={t("dashboard.servers")}
             size="small"
             extra={
               <Link to="/servers">
@@ -176,10 +178,10 @@ export default function Dashboard() {
               pagination={false}
               dataSource={serverRows.slice(0, RECENT)}
               columns={sortable([
-                { title: "Name", dataIndex: "name", key: "name" },
-                { title: "Status", dataIndex: "status", key: "status", render: (s: string) => statusTag(s) },
+                { title: t("dashboard.name"), dataIndex: "name", key: "name" },
+                { title: t("dashboard.status"), dataIndex: "status", key: "status", render: (s: string) => statusTag(s) },
                 {
-                  title: "Credentials",
+                  title: t("dashboard.credentials"),
                   dataIndex: "credential_status",
                   key: "credential_status",
                   render: (c: string) => credTag(c),
@@ -194,16 +196,16 @@ export default function Dashboard() {
         </Col>
 
         <Col xs={24} lg={12}>
-          <Card title="Environments" size="small">
+          <Card title={t("dashboard.environments")} size="small">
             <Table<{ env: string; total: number; healthy: number }>
               size="small"
               rowKey="env"
               pagination={false}
               dataSource={envBreakdown}
               columns={sortable([
-                { title: "Environment", dataIndex: "env", key: "env", render: (e: string) => <Tag color="geekblue">{e}</Tag> },
-                { title: "Servers", dataIndex: "total", key: "total" },
-                { title: "Healthy", key: "healthy", render: (_: unknown, r: { total: number; healthy: number }) => `${r.healthy} / ${r.total}` },
+                { title: t("dashboard.environment"), dataIndex: "env", key: "env", render: (e: string) => <Tag color="geekblue">{e}</Tag> },
+                { title: t("dashboard.servers"), dataIndex: "total", key: "total" },
+                { title: t("dashboard.healthy"), key: "healthy", render: (_: unknown, r: { total: number; healthy: number }) => `${r.healthy} / ${r.total}` },
               ])}
             />
           </Card>
@@ -211,7 +213,7 @@ export default function Dashboard() {
 
         <Col xs={24} lg={12}>
           <Card
-            title="Version drift"
+            title={t("dashboard.version_drift")}
             size="small"
             extra={
               versionDrift.drifted > 0 ? (
@@ -228,7 +230,7 @@ export default function Dashboard() {
               dataSource={versionDrift.rows}
               columns={sortable([
                 {
-                  title: "Version",
+                  title: t("dashboard.version"),
                   dataIndex: "version",
                   key: "version",
                   render: (v: string) => (
@@ -238,7 +240,7 @@ export default function Dashboard() {
                     </span>
                   ),
                 },
-                { title: "Servers", dataIndex: "count", key: "count" },
+                { title: t("dashboard.servers"), dataIndex: "count", key: "count" },
               ])}
             />
           </Card>
@@ -246,7 +248,7 @@ export default function Dashboard() {
 
         <Col xs={24} lg={12}>
           <Card
-            title="Recent Domains"
+            title={t("dashboard.recent_domains")}
             size="small"
             extra={
               <Link to="/domains">
@@ -263,8 +265,8 @@ export default function Dashboard() {
               pagination={false}
               dataSource={(domains.data || []).slice(0, RECENT)}
               columns={sortable([
-                { title: "Domain", dataIndex: "name", key: "name" },
-                { title: "Server", dataIndex: "server_name", key: "server_name" },
+                { title: t("dashboard.domain"), dataIndex: "name", key: "name" },
+                { title: t("dashboard.server"), dataIndex: "server_name", key: "server_name" },
               ])}
             />
           </Card>
@@ -272,7 +274,7 @@ export default function Dashboard() {
 
         <Col xs={24} lg={12}>
           <Card
-            title="Recent Users"
+            title={t("dashboard.recent_users")}
             size="small"
             extra={
               <Link to="/users">
@@ -290,12 +292,12 @@ export default function Dashboard() {
               dataSource={(users.data || []).slice(0, RECENT)}
               columns={sortable([
                 {
-                  title: "User",
+                  title: t("dashboard.user"),
                   dataIndex: "username",
                   key: "username",
                   render: (u: string, r: UserRow) => u || r.email,
                 },
-                { title: "Server", dataIndex: "server_name", key: "server_name" },
+                { title: t("dashboard.server"), dataIndex: "server_name", key: "server_name" },
               ])}
             />
           </Card>

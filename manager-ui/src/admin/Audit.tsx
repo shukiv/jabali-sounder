@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
   Card, Table, Typography, Select, Input, Button, Space, Tag, App,
@@ -32,6 +33,7 @@ const DAYS_OPTIONS = [
 // Audit shows the persisted trail of privileged mutations (SND-24) with filters
 // and a CSV export. Read-only.
 export default function Audit() {
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const [days, setDays] = useState("7");
   const [actor, setActor] = useState("");
@@ -77,7 +79,7 @@ export default function Audit() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      message.success("Audit CSV exported");
+      message.success(t("audit.audit_csv_exported"));
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     } finally {
@@ -87,22 +89,22 @@ export default function Audit() {
 
   const columns = [
     {
-      title: "Time",
+      title: t("audit.time"),
       dataIndex: "created_at",
       key: "created_at",
       render: (t: string) => new Date(t).toLocaleString(),
       width: 190,
     },
-    { title: "Event", dataIndex: "event", key: "event", render: (e: string) => <Tag>{e}</Tag> },
-    { title: "Actor", dataIndex: "actor", key: "actor", render: (a: string) => a || <Text type="secondary">—</Text> },
+    { title: t("audit.event"), dataIndex: "event", key: "event", render: (e: string) => <Tag>{e}</Tag> },
+    { title: t("audit.actor"), dataIndex: "actor", key: "actor", render: (a: string) => a || <Text type="secondary">—</Text> },
     {
-      title: "Server",
+      title: t("audit.server"),
       key: "server",
       render: (_: unknown, r: AuditRow) => r.server_name || <Text type="secondary">—</Text>,
     },
-    { title: "Source IP", dataIndex: "source_ip", key: "source_ip" },
+    { title: t("audit.source_ip"), dataIndex: "source_ip", key: "source_ip" },
     {
-      title: "Request",
+      title: t("audit.request"),
       dataIndex: "request_id",
       key: "request_id",
       render: (r: string) => (r ? <Text code style={{ fontSize: 11 }}>{r.slice(0, 8)}</Text> : null),
@@ -119,18 +121,18 @@ export default function Audit() {
       </div>
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
-          <Select value={days} onChange={setDays} options={DAYS_OPTIONS} style={{ width: 140 }} aria-label="Time range" />
+          <Select value={days} onChange={setDays} options={DAYS_OPTIONS} style={{ width: 140 }} aria-label={t("audit.time_range")} />
           <Input
-            placeholder="Filter by actor"
-            aria-label="Filter by actor"
+            placeholder={t("audit.filter_by_actor")}
+            aria-label={t("audit.filter_by_actor")}
             value={actor}
             onChange={(e) => setActor(e.target.value)}
             allowClear
             style={{ width: 180 }}
           />
           <Input
-            placeholder="Filter by event (e.g. server.delete)"
-            aria-label="Filter by event"
+            placeholder={t("audit.filter_by_event_e_g_server")}
+            aria-label={t("audit.filter_by_event")}
             value={event}
             onChange={(e) => setEvent(e.target.value)}
             allowClear

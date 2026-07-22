@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Card, Table, Typography, Tag, Button, Empty, Row, Col } from "antd";
 import { ReloadOutlined, SafetyOutlined, WarningOutlined, FileTextOutlined } from "@ant-design/icons";
 import { StatCard } from "../components/StatCard";
@@ -35,6 +36,7 @@ const CHECK_LABEL: Record<string, string> = {
 // Policy shows fleet compliance drift (SND-32): weak TLS, invalid credentials,
 // unreachability, cert expiry, and version drift from the fleet majority.
 export default function Policy() {
+  const { t } = useTranslation();
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["policy"],
     queryFn: async () => (await apiClient.get<PolicyResp>("/admin/policy")).data,
@@ -42,20 +44,20 @@ export default function Policy() {
   });
 
   const columns = [
-    { title: "Server", dataIndex: "server_name", key: "server_name" },
+    { title: t("compliance.server"), dataIndex: "server_name", key: "server_name" },
     {
-      title: "Check",
+      title: t("compliance.check"),
       dataIndex: "check",
       key: "check",
       render: (c: string) => <Tag>{CHECK_LABEL[c] || c}</Tag>,
     },
     {
-      title: "Severity",
+      title: t("compliance.severity"),
       dataIndex: "severity",
       key: "severity",
       render: (s: string) => <Tag color={SEV_COLOR[s] || "default"}>{s}</Tag>,
     },
-    { title: "Detail", dataIndex: "message", key: "message", render: (m: string) => <Text type="secondary">{m}</Text> },
+    { title: t("compliance.detail"), dataIndex: "message", key: "message", render: (m: string) => <Text type="secondary">{m}</Text> },
   ];
 
   const critical = (data?.violations || []).filter((v) => v.severity === "critical").length;
@@ -70,18 +72,18 @@ export default function Policy() {
       </div>
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} lg={8}>
-          <StatCard label="Servers at risk" value={`${data?.servers_at_risk ?? 0} / ${data?.servers_total ?? 0}`} Icon={SafetyOutlined} iconColor={(data?.servers_at_risk ?? 0) ? "#d48806" : "#3f8600"} />
+          <StatCard label={t("compliance.servers_at_risk")} value={`${data?.servers_at_risk ?? 0} / ${data?.servers_total ?? 0}`} Icon={SafetyOutlined} iconColor={(data?.servers_at_risk ?? 0) ? "#d48806" : "#3f8600"} />
         </Col>
         <Col xs={24} sm={12} lg={8}>
-          <StatCard label="Critical violations" value={critical} Icon={WarningOutlined} iconColor={critical ? "#cf1322" : "#3f8600"} />
+          <StatCard label={t("compliance.critical_violations")} value={critical} Icon={WarningOutlined} iconColor={critical ? "#cf1322" : "#3f8600"} />
         </Col>
         <Col xs={24} sm={12} lg={8}>
-          <StatCard label="Total violations" value={data?.total ?? 0} Icon={FileTextOutlined} iconColor="#8c8c8c" />
+          <StatCard label={t("compliance.total_violations")} value={data?.total ?? 0} Icon={FileTextOutlined} iconColor="#8c8c8c" />
         </Col>
       </Row>
       <Card>
         {data && data.total === 0 && !isLoading ? (
-          <Empty description="Fleet is compliant — no policy violations" />
+          <Empty description={t("compliance.fleet_is_compliant_no_policy_violations")} />
         ) : (
           <Table<Violation>
             scroll={{ x: "max-content" }}

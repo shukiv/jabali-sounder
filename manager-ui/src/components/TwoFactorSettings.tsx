@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Card, Button, Modal, Form, Input, Typography, Tag, Alert, App, Space } from "antd";
 import { SafetyCertificateOutlined } from "@ant-design/icons";
@@ -15,6 +16,7 @@ interface Me {
 // (M3). Enrollment shows the secret for manual entry into an authenticator app,
 // then confirms with a code before enabling.
 export default function TwoFactorSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { data: me } = useQuery({
@@ -55,7 +57,7 @@ export default function TwoFactorSettings() {
     setBusy(true);
     try {
       await apiClient.post("/auth/2fa/activate", { code: values.code });
-      message.success("Two-factor authentication enabled");
+      message.success(t("two_factor.two_factor_authentication_enabled"));
       setEnrollSecret(null);
       setOtpauthUrl(null);
       enrollForm.resetFields();
@@ -77,7 +79,7 @@ export default function TwoFactorSettings() {
     setBusy(true);
     try {
       await apiClient.post("/auth/2fa/disable", { password: values.password, code: values.code });
-      message.success("Two-factor authentication disabled");
+      message.success(t("two_factor.two_factor_authentication_disabled"));
       setDisableOpen(false);
       disableForm.resetFields();
       refetchMe();
@@ -120,7 +122,7 @@ export default function TwoFactorSettings() {
             {enrollSecret}
           </Text>
           <Form form={enrollForm} layout="inline">
-            <Form.Item name="code" rules={[{ required: true, message: "Enter the 6-digit code" }]}>
+            <Form.Item name="code" rules={[{ required: true, message: t("two_factor.enter_the_6_digit_code") }]}>
               <Input placeholder="123456" inputMode="numeric" maxLength={6} />
             </Form.Item>
             <Button type="primary" loading={busy} onClick={activate}>
@@ -135,7 +137,7 @@ export default function TwoFactorSettings() {
       )}
 
       <Modal
-        title="Disable two-factor authentication"
+        title={t("two_factor.disable_two_factor_authentication")}
         open={disableOpen}
         onOk={disable}
         confirmLoading={busy}
@@ -143,14 +145,14 @@ export default function TwoFactorSettings() {
           setDisableOpen(false);
           disableForm.resetFields();
         }}
-        okText="Disable"
+        okText={t("two_factor.disable")}
         okButtonProps={{ danger: true }}
       >
         <Form form={disableForm} layout="vertical">
-          <Form.Item name="password" label="Current password" rules={[{ required: true }]}>
+          <Form.Item name="password" label={t("two_factor.current_password")} rules={[{ required: true }]}>
             <Input.Password autoComplete="current-password" />
           </Form.Item>
-          <Form.Item name="code" label="Authenticator code" rules={[{ required: true }]}>
+          <Form.Item name="code" label={t("two_factor.authenticator_code")} rules={[{ required: true }]}>
             <Input inputMode="numeric" maxLength={6} placeholder="123456" />
           </Form.Item>
         </Form>

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 interface Series {
   label: string;
   color: string;
@@ -14,6 +15,7 @@ interface Props {
 // MetricChart is a dependency-free multi-series line chart with a shared Y axis
 // (default 0..100 for percentages), gridlines, and a legend (M6 / SND-25).
 export default function MetricChart({ series, timestamps, yMax = 100, height = 160 }: Props) {
+  const { t } = useTranslation();
   const width = 640;
   const padL = 32;
   const padB = 18;
@@ -37,7 +39,7 @@ export default function MetricChart({ series, timestamps, yMax = 100, height = 1
 
   return (
     <div style={{ overflowX: "auto" }}>
-      <svg width={width} height={height} style={{ display: "block", maxWidth: "100%" }} role="img" aria-label="metric chart">
+      <svg width={width} height={height} style={{ display: "block", maxWidth: "100%" }} role="img" aria-label={t("chart.metric_chart")}>
         {gridY.map((gv, i) => (
           <g key={i}>
             <line x1={padL} y1={y(gv)} x2={width - 4} y2={y(gv)} stroke="rgba(128,128,128,0.2)" strokeWidth={1} />

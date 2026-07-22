@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Card, Table, Button, Tag, Typography, App, Popconfirm } from "antd";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../apiClient";
@@ -21,6 +22,7 @@ interface SessionList {
 // SessionsSettings lists the operator's active logins and lets them revoke
 // others (or the current one, which logs out) (M3).
 export default function SessionsSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { data, isLoading } = useQuery({
@@ -32,11 +34,11 @@ export default function SessionsSettings() {
     try {
       await apiClient.delete(`/auth/sessions/${s.id}`);
       if (s.is_current) {
-        message.info("Session revoked — logging out");
+        message.info(t("sessions.session_revoked_logging_out"));
         window.location.reload();
         return;
       }
-      message.success("Session revoked");
+      message.success(t("sessions.session_revoked"));
       qc.invalidateQueries({ queryKey: ["sessions"] });
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -45,7 +47,7 @@ export default function SessionsSettings() {
 
   const columns = [
     {
-      title: "Device",
+      title: t("sessions.device"),
       dataIndex: "user_agent",
       key: "user_agent",
       render: (ua: string, r: Session) => (
@@ -60,20 +62,20 @@ export default function SessionsSettings() {
         </span>
       ),
     },
-    { title: "IP", dataIndex: "ip", key: "ip" },
+    { title: t("sessions.ip"), dataIndex: "ip", key: "ip" },
     {
-      title: "Last seen",
+      title: t("sessions.last_seen"),
       dataIndex: "last_seen_at",
       key: "last_seen_at",
       render: (t: string) => new Date(t).toLocaleString(),
     },
     {
-      title: "Actions",
+      title: t("sessions.actions"),
       key: "actions",
       render: (_: unknown, r: Session) => (
         <Popconfirm
           title={r.is_current ? "Revoke this session and log out?" : "Revoke this session?"}
-          okText="Revoke"
+          okText={t("sessions.revoke")}
           okButtonProps={{ danger: true }}
           onConfirm={() => revoke(r)}
         >

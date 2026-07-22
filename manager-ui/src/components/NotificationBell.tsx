@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Badge, Button, Dropdown, List, Typography, Empty, Tag, Space, App } from "antd";
 import {
   BellOutlined, CheckOutlined, ClockCircleOutlined, StopOutlined,
@@ -37,6 +38,7 @@ const SEV_COLOR: Record<string, string> = { info: "blue", warning: "gold", criti
 // badge and a dropdown; incidents can be acknowledged, snoozed, or muted.
 // Polls every 30s.
 export default function NotificationBell() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const nav = useNavigate();
   const { message } = App.useApp();
@@ -66,14 +68,14 @@ export default function NotificationBell() {
   const ack = async (id: string) => {
     try {
       await apiClient.post(`/admin/notifications/${id}/ack`);
-      message.success("Acknowledged");
+      message.success(t("notifications.acknowledged"));
       invalidate();
     } catch (err) { if (err instanceof Error) message.error(err.message); }
   };
   const snooze = async (id: string) => {
     try {
       await apiClient.post(`/admin/notifications/${id}/snooze`, { minutes: 60 });
-      message.success("Snoozed for 1h");
+      message.success(t("notifications.snoozed_for_1h"));
       invalidate();
     } catch (err) { if (err instanceof Error) message.error(err.message); }
   };
@@ -104,7 +106,7 @@ export default function NotificationBell() {
         {unread > 0 ? <Button type="link" size="small" onClick={markAll}>Mark all read</Button> : null}
       </div>
       {rows.length === 0 ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No notifications" style={{ padding: 24 }} />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("notifications.no_notifications")} style={{ padding: 24 }} />
       ) : (
         <List
           size="small"
@@ -154,7 +156,7 @@ export default function NotificationBell() {
   return (
     <Dropdown popupRender={() => panel} trigger={["click"]} placement="bottomRight">
       <Badge count={unread} size="small" offset={[-2, 4]}>
-        <Button type="text" icon={<BellOutlined />} title="Notifications" />
+        <Button type="text" icon={<BellOutlined />} title={t("notifications.notifications")} />
       </Badge>
     </Dropdown>
   );

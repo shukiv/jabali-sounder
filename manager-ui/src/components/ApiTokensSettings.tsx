@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
   Card,
@@ -46,6 +47,7 @@ const SCOPE_OPTIONS = [
 // ApiTokensSettings mints/lists/revokes read-only API tokens for external
 // tooling (M4). The plaintext token is shown exactly once, at creation.
 export default function ApiTokensSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { data, isLoading } = useQuery({
@@ -90,7 +92,7 @@ export default function ApiTokensSettings() {
   const revoke = async (id: string) => {
     try {
       await apiClient.delete(`/admin/api-tokens/${id}`);
-      message.success("Token revoked");
+      message.success(t("api_tokens.token_revoked"));
       qc.invalidateQueries({ queryKey: ["api-tokens"] });
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -101,7 +103,7 @@ export default function ApiTokensSettings() {
     try {
       const resp = await apiClient.post<{ token: string }>(`/admin/api-tokens/${id}/rotate`);
       setMinted(resp.data.token);
-      message.success("Token rotated — copy the new value now");
+      message.success(t("api_tokens.token_rotated_copy_the_new_value"));
       qc.invalidateQueries({ queryKey: ["api-tokens"] });
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -109,59 +111,59 @@ export default function ApiTokensSettings() {
   };
 
   const columns = [
-    { title: "Name", dataIndex: "name", key: "name" },
+    { title: t("api_tokens.name"), dataIndex: "name", key: "name" },
     {
-      title: "Created",
+      title: t("api_tokens.created"),
       dataIndex: "created_at",
       key: "created_at",
       render: (t: string) => new Date(t).toLocaleDateString(),
     },
     {
-      title: "Last used",
+      title: t("api_tokens.last_used"),
       dataIndex: "last_used_at",
       key: "last_used_at",
       render: (t?: string) => (t ? new Date(t).toLocaleString() : "never"),
     },
     {
-      title: "Expires",
+      title: t("api_tokens.expires"),
       dataIndex: "expires_at",
       key: "expires_at",
       render: (t?: string) => (t ? new Date(t).toLocaleDateString() : "never"),
     },
     {
-      title: "Scopes",
+      title: t("api_tokens.scopes"),
       dataIndex: "scopes",
       key: "scopes",
       render: (sc?: string[]) =>
         !sc || sc.length === 0 ? <Tag>read:*</Tag> : sc.map((x) => <Tag key={x}>{x}</Tag>),
     },
     {
-      title: "Source IPs",
+      title: t("api_tokens.source_ips"),
       dataIndex: "allowed_ips",
       key: "allowed_ips",
       render: (ips?: string[]) => (ips && ips.length ? ips.join(", ") : <Text type="secondary">any</Text>),
     },
     {
-      title: "Rate/min",
+      title: t("api_tokens.rate_min"),
       dataIndex: "rate_limit_per_min",
       key: "rate_limit_per_min",
       render: (n?: number) => (n && n > 0 ? n : <Text type="secondary">∞</Text>),
     },
     {
-      title: "Actions",
+      title: t("api_tokens.actions"),
       key: "actions",
       render: (_: unknown, r: ApiToken) => (
         <Space size={4}>
           <Popconfirm
             title={`Rotate "${r.name}"? The current token stops working immediately.`}
-            okText="Rotate"
+            okText={t("api_tokens.rotate")}
             onConfirm={() => rotate(r.id)}
           >
             <Button size="small">Rotate</Button>
           </Popconfirm>
           <Popconfirm
             title={`Revoke "${r.name}"?`}
-            okText="Revoke"
+            okText={t("api_tokens.revoke")}
             okButtonProps={{ danger: true }}
             onConfirm={() => revoke(r.id)}
           >
@@ -215,7 +217,7 @@ export default function ApiTokensSettings() {
       />
 
       <Modal
-        title="Create API token"
+        title={t("api_tokens.create_api_token")}
         open={open}
         onOk={mint}
         confirmLoading={busy}
@@ -223,22 +225,22 @@ export default function ApiTokensSettings() {
           setOpen(false);
           form.resetFields();
         }}
-        okText="Create"
+        okText={t("api_tokens.create")}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Name" rules={[{ required: true, message: "Name is required" }]}>
-            <Input placeholder="ci-monitoring" />
+          <Form.Item name="name" label={t("api_tokens.name")} rules={[{ required: true, message: t("api_tokens.name_is_required") }]}>
+            <Input placeholder={t("api_tokens.ci_monitoring")} />
           </Form.Item>
-          <Form.Item name="expires_in_days" label="Expires in (days, blank = never)">
+          <Form.Item name="expires_in_days" label={t("api_tokens.expires_in_days_blank_never")}>
             <InputNumber min={1} max={3650} style={{ width: "100%" }} />
           </Form.Item>
-          <Form.Item name="scopes" label="Scopes (blank = all reads)">
-            <Select mode="multiple" allowClear options={SCOPE_OPTIONS} placeholder="read:*" />
+          <Form.Item name="scopes" label={t("api_tokens.scopes_blank_all_reads")}>
+            <Select mode="multiple" allowClear options={SCOPE_OPTIONS} placeholder={t("api_tokens.read")} />
           </Form.Item>
-          <Form.Item name="allowed_ips" label="Source IP allowlist (comma-separated IP/CIDR, blank = any)">
-            <Input placeholder="203.0.113.7, 10.0.0.0/8" />
+          <Form.Item name="allowed_ips" label={t("api_tokens.source_ip_allowlist_comma_separated_ip")}>
+            <Input placeholder={t("api_tokens.203_0_113_7_10_0")} />
           </Form.Item>
-          <Form.Item name="rate_limit_per_min" label="Rate limit (requests/min, blank = unlimited)">
+          <Form.Item name="rate_limit_per_min" label={t("api_tokens.rate_limit_requests_min_blank_unlimited")}>
             <InputNumber min={1} max={100000} style={{ width: "100%" }} />
           </Form.Item>
         </Form>

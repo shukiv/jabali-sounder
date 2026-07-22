@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -92,6 +93,7 @@ function stampRows<T extends { id?: string }>(
 }
 
 export default function Mail() {
+  const { t } = useTranslation();
   const mail = useMail();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("mailboxes");
@@ -134,7 +136,7 @@ export default function Mail() {
 
   const mailboxColumns: TableColumnsType<ServerStamped<Mailbox>> = [
     {
-      title: "Mailbox",
+      title: t("mail.mailbox"),
       key: "email",
       render: (_, row) => (
         <Space direction="vertical" size={0}>
@@ -144,22 +146,22 @@ export default function Mail() {
       ),
       sorter: (a, b) => a.email.localeCompare(b.email),
     },
-    { title: "Domain", dataIndex: "domain_name", key: "domain_name" },
-    { title: "Owner", dataIndex: "user_username", key: "user_username", render: (value) => value || "—" },
-    { title: "Quota", dataIndex: "quota_bytes", key: "quota_bytes", render: (value) => bytes(value) },
-    { title: "Used", dataIndex: "last_usage_bytes", key: "last_usage_bytes", render: (value) => bytes(value) },
+    { title: t("mail.domain"), dataIndex: "domain_name", key: "domain_name" },
+    { title: t("mail.owner"), dataIndex: "user_username", key: "user_username", render: (value) => value || "—" },
+    { title: t("mail.quota"), dataIndex: "quota_bytes", key: "quota_bytes", render: (value) => bytes(value) },
+    { title: t("mail.used"), dataIndex: "last_usage_bytes", key: "last_usage_bytes", render: (value) => bytes(value) },
     {
-      title: "State",
+      title: t("mail.state"),
       dataIndex: "is_disabled",
       key: "is_disabled",
       render: (disabled) => disabled ? <Tag>disabled</Tag> : <Tag color="green">enabled</Tag>,
     },
-    { title: "Server", dataIndex: "server_name", key: "server_name", render: serverTag },
+    { title: t("mail.server"), dataIndex: "server_name", key: "server_name", render: serverTag },
   ];
 
   const groupColumns: TableColumnsType<ServerStamped<MailGroup>> = [
     {
-      title: "Group",
+      title: t("mail.group"),
       key: "email",
       render: (_, row) => (
         <Space direction="vertical" size={0}>
@@ -169,10 +171,10 @@ export default function Mail() {
       ),
       sorter: (a, b) => a.email.localeCompare(b.email),
     },
-    { title: "Kind", dataIndex: "group_kind", key: "group_kind", render: (value) => <Tag>{value}</Tag> },
-    { title: "Members", dataIndex: "member_count", key: "member_count" },
+    { title: t("mail.kind"), dataIndex: "group_kind", key: "group_kind", render: (value) => <Tag>{value}</Tag> },
+    { title: t("mail.members"), dataIndex: "member_count", key: "member_count" },
     {
-      title: "Services",
+      title: t("mail.services"),
       key: "services",
       render: (_, row) => (
         <Space wrap>
@@ -183,38 +185,38 @@ export default function Mail() {
         </Space>
       ),
     },
-    { title: "Scope", dataIndex: "internal_only", key: "internal_only", render: (value) => value ? <Tag color="orange">internal</Tag> : <Tag>public</Tag> },
-    { title: "Server", dataIndex: "server_name", key: "server_name", render: serverTag },
+    { title: t("mail.scope"), dataIndex: "internal_only", key: "internal_only", render: (value) => value ? <Tag color="orange">internal</Tag> : <Tag>public</Tag> },
+    { title: t("mail.server"), dataIndex: "server_name", key: "server_name", render: serverTag },
   ];
 
   const forwarderColumns: TableColumnsType<ServerStamped<MailForwarder>> = [
-    { title: "Mailbox", dataIndex: "mailbox_email", key: "mailbox_email" },
-    { title: "Type", dataIndex: "type", key: "type", render: (value) => <Tag>{value}</Tag> },
-    { title: "Local Part", dataIndex: "local_part", key: "local_part", render: (value) => value || "—" },
-    { title: "Target", dataIndex: "target", key: "target" },
-    { title: "Keep Copy", dataIndex: "keep_copy", key: "keep_copy", render: (value) => value ? <CheckCircleOutlined /> : "—" },
-    { title: "State", dataIndex: "enabled", key: "enabled", render: enabledTag },
-    { title: "Server", dataIndex: "server_name", key: "server_name", render: serverTag },
+    { title: t("mail.mailbox"), dataIndex: "mailbox_email", key: "mailbox_email" },
+    { title: t("mail.type"), dataIndex: "type", key: "type", render: (value) => <Tag>{value}</Tag> },
+    { title: t("mail.local_part"), dataIndex: "local_part", key: "local_part", render: (value) => value || "—" },
+    { title: t("mail.target"), dataIndex: "target", key: "target" },
+    { title: t("mail.keep_copy"), dataIndex: "keep_copy", key: "keep_copy", render: (value) => value ? <CheckCircleOutlined /> : "—" },
+    { title: t("mail.state"), dataIndex: "enabled", key: "enabled", render: enabledTag },
+    { title: t("mail.server"), dataIndex: "server_name", key: "server_name", render: serverTag },
   ];
 
   const domainForwarderColumns: TableColumnsType<ServerStamped<DomainForwarder>> = [
-    { title: "Domain", dataIndex: "domain_name", key: "domain_name" },
-    { title: "Type", dataIndex: "type", key: "type", render: (value) => <Tag>{value}</Tag> },
-    { title: "Local Part", dataIndex: "local_part", key: "local_part", render: (value) => value || "*" },
-    { title: "Target", dataIndex: "target", key: "target" },
-    { title: "Managed By", dataIndex: "managed_by", key: "managed_by", render: (value) => value || "—" },
-    { title: "State", dataIndex: "enabled", key: "enabled", render: enabledTag },
-    { title: "Server", dataIndex: "server_name", key: "server_name", render: serverTag },
+    { title: t("mail.domain"), dataIndex: "domain_name", key: "domain_name" },
+    { title: t("mail.type"), dataIndex: "type", key: "type", render: (value) => <Tag>{value}</Tag> },
+    { title: t("mail.local_part"), dataIndex: "local_part", key: "local_part", render: (value) => value || "*" },
+    { title: t("mail.target"), dataIndex: "target", key: "target" },
+    { title: t("mail.managed_by"), dataIndex: "managed_by", key: "managed_by", render: (value) => value || "—" },
+    { title: t("mail.state"), dataIndex: "enabled", key: "enabled", render: enabledTag },
+    { title: t("mail.server"), dataIndex: "server_name", key: "server_name", render: serverTag },
   ];
 
   const autoresponderColumns: TableColumnsType<ServerStamped<MailAutoresponder>> = [
-    { title: "Mailbox", dataIndex: "mailbox_email", key: "mailbox_email", render: (value, row) => value || row.mailbox_id },
-    { title: "Domain", dataIndex: "domain_name", key: "domain_name", render: (value) => value || "—" },
-    { title: "Subject", dataIndex: "subject", key: "subject", render: (value) => value || "—" },
-    { title: "From", dataIndex: "from_date", key: "from_date", render: dateText },
-    { title: "To", dataIndex: "to_date", key: "to_date", render: dateText },
-    { title: "State", dataIndex: "enabled", key: "enabled", render: enabledTag },
-    { title: "Server", dataIndex: "server_name", key: "server_name", render: serverTag },
+    { title: t("mail.mailbox"), dataIndex: "mailbox_email", key: "mailbox_email", render: (value, row) => value || row.mailbox_id },
+    { title: t("mail.domain"), dataIndex: "domain_name", key: "domain_name", render: (value) => value || "—" },
+    { title: t("mail.subject"), dataIndex: "subject", key: "subject", render: (value) => value || "—" },
+    { title: t("mail.from"), dataIndex: "from_date", key: "from_date", render: dateText },
+    { title: t("mail.to"), dataIndex: "to_date", key: "to_date", render: dateText },
+    { title: t("mail.state"), dataIndex: "enabled", key: "enabled", render: enabledTag },
+    { title: t("mail.server"), dataIndex: "server_name", key: "server_name", render: serverTag },
   ];
 
   const tableProps = {
@@ -236,31 +238,31 @@ export default function Mail() {
         <Alert
           type="warning"
           showIcon
-          title="Some server mail data is unavailable"
+          title={t("mail.some_server_mail_data_is_unavailable")}
           description={unavailable.map((row) => `${row.server.name}: ${row.error}`).join(" · ")}
         />
       )}
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} xl={6}>
-          <StatCard label="Mailboxes" value={rows.mailboxes.length} Icon={MailOutlined} iconColor="#1677ff" />
+          <StatCard label={t("mail.mailboxes")} value={rows.mailboxes.length} Icon={MailOutlined} iconColor="#1677ff" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <StatCard label="Forwarders" value={rows.forwarders.length + rows.domainForwarders.length} Icon={SwapOutlined} iconColor="#fa8c16" />
+          <StatCard label={t("mail.forwarders")} value={rows.forwarders.length + rows.domainForwarders.length} Icon={SwapOutlined} iconColor="#fa8c16" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <StatCard label="Groups" value={rows.groups.length} Icon={TeamOutlined} iconColor="#9254de" />
+          <StatCard label={t("mail.groups")} value={rows.groups.length} Icon={TeamOutlined} iconColor="#9254de" />
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <StatCard label="Autoresponders" value={rows.autoresponders.length} Icon={CheckCircleOutlined} iconColor="#3f8600" />
+          <StatCard label={t("mail.autoresponders")} value={rows.autoresponders.length} Icon={CheckCircleOutlined} iconColor="#3f8600" />
         </Col>
       </Row>
 
       <Card>
         <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
           <Input
-            placeholder="Search mail stack..."
-            aria-label="Search mail"
+            placeholder={t("mail.search_mail_stack")}
+            aria-label={t("mail.search_mail")}
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -338,7 +340,7 @@ export default function Mail() {
                 value={activeTab}
                 onChange={setActiveTab}
                 style={{ width: "100%", marginBottom: 12 }}
-                aria-label="Mail category"
+                aria-label={t("mail.mail_category")}
                 options={mailTabs.map((t) => ({ value: t.key, label: t.label }))}
               />
               {mailTabs.find((t) => t.key === activeTab)?.children}

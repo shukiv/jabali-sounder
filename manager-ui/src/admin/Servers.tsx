@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useMemo, useState } from "react";
 import {
   Card,
@@ -85,6 +86,7 @@ function hostnameFromBaseURL(baseURL: string) {
 }
 
 export default function Servers() {
+  const { t } = useTranslation();
   const { data: servers, isLoading } = useServers();
   const createMut = useCreateServer();
   const updateMut = useUpdateServer();
@@ -231,7 +233,7 @@ export default function Servers() {
             ? { token_secret: values.token_secret }
             : {}),
         });
-        message.success("Server updated successfully");
+        message.success(t("servers.server_updated_successfully"));
       } else {
         await createMut.mutateAsync({
           name: values.name,
@@ -243,7 +245,7 @@ export default function Servers() {
           environment: values.environment,
           insecure_skip_verify: values.insecure_skip_verify,
         });
-        message.success("Server enrolled successfully");
+        message.success(t("servers.server_enrolled_successfully"));
       }
       closeDrawer();
     } catch (err) {
@@ -286,9 +288,9 @@ export default function Servers() {
       if (result.reachable && result.credential_valid) {
         message.success(`Server healthy — version ${result.version}`);
       } else if (!result.reachable) {
-        message.error("Server unreachable");
+        message.error(t("servers.server_unreachable"));
       } else {
-        message.warning("Server reachable but credentials invalid");
+        message.warning(t("servers.server_reachable_but_credentials_invalid"));
       }
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -296,10 +298,10 @@ export default function Servers() {
   };
 
   const columns = [
-    { title: "Name", dataIndex: "name", key: "name" },
-    { title: "Version", dataIndex: "version", key: "version" },
+    { title: t("servers.name"), dataIndex: "name", key: "name" },
+    { title: t("servers.version"), dataIndex: "version", key: "version" },
     {
-      title: "Tags",
+      title: t("servers.tags"),
       dataIndex: "tags",
       key: "tags",
       render: (tags: string[]) => (
@@ -311,19 +313,19 @@ export default function Servers() {
       ),
     },
     {
-      title: "Status",
+      title: t("servers.status"),
       dataIndex: "status",
       key: "status",
       render: (s: string) => statusTag(s),
     },
     {
-      title: "Credentials",
+      title: t("servers.credentials"),
       dataIndex: "credential_status",
       key: "credential_status",
       render: (c: string) => credTag(c),
     },
     {
-      title: "Scopes",
+      title: t("servers.scopes"),
       dataIndex: "scopes",
       key: "scopes",
       render: (s: string[]) => (
@@ -335,7 +337,7 @@ export default function Servers() {
       ),
     },
     {
-      title: "URL",
+      title: t("servers.url"),
       dataIndex: "base_url",
       key: "base_url",
       render: (u: string) => (
@@ -345,7 +347,7 @@ export default function Servers() {
       ),
     },
     {
-      title: "Actions",
+      title: t("servers.actions"),
       key: "actions",
       width: 130,
       render: (_: unknown, record: Server) => (
@@ -353,14 +355,14 @@ export default function Servers() {
           actions={[
             {
               key: "check",
-              label: "Check",
+              label: t("servers.check"),
               icon: <ReloadOutlined />,
               loading: checkMut.isPending && checkMut.variables === record.id,
               onClick: () => handleCheck(record.id),
             },
             {
               key: "history",
-              label: "History",
+              label: t("servers.history"),
               icon: <HistoryOutlined />,
               onClick: () => setHistoryServer(record),
             },
@@ -368,27 +370,27 @@ export default function Servers() {
               ? [
                   {
                     key: "edit",
-                    label: "Edit",
+                    label: t("servers.edit"),
                     icon: <EditOutlined />,
                     onClick: () => openEdit(record),
                   },
                   record.status === "disabled"
                     ? {
                         key: "enable",
-                        label: "Enable",
+                        label: t("servers.enable"),
                         icon: <PlayCircleOutlined />,
                         onClick: () => handleEnable(record.id, record.name),
                       }
                     : {
                         key: "disable",
-                        label: "Disable",
+                        label: t("servers.disable"),
                         icon: <PoweroffOutlined />,
                         onClick: () => handleDisable(record.id, record.name),
                       },
                   ...(supports(record, "restart") || supports(record, "service")
                     ? [{
                         key: "restart-service",
-                        label: "Restart service",
+                        label: t("servers.restart_service"),
                         icon: <ReloadOutlined />,
                         onClick: () => setRestartServer(record),
                       }]
@@ -396,32 +398,31 @@ export default function Servers() {
                   ...(supports(record, "cache")
                     ? [{
                         key: "purge-cache",
-                        label: "Purge cache",
+                        label: t("servers.purge_cache"),
                         icon: <ReloadOutlined />,
                         onClick: () => runAction(record.id, "purge-cache", { scope: "all" }, "Cache purged"),
-                        confirm: { title: `Purge all cache on "${record.name}"?`, okText: "Purge" },
+                        confirm: { title: `Purge all cache on "${record.name}"?`, okText: t("servers.purge") },
                       }]
                     : []),
                   ...(supports(record, "backup")
                     ? [{
                         key: "backup",
-                        label: "Trigger backup",
+                        label: t("servers.trigger_backup"),
                         icon: <ReloadOutlined />,
                         onClick: () => runAction(record.id, "backup", {}, "Backup started"),
-                        confirm: { title: `Start a backup on "${record.name}"?`, okText: "Start" },
+                        confirm: { title: `Start a backup on "${record.name}"?`, okText: t("servers.start") },
                       }]
                     : []),
                   {
                     key: "delete",
-                    label: "Delete",
+                    label: t("servers.delete"),
                     icon: <DeleteOutlined />,
                     danger: true,
                     onClick: () => handleDelete(record.id, record.name),
                     confirm: {
                       title: `Delete server "${record.name}"?`,
-                      description:
-                        "Permanently removes it and its heartbeat history. This cannot be undone.",
-                      okText: "Delete",
+                      description: t("servers.permanently_removes_it_and_its_heartbeat"),
+                      okText: t("servers.delete"),
                     },
                   },
                 ]
@@ -440,8 +441,8 @@ export default function Servers() {
           <Select
             mode="multiple"
             allowClear
-            aria-label="Filter servers by tags"
-            placeholder="Filter by tags"
+            aria-label={t("servers.filter_servers_by_tags")}
+            placeholder={t("servers.filter_by_tags")}
             value={tagFilter}
             options={tagOptions}
             onChange={setTagFilter}
@@ -450,8 +451,8 @@ export default function Servers() {
           />
           <Select
             allowClear
-            aria-label="Filter servers by environment"
-            placeholder="Environment"
+            aria-label={t("servers.filter_servers_by_environment")}
+            placeholder={t("servers.environment")}
             value={envFilter}
             options={envOptions}
             onChange={setEnvFilter}
@@ -527,19 +528,19 @@ export default function Servers() {
         <Form form={form} layout="vertical" requiredMark>
           <Form.Item
             name="name"
-            label="Server Name"
-            rules={[{ required: true, message: "Enter a display name" }]}
+            label={t("servers.server_name")}
+            rules={[{ required: true, message: t("servers.enter_a_display_name") }]}
           >
-            <Input placeholder="e.g. panel-01.example.com" />
+            <Input placeholder={t("servers.e_g_panel_01_example_com")} />
           </Form.Item>
           <Form.Item
             name="panel_host"
-            label="Server Hostname"
+            label={t("servers.server_hostname")}
             rules={[
-              { required: true, message: "Enter the panel hostname" },
+              { required: true, message: t("servers.enter_the_panel_hostname") },
               {
                 pattern: /^[a-zA-Z0-9.-]+$/,
-                message: "Enter only the hostname, without https:// or port",
+                message: t("servers.enter_only_the_hostname_without_https"),
               },
             ]}
             extra="Sounder connects to the panel at https://hostname:8443."
@@ -548,18 +549,18 @@ export default function Servers() {
           </Form.Item>
           <Form.Item
             name="token_id"
-            label="Automation Token ID"
-            rules={[{ required: true, message: "Enter the token ID (ULID)" }]}
+            label={t("servers.automation_token_id")}
+            rules={[{ required: true, message: t("servers.enter_the_token_id_ulid") }]}
           >
             <Input placeholder="01J..." />
           </Form.Item>
           <Form.Item
             name="token_secret"
-            label="Automation Token Secret"
+            label={t("servers.automation_token_secret")}
             rules={
               editingServer
                 ? []
-                : [{ required: true, message: "Enter the token secret" }]
+                : [{ required: true, message: t("servers.enter_the_token_secret") }]
             }
             extra={
               editingServer
@@ -572,16 +573,16 @@ export default function Servers() {
               autoComplete="new-password"
             />
           </Form.Item>
-          <Form.Item name="scopes" label="Scopes">
+          <Form.Item name="scopes" label={t("servers.scopes")}>
             <Select
               mode="multiple"
-              placeholder="Leave empty for read:* (all read access)"
+              placeholder={t("servers.leave_empty_for_read_all_read")}
               options={scopeOptions}
             />
           </Form.Item>
           <Form.Item
             name="tags"
-            label="Tags"
+            label={t("servers.tags")}
             rules={[
               {
                 validator: async (_, tags: string[] = []) => {
@@ -601,10 +602,10 @@ export default function Servers() {
               mode="tags"
               tokenSeparators={[","]}
               maxCount={20}
-              placeholder="production, eu-west, customer-a"
+              placeholder={t("servers.production_eu_west_customer_a")}
             />
           </Form.Item>
-          <Form.Item name="environment" label="Environment">
+          <Form.Item name="environment" label={t("servers.environment")}>
             <AutoComplete
               allowClear
               options={envOptions.length ? envOptions : [
@@ -641,10 +642,10 @@ export default function Servers() {
           setRestartServer(null);
           restartForm.resetFields();
         }}
-        okText="Restart"
+        okText={t("servers.restart")}
       >
         <Form form={restartForm} layout="vertical">
-          <Form.Item name="name" label="Service name" rules={[{ required: true, message: "Enter a service name" }]}>
+          <Form.Item name="name" label={t("servers.service_name")} rules={[{ required: true, message: t("servers.enter_a_service_name") }]}>
             <Input placeholder="nginx" />
           </Form.Item>
         </Form>

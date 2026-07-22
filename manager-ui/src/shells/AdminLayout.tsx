@@ -189,7 +189,7 @@ export default function AdminLayout() {
             type="text"
             icon={<SearchOutlined />}
             onClick={() => setSearchOpen(true)}
-            title="Search (Ctrl/Cmd+K)"
+            title={t("shell.search_ctrl_cmd_k")}
           />
           <UpdatePill />
           <NotificationBell />

@@ -14,6 +14,7 @@ import {
   Tooltip,
   Typography,
 } from "antd";
+import { useTranslation } from "react-i18next";
 import { StatCard } from "../components/StatCard";
 import MetricChart from "../components/MetricChart";
 import MonitorRowDetails from "../components/MonitorRowDetails";
@@ -129,6 +130,7 @@ interface HistoryRow {
 }
 
 export default function Monitor() {
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const [range, setRange] = useState("live");
   const [autoMs, setAutoMs] = useState(10000);
@@ -185,7 +187,7 @@ export default function Monitor() {
       if (res?.healthy === false) message.warning(`${ref.name}: health check reported unhealthy`);
       else message.success(`${ref.name}: health check complete`);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : "Health check failed");
+      message.error(err instanceof Error ? err.message: t("monitor.health_check_failed"));
     }
   };
   const disableMonitoring = async (ref: MonitorServerRef) => {
@@ -193,7 +195,7 @@ export default function Monitor() {
       await disableMut.mutateAsync(ref.id);
       message.success(`Monitoring disabled for ${ref.name}`);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : "Failed to disable monitoring");
+      message.error(err instanceof Error ? err.message: t("monitor.failed_to_disable_monitoring"));
     }
   };
 
@@ -204,7 +206,7 @@ export default function Monitor() {
 
   const liveColumns = [
     {
-      title: "Server",
+      title: t("monitor.server"),
       key: "server",
       width: 280,
       sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.server.name, b.server.name),
@@ -222,7 +224,7 @@ export default function Monitor() {
               </Button>
               {reasons.length > 0 ? (
                 <Tooltip title={reasons.join("; ")}>
-                  <WarningOutlined aria-label="Needs attention" style={{ color: "#faad14" }} />
+                  <WarningOutlined aria-label={t("monitor.needs_attention")} style={{ color: "#faad14" }} />
                 </Tooltip>
               ) : null}
             </Space>
@@ -237,7 +239,7 @@ export default function Monitor() {
       },
     },
     {
-      title: "State",
+      title: t("monitor.state"),
       key: "state",
       width: 120,
       sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) =>
@@ -254,7 +256,7 @@ export default function Monitor() {
       ),
     },
     {
-      title: "CPU",
+      title: t("monitor.cpu"),
       key: "cpu",
       sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.cpu_percent, b.cpu_percent),
       render: (_: unknown, row: MonitorLiveEntry) => (
@@ -265,7 +267,7 @@ export default function Monitor() {
       ),
     },
     {
-      title: "RAM",
+      title: t("monitor.ram"),
       key: "ram",
       sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.ram_percent, b.ram_percent),
       render: (_: unknown, row: MonitorLiveEntry) => (
@@ -279,7 +281,7 @@ export default function Monitor() {
       ),
     },
     {
-      title: "Disk",
+      title: t("monitor.disk"),
       key: "disk",
       sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) =>
         compareValues(summaryByID.get(a.server.id)?.disk_percent, summaryByID.get(b.server.id)?.disk_percent),
@@ -294,7 +296,7 @@ export default function Monitor() {
       },
     },
     {
-      title: "Uptime",
+      title: t("monitor.uptime"),
       key: "uptime",
       width: 100,
       sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.uptime_seconds, b.uptime_seconds),
@@ -302,7 +304,7 @@ export default function Monitor() {
         row.available ? <Text>{fmtUptime(row.uptime_seconds)}</Text> : <Text type="secondary">—</Text>,
     },
     {
-      title: "Connection",
+      title: t("monitor.connection"),
       key: "connection",
       width: 170,
       sorter: (a: MonitorLiveEntry, b: MonitorLiveEntry) => compareValues(a.api_latency_ms, b.api_latency_ms),
@@ -318,17 +320,17 @@ export default function Monitor() {
       ),
     },
     {
-      title: "Actions",
+      title: t("monitor.actions"),
       key: "actions",
       width: 240,
       render: (_: unknown, row: MonitorLiveEntry) => (
         <RowActions
           actions={[
-            { key: "details", label: "View details", icon: <ProfileOutlined />, onClick: () => openDetails(row.server) },
-            { key: "panel", label: "Open panel", icon: <LinkOutlined />, onClick: () => openPanel(row.server.base_url) },
+            { key: "details", label: t("monitor.view_details"), icon: <ProfileOutlined />, onClick: () => openDetails(row.server) },
+            { key: "panel", label: t("monitor.open_panel"), icon: <LinkOutlined />, onClick: () => openPanel(row.server.base_url) },
             {
               key: "check",
-              label: "Run health check",
+              label: t("monitor.run_health_check"),
               icon: <ReloadOutlined />,
               loading: checkMut.isPending && checkMut.variables === row.server.id,
               onClick: () => runCheck(row.server),
@@ -337,7 +339,7 @@ export default function Monitor() {
               ? [
                   {
                     key: "disable",
-                    label: "Disable monitoring",
+                    label: t("monitor.disable_monitoring"),
                     icon: <PoweroffOutlined />,
                     danger: true,
                     onClick: () => disableMonitoring(row.server),
@@ -345,7 +347,7 @@ export default function Monitor() {
                       title: `Disable monitoring for "${row.server.name}"?`,
                       description:
                         "Stops health checks and metric polling for this server. This does NOT delete the server or its history — you can re-enable it anytime.",
-                      okText: "Disable monitoring",
+                      okText: t("monitor.disable_monitoring"),
                     },
                   },
                 ]
@@ -365,7 +367,7 @@ export default function Monitor() {
 
   const historyColumns = [
     {
-      title: "Server",
+      title: t("monitor.server"),
       key: "server",
       sorter: (a: HistoryRow, b: HistoryRow) => compareValues(a.server.name, b.server.name),
       render: (_: unknown, row: HistoryRow) => (
@@ -376,7 +378,7 @@ export default function Monitor() {
       ),
     },
     {
-      title: "Trend (CPU / RAM)",
+      title: t("monitor.trend_cpu_ram"),
       key: "trend",
       render: (_: unknown, row: HistoryRow) => {
         if (row.isLoading) return <Spin size="small" />;
@@ -389,19 +391,19 @@ export default function Monitor() {
               height={52}
               timestamps={ts}
               series={[
-                { label: "CPU", color: "#1677ff", values: row.samples.map((s) => s.cpu_percent ?? 0) },
-                { label: "RAM", color: "#722ed1", values: row.samples.map((s) => s.ram_percent ?? 0) },
+                { label: t("monitor.cpu"), color: "#1677ff", values: row.samples.map((s) => s.cpu_percent ?? 0) },
+                { label: t("monitor.ram"), color: "#722ed1", values: row.samples.map((s) => s.ram_percent ?? 0) },
               ]}
             />
           </div>
         );
       },
     },
-    { title: "CPU avg / peak", key: "cpu", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.cpu_percent)), mean(b.samples.map((s) => s.cpu_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.cpu_percent)) },
-    { title: "RAM avg / peak", key: "ram", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.ram_percent)), mean(b.samples.map((s) => s.ram_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.ram_percent)) },
-    { title: "Disk avg / peak", key: "disk", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.disk_percent)), mean(b.samples.map((s) => s.disk_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.disk_percent)) },
+    { title: t("monitor.cpu_avg_peak"), key: "cpu", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.cpu_percent)), mean(b.samples.map((s) => s.cpu_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.cpu_percent)) },
+    { title: t("monitor.ram_avg_peak"), key: "ram", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.ram_percent)), mean(b.samples.map((s) => s.ram_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.ram_percent)) },
+    { title: t("monitor.disk_avg_peak"), key: "disk", sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.disk_percent)), mean(b.samples.map((s) => s.disk_percent))), render: (_: unknown, row: HistoryRow) => rangeText(row, row.samples.map((s) => s.disk_percent)) },
     {
-      title: "Load avg",
+      title: t("monitor.load_avg"),
       key: "load",
       sorter: (a: HistoryRow, b: HistoryRow) => compareValues(mean(a.samples.map((s) => s.load1)), mean(b.samples.map((s) => s.load1))),
       render: (_: unknown, row: HistoryRow) => {
@@ -411,7 +413,7 @@ export default function Monitor() {
         return <Text type="secondary">{typeof m === "number" ? m.toFixed(2) : "n/a"}</Text>;
       },
     },
-    { title: "Samples", key: "samples", sorter: (a: HistoryRow, b: HistoryRow) => a.samples.length - b.samples.length, render: (_: unknown, row: HistoryRow) => row.isError ? <Text type="secondary">—</Text> : <Text type="secondary">{row.samples.length}</Text> },
+    { title: t("monitor.samples"), key: "samples", sorter: (a: HistoryRow, b: HistoryRow) => a.samples.length - b.samples.length, render: (_: unknown, row: HistoryRow) => row.isError ? <Text type="secondary">—</Text> : <Text type="secondary">{row.samples.length}</Text> },
   ];
 
   // ---- Fleet summary cards (SND-84, live mode: six focused values) ----
@@ -439,13 +441,13 @@ export default function Monitor() {
       <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
         <Space wrap>
           <Title level={3} style={{ margin: 0 }}>Monitor</Title>
-          <Segmented options={RANGE_OPTIONS} value={range} onChange={(v) => setRange(v as string)} aria-label="Monitor time range" />
+          <Segmented options={RANGE_OPTIONS} value={range} onChange={(v) => setRange(v as string)} aria-label={t("monitor.monitor_time_range")} />
         </Space>
         {isLive ? (
           <Space wrap>
             <Space size={4}>
               <Text type="secondary" style={{ fontSize: 12 }}>Auto refresh:</Text>
-              <Segmented size="small" options={AUTO_OPTIONS} value={autoMs} onChange={(v) => setAutoMs(Number(v))} aria-label="Auto refresh interval" />
+              <Segmented size="small" options={AUTO_OPTIONS} value={autoMs} onChange={(v) => setAutoMs(Number(v))} aria-label={t("monitor.auto_refresh_interval")} />
             </Space>
             <Text type={stale ? "warning" : "secondary"} style={{ fontSize: 12 }}>
               {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString()}${stale ? " · stale" : ""}` : "—"}
@@ -486,17 +488,17 @@ export default function Monitor() {
 
       {isLive ? (
         <div className="monitor-summary-grid">
-          <StatCard label="Server health" value={`${healthyRows.length} healthy · ${Math.max(issueCount, 0)} issues`} Icon={DashboardOutlined} iconColor={issueCount > 0 ? "#faad14" : "#52c41a"} />
+          <StatCard label={t("monitor.server_health")} value={`${healthyRows.length} healthy · ${Math.max(issueCount, 0)} issues`} Icon={DashboardOutlined} iconColor={issueCount > 0 ? "#faad14" : "#52c41a"} />
           <StatCard label={`Avg CPU (${cpuSamples.length}/${activeRows.length})`} value={pctText(avgCpu)} Icon={ThunderboltOutlined} iconColor="#fa8c16" />
           <StatCard label={`Avg RAM (${ramSamples.length}/${activeRows.length})`} value={pctText(avgRam)} Icon={HddOutlined} iconColor="#9254de" />
-          <StatCard label="Storage used" value={`${bytes(storageUsed)} / ${bytes(storageTotal)}`} Icon={CloudServerOutlined} iconColor="#1677ff" />
-          <StatCard label="Accounts" value={accountsTotal.toLocaleString()} Icon={TeamOutlined} iconColor="#13c2c2" />
-          <StatCard label="Domains" value={domainsTotal.toLocaleString()} Icon={GlobalOutlined} iconColor="#eb2f96" />
+          <StatCard label={t("monitor.storage_used")} value={`${bytes(storageUsed)} / ${bytes(storageTotal)}`} Icon={CloudServerOutlined} iconColor="#1677ff" />
+          <StatCard label={t("monitor.accounts")} value={accountsTotal.toLocaleString()} Icon={TeamOutlined} iconColor="#13c2c2" />
+          <StatCard label={t("monitor.domains")} value={domainsTotal.toLocaleString()} Icon={GlobalOutlined} iconColor="#eb2f96" />
         </div>
       ) : (
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} xl={6}>
-            <StatCard label="Servers with data" value={`${withData} / ${roster.length}`} Icon={DashboardOutlined} iconColor="#1677ff" />
+            <StatCard label={t("monitor.servers_with_data")} value={`${withData} / ${roster.length}`} Icon={DashboardOutlined} iconColor="#1677ff" />
           </Col>
           <Col xs={24} sm={12} xl={6}>
             <StatCard label={`Avg CPU (${range})`} value={pctText(fleetCpu)} Icon={ThunderboltOutlined} iconColor="#fa8c16" />
@@ -505,7 +507,7 @@ export default function Monitor() {
             <StatCard label={`Avg RAM (${range})`} value={pctText(fleetRam)} Icon={HddOutlined} iconColor="#9254de" />
           </Col>
           <Col xs={24} sm={12} xl={6}>
-            <StatCard label="Accounts / Domains" value={`${accountsTotal.toLocaleString()} / ${domainsTotal.toLocaleString()}`} Icon={TeamOutlined} iconColor="#13c2c2" />
+            <StatCard label={t("monitor.accounts_domains")} value={`${accountsTotal.toLocaleString()} / ${domainsTotal.toLocaleString()}`} Icon={TeamOutlined} iconColor="#13c2c2" />
           </Col>
         </Row>
       )}

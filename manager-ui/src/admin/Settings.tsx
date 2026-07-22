@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Alert, App, Button, Card, Form, Input, Space, Typography, Upload } from "antd";
 import { DownloadOutlined, UploadOutlined, LockOutlined } from "@ant-design/icons";
@@ -25,6 +26,7 @@ interface ImportResult {
 }
 
 export default function Settings() {
+  const { t } = useTranslation();
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const [exporting, setExporting] = useState(false);
@@ -47,7 +49,7 @@ export default function Settings() {
         current_password: values.current_password,
         new_password: values.new_password,
       });
-      message.success("Password changed");
+      message.success(t("settings.password_changed"));
       pwForm.resetFields();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -73,7 +75,7 @@ export default function Settings() {
       if (bridge && isMobileApp()) {
         // Android/iOS have no save-file dialog — share the export instead.
         await bridge.ShareText?.(text);
-        message.success("Opened the share sheet — save the file from there");
+        message.success(t("settings.opened_the_share_sheet_save_the"));
         return;
       }
       if (bridge?.SaveFile) {
@@ -90,7 +92,7 @@ export default function Settings() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      message.success("Settings exported");
+      message.success(t("settings.settings_exported"));
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     } finally {
@@ -119,7 +121,7 @@ export default function Settings() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      message.success("Fleet CSV exported");
+      message.success(t("settings.fleet_csv_exported"));
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     } finally {
@@ -143,7 +145,7 @@ export default function Settings() {
       }
     } catch (err) {
       if (err instanceof SyntaxError) {
-        message.error("Import file is not valid JSON");
+        message.error(t("settings.import_file_is_not_valid_json"));
       } else if (err instanceof Error) {
         message.error(err.message);
       }
@@ -179,7 +181,7 @@ export default function Settings() {
         <Title level={3} style={{ margin: 0 }}>Settings</Title>
       </Space>
 
-      <nav className="settings-section-nav" aria-label="Settings sections">
+      <nav className="settings-section-nav" aria-label={t("settings.settings_sections")}>
         <a href="#sec-import">Import / Export</a>
         <a href="#sec-password">Password</a>
         <a href="#sec-2fa">Two-factor</a>
@@ -191,7 +193,7 @@ export default function Settings() {
       </nav>
 
       <section id="sec-import">
-      <Card title="Import / Export">
+      <Card title={t("settings.import_export")}>
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
           <Paragraph type="secondary" style={{ margin: 0 }}>
             Export the current Sounder settings and enrolled server list as JSON.
@@ -211,10 +213,10 @@ export default function Settings() {
               loading={exporting}
               onClick={() =>
                 modal.confirm({
-                  title: "Export with token secrets?",
+                  title: t("settings.export_with_token_secrets"),
                   content:
                     "The file will contain your panels' token secrets in PLAINTEXT so it can be imported on another install. Anyone with the file can control those panels — store it like a password and delete it after use.",
-                  okText: "Export with secrets",
+                  okText: t("settings.export_with_secrets"),
                   okButtonProps: { danger: true },
                   onOk: () => handleExport(true),
                 })
@@ -245,7 +247,7 @@ export default function Settings() {
             type="info"
             showIcon
             message="Portable imports"
-            description="For a different Sounder install, add token_secret values to the imported JSON or rotate tokens after import."
+            description={t("settings.for_a_different_sounder_install_add")}
           />
           {lastImport && (
             <Alert
@@ -267,7 +269,7 @@ export default function Settings() {
       </section>
 
       <section id="sec-password">
-      <Card title="Change Password" style={{ marginTop: 16 }}>
+      <Card title={t("settings.change_password")} style={{ marginTop: 16 }}>
         <Form
           form={pwForm}
           layout="vertical"
@@ -276,27 +278,27 @@ export default function Settings() {
         >
           <Form.Item
             name="current_password"
-            label="Current password"
-            rules={[{ required: true, message: "Enter your current password" }]}
+            label={t("settings.current_password")}
+            rules={[{ required: true, message: t("settings.enter_your_current_password") }]}
           >
             <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
           </Form.Item>
           <Form.Item
             name="new_password"
-            label="New password"
+            label={t("settings.new_password")}
             rules={[
-              { required: true, message: "Enter a new password" },
-              { min: 8, message: "At least 8 characters" },
+              { required: true, message: t("settings.enter_a_new_password") },
+              { min: 8, message: t("settings.at_least_8_characters") },
             ]}
           >
             <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
           </Form.Item>
           <Form.Item
             name="confirm_password"
-            label="Confirm new password"
+            label={t("settings.confirm_new_password")}
             dependencies={["new_password"]}
             rules={[
-              { required: true, message: "Confirm the new password" },
+              { required: true, message: t("settings.confirm_the_new_password") },
               ({ getFieldValue }) => ({
                 validator(_, value) {
                   if (!value || getFieldValue("new_password") === value) {

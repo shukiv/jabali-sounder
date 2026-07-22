@@ -7,6 +7,7 @@
 // Destructive actions pass `confirm` (a Modal.confirm pops before onClick) so
 // the menu can hold a Delete without nesting a Popconfirm inside the dropdown.
 
+import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 import { Dropdown, Modal, Space, Tooltip } from "antd";
 import { EllipsisOutlined } from "@ant-design/icons";
@@ -46,6 +47,7 @@ function run(a: RowAction) {
 }
 
 export function RowActions({ actions }: { actions: RowAction[] }) {
+  const { t } = useTranslation();
   const visible = actions.filter((a) => !a.hidden);
   if (visible.length === 0) {
     return null;
@@ -81,7 +83,7 @@ export function RowActions({ actions }: { actions: RowAction[] }) {
             })),
           }}
         >
-          <RowActionButton icon={<EllipsisOutlined />} color="default" aria-label="More actions" />
+          <RowActionButton icon={<EllipsisOutlined />} color="default" aria-label={t("actions.more_actions")} />
         </Dropdown>
       )}
     </Space>

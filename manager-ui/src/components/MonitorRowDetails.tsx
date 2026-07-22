@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Descriptions, Space, Tag, Tooltip, Typography } from "antd";
 import {
   CheckCircleFilled,
@@ -92,6 +93,7 @@ interface Props {
 // when the managed Panel reports them (JAB-150); otherwise fields stay explicitly
 // unknown/unsupported.
 export default function MonitorRowDetails({ entry }: Props) {
+  const { t } = useTranslation();
   const serverCaps = entry.server.capabilities;
   const latency = entry.api_latency_ms;
   const lastHb = entry.server.last_heartbeat_at;
@@ -150,7 +152,7 @@ export default function MonitorRowDetails({ entry }: Props) {
           items={[
             {
               key: "latency",
-              label: "Panel API latency",
+              label: t("monitor_details.panel_api_latency"),
               children:
                 typeof latency === "number" ? (
                   <Text>{latency} ms <Text type="secondary" style={{ fontSize: 12 }}>(GET /automation/status)</Text></Text>
@@ -160,18 +162,18 @@ export default function MonitorRowDetails({ entry }: Props) {
             },
             {
               key: "heartbeat",
-              label: "Last successful heartbeat",
+              label: t("monitor_details.last_successful_heartbeat"),
               children: lastHb ? (
                 <Text>{fmtAbs(lastHb)} <Text type="secondary" style={{ fontSize: 12 }}>({fmtAge(lastHb)})</Text></Text>
               ) : (
                 <Text type="secondary">never</Text>
               ),
             },
-            { key: "down", label: "Download rate", children: net ? <Text>{fmtRate(net.download_bps)}</Text> : unsupportedTag },
-            { key: "up", label: "Upload rate", children: net ? <Text>{fmtRate(net.upload_bps)}</Text> : unsupportedTag },
+            { key: "down", label: t("monitor_details.download_rate"), children: net ? <Text>{fmtRate(net.download_bps)}</Text> : unsupportedTag },
+            { key: "up", label: t("monitor_details.upload_rate"), children: net ? <Text>{fmtRate(net.upload_bps)}</Text> : unsupportedTag },
             {
               key: "loss",
-              label: "Packet loss",
+              label: t("monitor_details.packet_loss"),
               children: net ? (
                 <Text>{net.packet_loss_pct.toFixed(1)}%{net.window_seconds ? <Text type="secondary" style={{ fontSize: 12 }}> ({net.window_seconds}s)</Text> : null}</Text>
               ) : (
@@ -180,7 +182,7 @@ export default function MonitorRowDetails({ entry }: Props) {
             },
             {
               key: "ntp",
-              label: "Clock (NTP)",
+              label: t("monitor_details.clock_ntp"),
               children:
                 entry.ntp_synced === undefined ? (
                   <Text type="secondary">unknown</Text>
