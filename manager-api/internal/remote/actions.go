@@ -52,7 +52,7 @@ func (c *Client) post(ctx context.Context, path string, body any) (*ActionResult
 	defer func() { _ = resp.Body.Close() }()
 
 	var result ActionResult
-	_ = json.NewDecoder(resp.Body).Decode(&result)
+	_ = decodeCapped(resp, &result)
 	if resp.StatusCode >= 300 {
 		msg := result.Error
 		if msg == "" {
@@ -111,7 +111,7 @@ func (c *Client) OperationStatus(ctx context.Context, opID string) (*OperationSt
 		return nil, resp.StatusCode, fmt.Errorf("operation status: HTTP %d", resp.StatusCode)
 	}
 	var op OperationStatus
-	if err := json.NewDecoder(resp.Body).Decode(&op); err != nil {
+	if err := decodeCapped(resp, &op); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("operation status decode: %w", err)
 	}
 	return &op, resp.StatusCode, nil
@@ -128,7 +128,7 @@ func (c *Client) Capabilities(ctx context.Context) (*Capabilities, int, error) {
 		return nil, resp.StatusCode, fmt.Errorf("capabilities: HTTP %d", resp.StatusCode)
 	}
 	var caps Capabilities
-	if err := json.NewDecoder(resp.Body).Decode(&caps); err != nil {
+	if err := decodeCapped(resp, &caps); err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("capabilities decode: %w", err)
 	}
 	return &caps, resp.StatusCode, nil
