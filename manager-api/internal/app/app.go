@@ -31,6 +31,7 @@ type Deps struct {
 	MutedRepo        repository.MutedAlertRepository
 	AuditRepo        repository.AuditRepository
 	BackupRepo       repository.BackupRepository
+	PolicyExRepo     repository.PolicyExceptionRepository
 	AdminRepo        repository.AdminRepository
 	SecretKey        *secrets.Key
 	JWTSecret        string
@@ -208,8 +209,10 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	})
 
 	api.RegisterPolicyRoutes(adminGroup, api.PolicyHandlerConfig{
-		Repo: deps.ServerRepo,
-		Log:  deps.Log,
+		Repo:       deps.ServerRepo,
+		Exceptions: deps.PolicyExRepo,
+		Audit:      deps.AuditRepo,
+		Log:        deps.Log,
 	})
 
 	api.RegisterAlertingRoutes(adminGroup, api.AlertingHandlerConfig{

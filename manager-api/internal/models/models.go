@@ -175,10 +175,10 @@ type Notification struct {
 	ReadAt     sql.NullTime `gorm:"column:read_at" json:"-"`
 	ResolvedAt sql.NullTime `gorm:"column:resolved_at" json:"-"`
 	// Incident fields (SND-21): acknowledgement, snooze, and escalation tracking.
-	AckedAt      sql.NullTime   `gorm:"column:acked_at" json:"-"`
-	AckedBy      string         `gorm:"column:acked_by;type:varchar(120)" json:"acked_by"`
-	SnoozedUntil sql.NullTime   `gorm:"column:snoozed_until" json:"-"`
-	EscalatedAt  sql.NullTime   `gorm:"column:escalated_at" json:"-"`
+	AckedAt      sql.NullTime `gorm:"column:acked_at" json:"-"`
+	AckedBy      string       `gorm:"column:acked_by;type:varchar(120)" json:"acked_by"`
+	SnoozedUntil sql.NullTime `gorm:"column:snoozed_until" json:"-"`
+	EscalatedAt  sql.NullTime `gorm:"column:escalated_at" json:"-"`
 }
 
 func (Notification) TableName() string { return "notifications" }
@@ -259,6 +259,21 @@ type MutedAlert struct {
 }
 
 func (MutedAlert) TableName() string { return "muted_alerts" }
+
+// PolicyException acknowledges an intentional compliance exception for one
+// server + check, so the Compliance view can hide that specific violation
+// (SND-107). An optional ExpiresAt auto-reactivates the violation when it lapses.
+type PolicyException struct {
+	ID        string       `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	ServerID  string       `gorm:"column:server_id;type:char(26);index:idx_polex_server_check,unique" json:"server_id"`
+	Check     string       `gorm:"column:check_name;type:varchar(40);index:idx_polex_server_check,unique" json:"check"`
+	Reason    string       `gorm:"column:reason;type:varchar(400)" json:"reason"`
+	ExpiresAt sql.NullTime `gorm:"column:expires_at" json:"-"`
+	CreatedBy string       `gorm:"column:created_by;type:varchar(120)" json:"created_by"`
+	CreatedAt time.Time    `gorm:"column:created_at" json:"created_at"`
+}
+
+func (PolicyException) TableName() string { return "policy_exceptions" }
 
 // AuditLog is a persisted record of a privileged mutation (SND-24). It mirrors
 // the structured slog "audit" event so the trail is queryable in the UI.
