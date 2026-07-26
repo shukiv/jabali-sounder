@@ -1,0 +1,125 @@
+{
+  "about": {
+    "version": "Versiune"
+  },
+  "alert_channels": {
+    "actions": "Acțiuni",
+    "create": "Creează",
+    "delete": "Șterge",
+    "enabled": "Activat",
+    "name": "Nume",
+    "type": "Tip"
+  },
+  "alert_rules": {
+    "enabled": "Activat",
+    "save": "Salvează",
+    "severity": "Severitate"
+  },
+  "api_tokens": {
+    "actions": "Acțiuni",
+    "create": "Creează",
+    "created": "Creat",
+    "name": "Nume"
+  },
+  "audit": {
+    "event": "Eveniment"
+  },
+  "backups": {
+    "started": "Început",
+    "status": "Stare"
+  },
+  "compliance": {
+    "actions": "Acțiuni",
+    "reason": "Motiv",
+    "refresh": "Reîmprospătează",
+    "restore": "Restaurează",
+    "severity": "Severitate"
+  },
+  "dashboard": {
+    "domain": "Domeniu",
+    "domains": "Domenii",
+    "name": "Nume",
+    "status": "Stare",
+    "user": "Utilizator",
+    "users": "Utilizatori",
+    "version": "Versiune"
+  },
+  "domains": {
+    "actions": "Acțiuni",
+    "domain": "Domeniu",
+    "enabled": "Activat",
+    "owner": "Proprietar",
+    "status": "Stare",
+    "suspend": "Suspendă"
+  },
+  "login": {
+    "password": "Parolă",
+    "username": "Nume de utilizator"
+  },
+  "mail": {
+    "domain": "Domeniu",
+    "mailboxes": "Căsuțe poștale",
+    "owner": "Proprietar",
+    "state": "Stare",
+    "type": "Tip"
+  },
+  "maintenance": {
+    "actions": "Acțiuni",
+    "reason": "Motiv",
+    "remove": "Elimină",
+    "schedule": "Programare"
+  },
+  "menu": {
+    "language": "Limbă"
+  },
+  "monitor": {
+    "actions": "Acțiuni",
+    "domains": "Domenii",
+    "state": "Stare"
+  },
+  "nav": {
+    "backups": "Copii de rezervă",
+    "dashboard": "Tablou de bord",
+    "domains": "Domenii",
+    "settings": "Setări",
+    "users": "Utilizatori"
+  },
+  "notifications": {
+    "notifications": "Notificări"
+  },
+  "servers": {
+    "actions": "Acțiuni",
+    "delete": "Șterge",
+    "disable": "Dezactivează",
+    "edit": "Editează",
+    "enable": "Activează",
+    "name": "Nume",
+    "status": "Stare",
+    "version": "Versiune"
+  },
+  "sessions": {
+    "actions": "Acțiuni"
+  },
+  "settings": {
+    "new_password": "Parolă nouă"
+  },
+  "team": {
+    "actions": "Acțiuni",
+    "create": "Creează",
+    "password": "Parolă",
+    "remove": "Elimină",
+    "role": "Rol",
+    "username": "Nume de utilizator"
+  },
+  "two_factor": {
+    "disable": "Dezactivează"
+  },
+  "users": {
+    "actions": "Acțiuni",
+    "admin": "Administrator",
+    "disable": "Dezactivează",
+    "email": "Email",
+    "package": "Pachet",
+    "username": "Nume de utilizator"
+  }
+}

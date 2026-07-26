@@ -20,6 +20,7 @@ import ptBR from "antd/locale/pt_BR";
 import ruRU from "antd/locale/ru_RU";
 import trTR from "antd/locale/tr_TR";
 import arEG from "antd/locale/ar_EG";
+import roRO from "antd/locale/ro_RO";
 
 import enCommon from "./locales/en/common.json";
 import heCommon from "./locales/he/common.json";
@@ -34,12 +35,13 @@ import ptBRCommon from "./locales/pt_BR/common.json";
 import ruCommon from "./locales/ru/common.json";
 import trCommon from "./locales/tr/common.json";
 import arCommon from "./locales/ar/common.json";
+import roCommon from "./locales/ro/common.json";
 
 export const DEFAULT_LNG = "en";
 
 /** Locales Sounder ships. Keep in sync with src/locales/*. */
 export const SUPPORTED = [
-  "en", "he", "de", "es", "fr", "it", "ja", "uk", "zh_Hans", "pt_BR", "ru", "tr", "ar",
+  "en", "he", "de", "es", "fr", "it", "ja", "uk", "zh_Hans", "pt_BR", "ru", "tr", "ro", "ar",
 ] as const;
 export type SupportedLng = (typeof SUPPORTED)[number];
 
@@ -61,6 +63,7 @@ export const LANGUAGE_LABELS: Record<SupportedLng, string> = {
   pt_BR: "Português (Brasil)",
   ru: "Русский",
   tr: "Türkçe",
+  ro: "Română",
   ar: "العربية",
 };
 
@@ -69,7 +72,7 @@ const RTL = new Set<string>(["he", "ar", "fa", "ur"]);
 
 const ANTD_LOCALES: Record<SupportedLng, AntdLocale> = {
   en: enUS, he: heIL, de: deDE, es: esES, fr: frFR, it: itIT, ja: jaJP,
-  uk: ukUA, zh_Hans: zhCN, pt_BR: ptBR, ru: ruRU, tr: trTR, ar: arEG,
+  uk: ukUA, zh_Hans: zhCN, pt_BR: ptBR, ru: ruRU, tr: trTR, ro: roRO, ar: arEG,
 };
 
 const STORAGE_KEY = "jabali-sounder-lng";
@@ -144,6 +147,7 @@ void i18n.use(initReactI18next).init({
     pt_BR: { common: ptBRCommon },
     ru: { common: ruCommon },
     tr: { common: trCommon },
+    ro: { common: roCommon },
     ar: { common: arCommon },
   },
   interpolation: { escapeValue: false },
