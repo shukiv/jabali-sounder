@@ -62,10 +62,15 @@ func safeRemoteError(log *slog.Logger, server, part string, code int, err error)
 // supplied it also persists the record so the trail is queryable (SND-24);
 // persistence failure is non-fatal to the mutation.
 func auditServerMutation(log *slog.Logger, audit repository.AuditRepository, c *gin.Context, action, serverID, serverName string) {
+	auditEvent(log, audit, c, "server."+action, serverID, serverName)
+}
+
+// auditEvent persists (and logs) one privileged-mutation audit record for an
+// arbitrary event name (e.g. "policy.ignore"). Safe when audit is nil.
+func auditEvent(log *slog.Logger, audit repository.AuditRepository, c *gin.Context, event, serverID, serverName string) {
 	if log == nil {
 		log = slog.Default()
 	}
-	event := "server." + action
 	actor := middleware.AdminUsername(c)
 	actorID := middleware.AdminID(c)
 	sourceIP := c.ClientIP()
