@@ -99,9 +99,9 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	// Protected admin routes. Mounted unconditionally — with an empty secret
 	// AuthMiddleware fails closed (rejects everything) rather than serve open.
 	// A revoked/expired session is also rejected here (M3).
-	sessionCheck := func(ctx context.Context, sid string) bool {
+	sessionCheck := func(ctx context.Context, sid string) (bool, error) {
 		if deps.SessionRepo == nil {
-			return true
+			return true, nil
 		}
 		return deps.SessionRepo.Active(ctx, sid)
 	}

@@ -23,7 +23,7 @@ type Claims struct {
 
 // SessionCheck reports whether a session id is still active (not revoked/
 // expired). nil disables the server-side session check (stateless JWT).
-type SessionCheck func(ctx context.Context, sessionID string) bool
+type SessionCheck func(ctx context.Context, sessionID string) (bool, error)
 
 // APITokenCheck validates a presented API token, returning (id, name, ok). nil
 // disables API-token auth (JWT only).
@@ -89,9 +89,19 @@ func AuthMiddleware(secret string, sessions SessionCheck, apiTokens APITokenChec
 
 		// Server-side session check (M3): reject revoked/expired sessions even
 		// while the JWT itself is still cryptographically valid.
-		if sessions != nil && !sessions(c.Request.Context(), claims.SessionID) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "session revoked or expired"})
-			return
+		if sessions != nil {
+			active, err := sessions(c.Request.Context(), claims.SessionID)
+			if err != nil {
+				// Infra error (e.g. a transient SQLite lock) — the session is probably
+				// fine. Fail soft with 503 so the client retries instead of dropping to
+				// the login screen (#5).
+				c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "session check unavailable"})
+				return
+			}
+			if !active {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "session revoked or expired"})
+				return
+			}
 		}
 
 		// claims.Subject = admin ID; claims.ID = username; Role = permission level.
