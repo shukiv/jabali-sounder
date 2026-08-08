@@ -113,6 +113,20 @@ client.defaults.adapter = (config) =>
 client.interceptors.response.use(
   (resp) => resp,
   (error) => {
+    // A lone 401 on an already-authenticated request can be a transient
+    // backend blip (e.g. a brief session-store hiccup under load) rather than
+    // a real logout. Retry once with the current token before tearing the
+    // session down (#5). A genuinely dead session 401s again and falls through.
+    const retryCfg = error.config as (typeof error.config & { _retry?: boolean }) | undefined;
+    if (
+      error.response?.status === 401 &&
+      retryCfg &&
+      !retryCfg._retry &&
+      !!client.defaults.headers.common["Authorization"]
+    ) {
+      retryCfg._retry = true;
+      return client(retryCfg);
+    }
     if (error.response?.status === 401) {
       const wasAuthed =
         !!localStorage.getItem("jabali-sounder-auth") ||

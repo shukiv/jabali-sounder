@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"git.jabali-panel.com/shukivaknin/jabali-sounder/manager-api/internal/models"
 	"github.com/glebarez/sqlite"
@@ -38,7 +39,7 @@ func Open(dbDriver, dsn string) (*gorm.DB, error) {
 	case "", "mysql", "mariadb":
 		db, err = gorm.Open(mysql.Open(dsn), gormCfg)
 	case "sqlite", "sqlite3":
-		db, err = gorm.Open(sqlite.Open(dsn), gormCfg)
+		db, err = gorm.Open(sqlite.Open(sqlitePragmaDSN(dsn)), gormCfg)
 	default:
 		return nil, fmt.Errorf("unsupported database driver %q", dbDriver)
 	}
@@ -46,6 +47,22 @@ func Open(dbDriver, dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("gorm open: %w", err)
 	}
 	return db, nil
+}
+
+// sqlitePragmaDSN appends the pragmas that keep the embedded SQLite database
+// safe under the control plane's concurrent request load. Without WAL + a
+// busy_timeout, a background poll racing a write (every authenticated request
+// stamps last_seen_at) hits "database is locked", which surfaced as users
+// being randomly bounced to the login screen (#5).
+func sqlitePragmaDSN(dsn string) string {
+	if strings.Contains(dsn, "_pragma=") {
+		return dsn
+	}
+	sep := "?"
+	if strings.Contains(dsn, "?") {
+		sep = "&"
+	}
+	return dsn + sep + "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
 }
 
 // Migrate applies all pending .sql migrations from the migrations directory.

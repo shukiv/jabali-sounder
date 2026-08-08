@@ -46,9 +46,9 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 		cfg.Log = slog.Default()
 	}
 	h := &authHandler{cfg: cfg, acctFail: middleware.NewAccountFailureTracker(0, cfg.LoginWindow, nil)}
-	sessionCheck := func(ctx context.Context, sid string) bool {
+	sessionCheck := func(ctx context.Context, sid string) (bool, error) {
 		if cfg.SessionRepo == nil {
-			return true
+			return true, nil
 		}
 		return cfg.SessionRepo.Active(ctx, sid)
 	}

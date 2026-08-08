@@ -18,8 +18,10 @@ type SessionRepository interface {
 	ListActiveByAdmin(ctx context.Context, adminID string) ([]models.Session, error)
 	Revoke(ctx context.Context, id string) error
 	// Active reports whether a session is usable (exists, not revoked, not
-	// expired) and stamps last_seen_at. Used by AuthMiddleware.
-	Active(ctx context.Context, id string) bool
+	// expired) and stamps last_seen_at. Used by AuthMiddleware. A non-nil error
+	// signals an infrastructure failure (e.g. a transient SQLite lock), NOT an
+	// inactive session; callers must not treat it as a logout.
+	Active(ctx context.Context, id string) (bool, error)
 	PruneExpired(ctx context.Context, now time.Time) (int64, error)
 }
 
@@ -68,19 +70,31 @@ func (r *sessionRepo) Revoke(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *sessionRepo) Active(ctx context.Context, id string) bool {
+// sessionTouchInterval throttles last_seen_at writes. Stamping it on every
+// request amplified write load and, on SQLite, drove the lock contention that
+// randomly logged users out (#5).
+const sessionTouchInterval = time.Minute
+
+func (r *sessionRepo) Active(ctx context.Context, id string) (bool, error) {
 	if id == "" {
-		return false
+		return false, nil
 	}
 	var sess models.Session
 	if err := r.db.WithContext(ctx).First(&sess, "id = ?", id).Error; err != nil {
-		return false
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		// Transient/infra error (e.g. SQLite "database is locked"). Surface it so
+		// the middleware fails soft (503) instead of forcing a logout.
+		return false, fmt.Errorf("session active: %w", err)
 	}
 	if sess.RevokedAt.Valid || !sess.ExpiresAt.After(time.Now()) {
-		return false
+		return false, nil
 	}
-	_ = r.db.WithContext(ctx).Model(&models.Session{}).Where("id = ?", id).Update("last_seen_at", time.Now()).Error
-	return true
+	if time.Since(sess.LastSeenAt) > sessionTouchInterval {
+		_ = r.db.WithContext(ctx).Model(&models.Session{}).Where("id = ?", id).Update("last_seen_at", time.Now()).Error
+	}
+	return true, nil
 }
 
 func (r *sessionRepo) PruneExpired(ctx context.Context, now time.Time) (int64, error) {
