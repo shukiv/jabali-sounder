@@ -225,9 +225,13 @@
     "enter_code": "Enter your 6-digit code",
     "enter_password": "Enter password",
     "enter_username": "Enter username",
+    "forgot_password": "Forgot password?",
     "log_in": "Log in",
     "logged_in": "Logged in",
     "password": "Password",
+    "password_reset_done": "Password reset — log in with the new password",
+    "reset_help": "Set a new password for this device's admin account. This works only on this device.",
+    "reset_title": "Reset password",
     "tagline": "Central Sounding Plane",
     "username": "Username"
   },

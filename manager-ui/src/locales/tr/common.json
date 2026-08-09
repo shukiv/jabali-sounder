@@ -225,9 +225,13 @@
     "enter_code": "6 haneli kodunuzu girin",
     "enter_password": "Parolayı girin",
     "enter_username": "Kullanıcı adını girin",
+    "forgot_password": "Parolanızı mı unuttunuz?",
     "log_in": "Giriş yap",
     "logged_in": "Giriş yapıldı",
     "password": "Parola",
+    "password_reset_done": "Parola sıfırlandı — yeni parolayla giriş yapın",
+    "reset_help": "Bu cihazın yönetici hesabı için yeni bir parola belirleyin. Bu yalnızca bu cihazda çalışır.",
+    "reset_title": "Parolayı sıfırla",
     "tagline": "Merkezi kontrol düzlemi",
     "username": "Kullanıcı adı"
   },

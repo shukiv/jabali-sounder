@@ -225,9 +225,13 @@
     "enter_code": "Geben Sie Ihren 6-stelligen Code ein",
     "enter_password": "Passwort eingeben",
     "enter_username": "Benutzernamen eingeben",
+    "forgot_password": "Passwort vergessen?",
     "log_in": "Anmelden",
     "logged_in": "Angemeldet",
     "password": "Passwort",
+    "password_reset_done": "Passwort zurückgesetzt — mit dem neuen Passwort anmelden",
+    "reset_help": "Legen Sie ein neues Passwort für das Administratorkonto dieses Geräts fest. Dies funktioniert nur auf diesem Gerät.",
+    "reset_title": "Passwort zurücksetzen",
     "tagline": "Zentrale Steuerungsebene",
     "username": "Benutzername"
   },

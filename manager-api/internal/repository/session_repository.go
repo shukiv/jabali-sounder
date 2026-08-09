@@ -17,6 +17,9 @@ type SessionRepository interface {
 	FindByID(ctx context.Context, id string) (*models.Session, error)
 	ListActiveByAdmin(ctx context.Context, adminID string) ([]models.Session, error)
 	Revoke(ctx context.Context, id string) error
+	// RevokeAllForAdmin revokes every active session belonging to an admin.
+	// Used by local password reset so an old token cannot outlive the reset.
+	RevokeAllForAdmin(ctx context.Context, adminID string) (int64, error)
 	// Active reports whether a session is usable (exists, not revoked, not
 	// expired) and stamps last_seen_at. Used by AuthMiddleware. A non-nil error
 	// signals an infrastructure failure (e.g. a transient SQLite lock), NOT an
@@ -68,6 +71,16 @@ func (r *sessionRepo) Revoke(ctx context.Context, id string) error {
 		return fmt.Errorf("session revoke: %w", err)
 	}
 	return nil
+}
+
+func (r *sessionRepo) RevokeAllForAdmin(ctx context.Context, adminID string) (int64, error) {
+	res := r.db.WithContext(ctx).Model(&models.Session{}).
+		Where("admin_id = ? AND revoked_at IS NULL", adminID).
+		Update("revoked_at", time.Now())
+	if res.Error != nil {
+		return 0, fmt.Errorf("session revoke all: %w", res.Error)
+	}
+	return res.RowsAffected, nil
 }
 
 // sessionTouchInterval throttles last_seen_at writes. Stamping it on every

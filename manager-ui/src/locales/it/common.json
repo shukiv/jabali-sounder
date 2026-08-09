@@ -225,9 +225,13 @@
     "enter_code": "Inserisci il codice a 6 cifre",
     "enter_password": "Inserisci la password",
     "enter_username": "Inserisci il nome utente",
+    "forgot_password": "Password dimenticata?",
     "log_in": "Accedi",
     "logged_in": "Accesso effettuato",
     "password": "Password",
+    "password_reset_done": "Password reimpostata — accedi con la nuova password",
+    "reset_help": "Imposta una nuova password per l'account amministratore di questo dispositivo. Funziona solo su questo dispositivo.",
+    "reset_title": "Reimposta password",
     "tagline": "Piano di controllo centrale",
     "username": "Nome utente"
   },

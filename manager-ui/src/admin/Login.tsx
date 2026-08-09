@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Form, Input, Button, Typography, App } from "antd";
+import { Card, Form, Input, Button, Typography, App, Modal } from "antd";
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import apiClient from "../apiClient";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,8 @@ import { useAuth } from "../hooks/useAuth";
 import { useThemeMode } from "../theme/ThemeModeContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { BrandLogo } from "../components/BrandLogo";
+import { Call } from "@wailsio/runtime";
+import { isMobileApp } from "../lib/desktop";
 
 const { Text } = Typography;
 
@@ -17,6 +19,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [setupAvailable, setSetupAvailable] = useState(false);
   const [needs2FA, setNeeds2FA] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const { mode } = useThemeMode();
 
   useEffect(() => {
@@ -48,6 +52,23 @@ export default function Login() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReset = async (values: { username?: string; new_password: string }) => {
+    setResetLoading(true);
+    try {
+      await Call.ByName(
+        "main.Bridge.ResetLostPassword",
+        (values.username || "admin").trim(),
+        values.new_password,
+      );
+      message.success(t("login.password_reset_done"));
+      setResetOpen(false);
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -98,6 +119,56 @@ export default function Login() {
             </Button>
           </Form.Item>
         </Form>
+        {!setupAvailable && isMobileApp() ? (
+          <>
+            <Button type="link" block onClick={() => setResetOpen(true)} style={{ marginTop: 4 }}>
+              {t("login.forgot_password")}
+            </Button>
+            <Modal
+              open={resetOpen}
+              title={t("login.reset_title")}
+              onCancel={() => setResetOpen(false)}
+              footer={null}
+              destroyOnClose
+            >
+              <Text type="secondary">{t("login.reset_help")}</Text>
+              <Form onFinish={handleReset} layout="vertical" requiredMark={false} style={{ marginTop: 16 }}>
+                <Form.Item name="username" initialValue="admin" label={t("login.username")}>
+                  <Input prefix={<UserOutlined />} />
+                </Form.Item>
+                <Form.Item
+                  name="new_password"
+                  label={t("settings.new_password")}
+                  rules={[{ required: true, min: 8, message: t("settings.at_least_8_characters") }]}
+                >
+                  <Input.Password prefix={<LockOutlined />} />
+                </Form.Item>
+                <Form.Item
+                  name="confirm"
+                  label={t("settings.confirm_new_password")}
+                  dependencies={["new_password"]}
+                  rules={[
+                    { required: true, message: t("settings.confirm_the_new_password") },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        return !value || getFieldValue("new_password") === value
+                          ? Promise.resolve()
+                          : Promise.reject(new Error(t("settings.confirm_the_new_password")));
+                      },
+                    }),
+                  ]}
+                >
+                  <Input.Password prefix={<LockOutlined />} />
+                </Form.Item>
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Button type="primary" htmlType="submit" loading={resetLoading} block>
+                    {t("login.reset_title")}
+                  </Button>
+                </Form.Item>
+              </Form>
+            </Modal>
+          </>
+        ) : null}
       </Card>
     </div>
   );

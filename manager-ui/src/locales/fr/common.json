@@ -225,9 +225,13 @@
     "enter_code": "Saisissez votre code à 6 chiffres",
     "enter_password": "Saisissez le mot de passe",
     "enter_username": "Saisissez le nom d'utilisateur",
+    "forgot_password": "Mot de passe oublié ?",
     "log_in": "Se connecter",
     "logged_in": "Connecté",
     "password": "Mot de passe",
+    "password_reset_done": "Mot de passe réinitialisé — connectez-vous avec le nouveau mot de passe",
+    "reset_help": "Définissez un nouveau mot de passe pour le compte administrateur de cet appareil. Cela ne fonctionne que sur cet appareil.",
+    "reset_title": "Réinitialiser le mot de passe",
     "tagline": "Plan de contrôle central",
     "username": "Nom d'utilisateur"
   },
