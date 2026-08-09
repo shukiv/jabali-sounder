@@ -232,6 +232,7 @@
     "password_reset_done": "Parolă resetată — autentificați-vă cu noua parolă",
     "reset_help": "Setați o parolă nouă pentru contul de administrator al acestui dispozitiv. Funcționează doar pe acest dispozitiv.",
     "reset_title": "Resetare parolă",
+    "stay_signed_in": "Rămâneți conectat",
     "tagline": "Plan central de sondare",
     "username": "Nume de utilizator"
   },

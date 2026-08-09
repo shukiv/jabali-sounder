@@ -232,6 +232,7 @@
     "password_reset_done": "Passwort zurückgesetzt — mit dem neuen Passwort anmelden",
     "reset_help": "Legen Sie ein neues Passwort für das Administratorkonto dieses Geräts fest. Dies funktioniert nur auf diesem Gerät.",
     "reset_title": "Passwort zurücksetzen",
+    "stay_signed_in": "Angemeldet bleiben",
     "tagline": "Zentrale Steuerungsebene",
     "username": "Benutzername"
   },

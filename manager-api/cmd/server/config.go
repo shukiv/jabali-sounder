@@ -70,6 +70,10 @@ type authConfig struct {
 	LoginMaxFailures    int `toml:"login_max_failures"`
 	LoginLockoutSeconds int `toml:"login_lockout_seconds"`
 	LoginWindowSeconds  int `toml:"login_window_seconds"`
+	// Session lifetime. Non-positive falls back to defaults (24h normal,
+	// 30d for the "stay signed in" option).
+	SessionTTLHours         int `toml:"session_ttl_hours"`
+	ExtendedSessionTTLHours int `toml:"extended_session_ttl_hours"`
 }
 
 type logConfig struct {
@@ -103,9 +107,11 @@ func Defaults() config {
 			MaxBodyBytes: 1 << 20, // 1 MiB
 		},
 		Auth: authConfig{
-			LoginMaxFailures:    5,
-			LoginLockoutSeconds: 900,
-			LoginWindowSeconds:  900,
+			LoginMaxFailures:        5,
+			LoginLockoutSeconds:     900,
+			LoginWindowSeconds:      900,
+			SessionTTLHours:         24,
+			ExtendedSessionTTLHours: 720,
 		},
 		Poller: pollerConfig{
 			Enabled:         true,
@@ -165,6 +171,16 @@ func loadConfig(path string) (*config, error) {
 	}
 	if v := envFirst("JABALI_SOUNDER_JWT_SECRET", "JABALI_MANAGER_JWT_SECRET"); v != "" {
 		cfg.JWT.Secret = v
+	}
+	if v := envFirst("JABALI_SOUNDER_SESSION_TTL_HOURS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Auth.SessionTTLHours = n
+		}
+	}
+	if v := envFirst("JABALI_SOUNDER_EXTENDED_SESSION_TTL_HOURS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Auth.ExtendedSessionTTLHours = n
+		}
 	}
 
 	if v := envFirst("JABALI_SOUNDER_ALLOW_PLAINTEXT_FALLBACK"); v != "" {

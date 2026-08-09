@@ -45,6 +45,7 @@ func newAuthTestRouter(t *testing.T, maxFailures int) *gin.Engine {
 		AdminRepo:        repo,
 		JWTSecret:        "test-jwt-secret-not-empty-000000",
 		JWTTTL:           time.Hour,
+		ExtendedTTL:      240 * time.Hour,
 		LoginMaxFailures: maxFailures,
 		LoginLockout:     time.Hour,
 		LoginWindow:      time.Hour,
@@ -263,4 +264,28 @@ func deleteAuth(r *gin.Engine, path, token string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
+}
+
+// TestLoginRememberExtendsSession covers the "stay signed in" option: remember:true
+// mints a much longer session than the default lifetime.
+func TestLoginRememberExtendsSession(t *testing.T) {
+	r := newAuthTestRouter(t, 100)
+	parse := func(w *httptest.ResponseRecorder) time.Time {
+		if w.Code != http.StatusOK {
+			t.Fatalf("login code %d: %s", w.Code, w.Body.String())
+		}
+		var resp struct {
+			ExpiresAt time.Time `json:"expires_at"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		return resp.ExpiresAt
+	}
+	normal := parse(postLogin(r, "10.9.0.1", `{"username":"admin","password":"correct-horse-battery"}`))
+	remember := parse(postLogin(r, "10.9.0.2", `{"username":"admin","password":"correct-horse-battery","remember":true}`))
+	// normal ~1h, remember ~240h — remember must be far later.
+	if !remember.After(normal.Add(100 * time.Hour)) {
+		t.Fatalf("remember session not extended: normal=%v remember=%v", normal, remember)
+	}
 }

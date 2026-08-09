@@ -41,6 +41,9 @@ type Deps struct {
 	LoginMaxFailures int
 	LoginLockout     time.Duration
 	LoginWindow      time.Duration
+	// Session lifetime; <=0 uses defaults (24h normal, 30d "stay signed in").
+	SessionTTL         time.Duration
+	ExtendedSessionTTL time.Duration
 	// AllowPrivateTargets permits enrolling panels on private IPs (SND-4).
 	AllowPrivateTargets bool
 	// AllowPlaintextSecrets permits the dev hex-plaintext token fallback when
@@ -50,6 +53,14 @@ type Deps struct {
 	UpdateRepo string
 	// DisableUpdateCheck turns off the outbound GitHub release check.
 	DisableUpdateCheck bool
+}
+
+// orDefaultDuration returns d if positive, otherwise def.
+func orDefaultDuration(d, def time.Duration) time.Duration {
+	if d <= 0 {
+		return def
+	}
+	return d
 }
 
 // NewWithDeps creates a Gin engine with all routes mounted.
@@ -85,7 +96,8 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	api.RegisterAuthRoutes(v1, api.AuthHandlerConfig{
 		AdminRepo:        deps.AdminRepo,
 		JWTSecret:        deps.JWTSecret,
-		JWTTTL:           24 * time.Hour,
+		JWTTTL:           orDefaultDuration(deps.SessionTTL, 24*time.Hour),
+		ExtendedTTL:      orDefaultDuration(deps.ExtendedSessionTTL, 30*24*time.Hour),
 		Log:              deps.Log,
 		LoginMaxFailures: deps.LoginMaxFailures,
 		LoginLockout:     deps.LoginLockout,
