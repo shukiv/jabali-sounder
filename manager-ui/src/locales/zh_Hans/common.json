@@ -225,9 +225,13 @@
     "enter_code": "请输入 6 位验证码",
     "enter_password": "请输入密码",
     "enter_username": "请输入用户名",
+    "forgot_password": "忘记密码？",
     "log_in": "登录",
     "logged_in": "已登录",
     "password": "密码",
+    "password_reset_done": "密码已重置 — 请使用新密码登录",
+    "reset_help": "为此设备的管理员账户设置新密码。此操作仅在本设备上有效。",
+    "reset_title": "重置密码",
     "tagline": "中央控制平面",
     "username": "用户名"
   },

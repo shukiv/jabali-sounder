@@ -225,9 +225,13 @@
     "enter_code": "Digite seu código de 6 dígitos",
     "enter_password": "Digite a senha",
     "enter_username": "Digite o nome de usuário",
+    "forgot_password": "Esqueceu a senha?",
     "log_in": "Entrar",
     "logged_in": "Conectado",
     "password": "Senha",
+    "password_reset_done": "Senha redefinida — entre com a nova senha",
+    "reset_help": "Defina uma nova senha para a conta de administrador deste dispositivo. Isto funciona apenas neste dispositivo.",
+    "reset_title": "Redefinir senha",
     "tagline": "Plano de controle central",
     "username": "Nome de usuário"
   },

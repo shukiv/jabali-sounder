@@ -225,9 +225,13 @@
     "enter_code": "Introduzca su código de 6 dígitos",
     "enter_password": "Introduzca la contraseña",
     "enter_username": "Introduzca el nombre de usuario",
+    "forgot_password": "¿Olvidó la contraseña?",
     "log_in": "Iniciar sesión",
     "logged_in": "Sesión iniciada",
     "password": "Contraseña",
+    "password_reset_done": "Contraseña restablecida: inicie sesión con la nueva contraseña",
+    "reset_help": "Establezca una nueva contraseña para la cuenta de administrador de este dispositivo. Esto solo funciona en este dispositivo.",
+    "reset_title": "Restablecer contraseña",
     "tagline": "Plano de control central",
     "username": "Nombre de usuario"
   },

@@ -225,9 +225,13 @@
     "enter_code": "Introduceți codul din 6 cifre",
     "enter_password": "Introduceți parola",
     "enter_username": "Introduceți numele de utilizator",
+    "forgot_password": "Ați uitat parola?",
     "log_in": "Autentificare",
     "logged_in": "Autentificat",
     "password": "Parolă",
+    "password_reset_done": "Parolă resetată — autentificați-vă cu noua parolă",
+    "reset_help": "Setați o parolă nouă pentru contul de administrator al acestui dispozitiv. Funcționează doar pe acest dispozitiv.",
+    "reset_title": "Resetare parolă",
     "tagline": "Plan central de sondare",
     "username": "Nume de utilizator"
   },
