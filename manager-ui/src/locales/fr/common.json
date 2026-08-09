@@ -232,6 +232,7 @@
     "password_reset_done": "Mot de passe réinitialisé — connectez-vous avec le nouveau mot de passe",
     "reset_help": "Définissez un nouveau mot de passe pour le compte administrateur de cet appareil. Cela ne fonctionne que sur cet appareil.",
     "reset_title": "Réinitialiser le mot de passe",
+    "stay_signed_in": "Rester connecté",
     "tagline": "Plan de contrôle central",
     "username": "Nom d'utilisateur"
   },

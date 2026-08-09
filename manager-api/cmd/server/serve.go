@@ -170,6 +170,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		LoginMaxFailures:      cfg.Auth.LoginMaxFailures,
 		LoginLockout:          time.Duration(cfg.Auth.LoginLockoutSeconds) * time.Second,
 		LoginWindow:           time.Duration(cfg.Auth.LoginWindowSeconds) * time.Second,
+		SessionTTL:            time.Duration(cfg.Auth.SessionTTLHours) * time.Hour,
+		ExtendedSessionTTL:    time.Duration(cfg.Auth.ExtendedSessionTTLHours) * time.Hour,
 	}
 
 	ginEngine := app.NewWithDeps(deps)

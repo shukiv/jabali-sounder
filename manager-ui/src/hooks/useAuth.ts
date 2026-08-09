@@ -63,11 +63,12 @@ export function useAuth() {
   }, []);
 
   const login = useCallback(
-    async (username: string, password: string, totpCode?: string) => {
+    async (username: string, password: string, totpCode?: string, remember?: boolean) => {
       const resp = await apiClient.post("/auth/login", {
         username,
         password,
         ...(totpCode ? { totp_code: totpCode } : {}),
+        ...(remember ? { remember: true } : {}),
       });
       if (resp.data?.two_factor_required) {
         return { twoFactorRequired: true as const };

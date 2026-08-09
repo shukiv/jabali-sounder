@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Form, Input, Button, Typography, App, Modal } from "antd";
+import { Card, Form, Input, Button, Typography, App, Modal, Checkbox } from "antd";
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import apiClient from "../apiClient";
 import { useTranslation } from "react-i18next";
@@ -29,7 +29,7 @@ export default function Login() {
       .catch(() => setSetupAvailable(false));
   }, []);
 
-  const handleSubmit = async (values: { username: string; password: string; totp_code?: string }) => {
+  const handleSubmit = async (values: { username: string; password: string; totp_code?: string; remember?: boolean }) => {
     setLoading(true);
     try {
       if (setupAvailable) {
@@ -38,7 +38,7 @@ export default function Login() {
         window.location.reload();
         return;
       }
-      const res = await login(values.username, values.password, values.totp_code);
+      const res = await login(values.username, values.password, values.totp_code, values.remember);
       if (res.twoFactorRequired) {
         setNeeds2FA(true);
         message.info(t("login.enter_2fa"));
@@ -111,6 +111,11 @@ export default function Login() {
               rules={[{ required: true, message: t("login.enter_code") }]}
             >
               <Input prefix={<LockOutlined />} placeholder={t("login.auth_code")} inputMode="numeric" />
+            </Form.Item>
+          ) : null}
+          {!setupAvailable ? (
+            <Form.Item name="remember" valuePropName="checked" style={{ marginBottom: 12 }}>
+              <Checkbox>{t("login.stay_signed_in")}</Checkbox>
             </Form.Item>
           ) : null}
           <Form.Item>

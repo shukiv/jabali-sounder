@@ -24,7 +24,9 @@ type AuthHandlerConfig struct {
 	AdminRepo repository.AdminRepository
 	JWTSecret string
 	JWTTTL    time.Duration
-	Log       *slog.Logger
+	// ExtendedTTL is the "stay signed in" lifetime; <=0 uses a 30d default.
+	ExtendedTTL time.Duration
+	Log         *slog.Logger
 	// Login throttle (SND-3); <=0 uses limiter defaults.
 	LoginMaxFailures int
 	LoginLockout     time.Duration
@@ -78,6 +80,8 @@ type loginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 	TOTPCode string `json:"totp_code"`
+	// Remember requests the extended "stay signed in" session lifetime.
+	Remember bool `json:"remember"`
 }
 
 type setupRequest struct {
@@ -139,7 +143,7 @@ func (h *authHandler) login(c *gin.Context) {
 		h.cfg.Log.Warn("login: admin has invalid role, defaulting to viewer", "username", admin.Username)
 		role = models.RoleViewer
 	}
-	token, expiresAt, err := h.issueSession(c, admin, role)
+	token, expiresAt, err := h.issueSession(c, admin, role, req.Remember)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
@@ -411,7 +415,7 @@ func (h *authHandler) setup(c *gin.Context) {
 		return
 	}
 
-	token, expiresAt, err := h.issueSession(c, admin, models.RoleOwner)
+	token, expiresAt, err := h.issueSession(c, admin, models.RoleOwner, false)
 	if err != nil {
 		failInternal(c, h.cfg.Log, err)
 		return
@@ -454,9 +458,10 @@ func NewAdmin(username, password string, role models.Role) (*models.Admin, error
 
 // issueSession records a server-side session (if a repo is configured) and mints
 // a JWT bound to it, so the login can later be listed and revoked (M3).
-func (h *authHandler) issueSession(c *gin.Context, admin *models.Admin, role models.Role) (string, time.Time, error) {
+func (h *authHandler) issueSession(c *gin.Context, admin *models.Admin, role models.Role, remember bool) (string, time.Time, error) {
 	now := time.Now()
 	sessionID := ids.NewULID()
+	ttl := h.sessionTTL(remember)
 	if h.cfg.SessionRepo != nil {
 		sess := &models.Session{
 			ID:         sessionID,
@@ -465,13 +470,32 @@ func (h *authHandler) issueSession(c *gin.Context, admin *models.Admin, role mod
 			IP:         c.ClientIP(),
 			CreatedAt:  now,
 			LastSeenAt: now,
-			ExpiresAt:  now.Add(h.cfg.JWTTTL),
+			ExpiresAt:  now.Add(ttl),
 		}
 		if err := h.cfg.SessionRepo.Create(c.Request.Context(), sess); err != nil {
 			return "", time.Time{}, err
 		}
 	}
-	return middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, role, sessionID, h.cfg.JWTTTL)
+	return middleware.MintToken(h.cfg.JWTSecret, admin.ID, admin.Username, role, sessionID, ttl)
+}
+
+// sessionTTL picks the normal or extended ("stay signed in") lifetime,
+// applying defaults and a hard 30-day cap.
+func (h *authHandler) sessionTTL(remember bool) time.Duration {
+	ttl := h.cfg.JWTTTL
+	if ttl <= 0 {
+		ttl = 24 * time.Hour
+	}
+	if remember {
+		ttl = h.cfg.ExtendedTTL
+		if ttl <= 0 {
+			ttl = 30 * 24 * time.Hour
+		}
+	}
+	if maxTTL := 30 * 24 * time.Hour; ttl > maxTTL {
+		ttl = maxTTL
+	}
+	return ttl
 }
 
 func truncate(s string, n int) string {
