@@ -71,6 +71,7 @@ export default function AdminLayout() {
   const { auth, logout } = useAuth();
   const { data: versionInfo } = useVersion();
   const { mode } = useThemeMode();
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -86,10 +87,9 @@ export default function AdminLayout() {
   // SND-65: each route gets a distinct document title.
   useEffect(() => {
     const item = navItems.find((n) => n.key === location.pathname);
-    document.title = (item ? item.label + " · " : "") + "Jabali Sounder";
-  }, [location.pathname]);
+    document.title = (item ? t(item.label) + " · " : "") + "Jabali Sounder";
+  }, [location.pathname, t, i18n.resolvedLanguage]);
   const { token } = theme.useToken();
-  const { t, i18n } = useTranslation();
   const screens = Grid.useBreakpoint();
   const isDesktop = screens.lg ?? (typeof window !== "undefined" ? window.innerWidth >= 992 : true);
 
@@ -293,7 +293,10 @@ export default function AdminLayout() {
             }}
           >
             <h1 className="sr-only">
-              {navItems.find((n) => n.key === location.pathname)?.label ?? "Jabali Sounder"}
+              {(() => {
+                const lbl = navItems.find((n) => n.key === location.pathname)?.label;
+                return lbl ? t(lbl) : "Jabali Sounder";
+              })()}
             </h1>
             <Outlet />
           </Content>

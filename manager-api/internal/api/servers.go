@@ -690,6 +690,11 @@ func (h *serverHandler) checkHealth(c *gin.Context) {
 		}
 	}
 	_ = h.cfg.Repo.UpdateStatus(c.Request.Context(), s.ID, status, credStatus)
+	// Keep the in-memory copy consistent: the Save() calls below (version /
+	// capabilities) write the whole row, so a stale Status/CredentialStatus here
+	// would clobber the values we just persisted.
+	s.Status = status
+	s.CredentialStatus = credStatus
 
 	// Update version if we got it.
 	if result.Version != "" && result.Version != s.Version {

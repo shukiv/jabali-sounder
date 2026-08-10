@@ -17,6 +17,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -100,4 +101,14 @@ func (c *Client) Do(ctx context.Context, method, pathAndQuery string, body []byt
 // Get is a convenience wrapper for GET requests with no body.
 func (c *Client) Get(ctx context.Context, pathAndQuery string) (*http.Response, error) {
 	return c.Do(ctx, http.MethodGet, pathAndQuery, nil)
+}
+
+// decodeCapped JSON-decodes resp.Body into v, reading at most maxBody bytes.
+// Bounding the read is what keeps one hostile or compromised managed panel from
+// OOMing the control plane: an over-cap (or slow-drip) response fails to decode
+// — an error attributed to that server — instead of growing memory without
+// limit. Every remote response decode goes through here rather than reading
+// resp.Body unbounded.
+func decodeCapped(resp *http.Response, v any) error {
+	return json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(v)
 }
