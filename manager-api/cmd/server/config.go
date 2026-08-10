@@ -74,6 +74,10 @@ type authConfig struct {
 	// 30d for the "stay signed in" option).
 	SessionTTLHours         int `toml:"session_ttl_hours"`
 	ExtendedSessionTTLHours int `toml:"extended_session_ttl_hours"`
+	// Passkeys (SND-109). Empty derives RP id + origin from the request Host +
+	// X-Forwarded-Proto (correct behind the panel reverse proxy). Set to pin.
+	WebAuthnRPID   string `toml:"webauthn_rp_id"`
+	WebAuthnOrigin string `toml:"webauthn_origin"`
 }
 
 type logConfig struct {
@@ -181,6 +185,12 @@ func loadConfig(path string) (*config, error) {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.Auth.ExtendedSessionTTLHours = n
 		}
+	}
+	if v := envFirst("JABALI_SOUNDER_WEBAUTHN_RP_ID"); v != "" {
+		cfg.Auth.WebAuthnRPID = v
+	}
+	if v := envFirst("JABALI_SOUNDER_WEBAUTHN_ORIGIN"); v != "" {
+		cfg.Auth.WebAuthnOrigin = v
 	}
 
 	if v := envFirst("JABALI_SOUNDER_ALLOW_PLAINTEXT_FALLBACK"); v != "" {

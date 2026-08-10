@@ -186,6 +186,7 @@ func newDesktopHandler() (http.Handler, error) {
 	auditRepo := repository.NewAuditRepository(gormDB)
 	backupRepo := repository.NewBackupRepository(gormDB)
 	policyExRepo := repository.NewPolicyExceptionRepository(gormDB)
+	webauthnCredRepo := repository.NewWebAuthnCredentialRepository(gormDB)
 	if err := alertRuleRepo.EnsureDefaults(context.Background(), time.Now().UTC()); err != nil {
 		slog.Warn("seed default alert rules failed", "error", err)
 	}
@@ -202,6 +203,7 @@ func newDesktopHandler() (http.Handler, error) {
 		MaintenanceRepo:  maintenanceRepo,
 		MutedRepo:        mutedRepo,
 		PolicyExRepo:     policyExRepo,
+		WebAuthnCredRepo: webauthnCredRepo,
 		AuditRepo:        auditRepo,
 		BackupRepo:       backupRepo,
 		AdminRepo:        repository.NewAdminRepository(gormDB),

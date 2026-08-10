@@ -93,6 +93,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	var auditRepo repository.AuditRepository
 	var backupRepo repository.BackupRepository
 	var policyExRepo repository.PolicyExceptionRepository
+	var webauthnCredRepo repository.WebAuthnCredentialRepository
 	if cfg.Database.URL != "" {
 		if err := db.Migrate(cfg.Database.Driver, cfg.Database.URL); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -117,6 +118,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		auditRepo = repository.NewAuditRepository(gormDB)
 		backupRepo = repository.NewBackupRepository(gormDB)
 		policyExRepo = repository.NewPolicyExceptionRepository(gormDB)
+		webauthnCredRepo = repository.NewWebAuthnCredentialRepository(gormDB)
 		if err := alertRuleRepo.EnsureDefaults(context.Background(), time.Now().UTC()); err != nil {
 			log.Warn("seed default alert rules failed", "error", err)
 		}
@@ -171,6 +173,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 		LoginLockout:          time.Duration(cfg.Auth.LoginLockoutSeconds) * time.Second,
 		LoginWindow:           time.Duration(cfg.Auth.LoginWindowSeconds) * time.Second,
 		SessionTTL:            time.Duration(cfg.Auth.SessionTTLHours) * time.Hour,
+		WebAuthnCredRepo:      webauthnCredRepo,
+		WebAuthnRPID:          cfg.Auth.WebAuthnRPID,
+		WebAuthnOrigin:        cfg.Auth.WebAuthnOrigin,
 		ExtendedSessionTTL:    time.Duration(cfg.Auth.ExtendedSessionTTLHours) * time.Hour,
 	}
 

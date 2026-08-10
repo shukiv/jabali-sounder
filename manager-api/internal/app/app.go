@@ -32,9 +32,13 @@ type Deps struct {
 	AuditRepo        repository.AuditRepository
 	BackupRepo       repository.BackupRepository
 	PolicyExRepo     repository.PolicyExceptionRepository
-	AdminRepo        repository.AdminRepository
-	SecretKey        *secrets.Key
-	JWTSecret        string
+	WebAuthnCredRepo repository.WebAuthnCredentialRepository
+	// WebAuthn RP overrides (SND-109); empty derives from the request.
+	WebAuthnRPID   string
+	WebAuthnOrigin string
+	AdminRepo      repository.AdminRepository
+	SecretKey      *secrets.Key
+	JWTSecret      string
 	// MaxBodyBytes caps request body size (SND-5); <=0 uses the default.
 	MaxBodyBytes int64
 	// Login throttle (SND-3); <=0 uses defaults.
@@ -105,6 +109,9 @@ func NewWithDeps(deps Deps) *gin.Engine {
 		SecretKey:        deps.SecretKey,
 		AllowPlaintext:   deps.AllowPlaintextSecrets,
 		SessionRepo:      deps.SessionRepo,
+		WebAuthnCredRepo: deps.WebAuthnCredRepo,
+		WebAuthnRPID:     deps.WebAuthnRPID,
+		WebAuthnOrigin:   deps.WebAuthnOrigin,
 		Notifications:    deps.NotificationRepo,
 	})
 

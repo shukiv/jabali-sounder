@@ -233,6 +233,7 @@
     "reset_help": "Legen Sie ein neues Passwort für das Administratorkonto dieses Geräts fest. Dies funktioniert nur auf diesem Gerät.",
     "reset_title": "Passwort zurücksetzen",
     "reset_two_factor": "Auch die Zwei-Faktor-Authentifizierung zurücksetzen",
+    "sign_in_with_passkey": "Mit Passkey anmelden",
     "stay_signed_in": "Angemeldet bleiben",
     "tagline": "Zentrale Steuerungsebene",
     "username": "Benutzername"
@@ -359,6 +360,23 @@
     "service_down": "Dienst {{service}} ist {{status}}",
     "snoozed_for_1h": "Für 1 Std. zurückgestellt",
     "token_expiring": "API-Token \"{{name}}\" läuft in {{days}} Tagen ab"
+  },
+  "passkeys": {
+    "actions": "Aktionen",
+    "add_passkey": "Passkey hinzufügen",
+    "cancel": "Abbrechen",
+    "created": "Hinzugefügt",
+    "current_password": "Aktuelles Passwort",
+    "label": "Name",
+    "label_placeholder": "z. B. YubiKey, dieses Notebook",
+    "last_used": "Zuletzt verwendet",
+    "passkey_added": "Passkey hinzugefügt",
+    "passkey_removed": "Passkey entfernt",
+    "passkeys": "Passkeys",
+    "passkeys_help": "Ohne Passwort anmelden mit einem Passkey auf diesem Gerät oder in Ihrem Passwortmanager. Funktioniert im Browser über HTTPS.",
+    "password_required": "Ihr aktuelles Passwort ist erforderlich",
+    "remove": "Entfernen",
+    "remove_passkey": "Diesen Passkey entfernen?"
   },
   "search": {
     "global_search": "Globale Suche",

@@ -233,6 +233,7 @@
     "reset_help": "Set a new password for this device's admin account. This works only on this device.",
     "reset_title": "Reset password",
     "reset_two_factor": "Also reset two-factor authentication",
+    "sign_in_with_passkey": "Sign in with a passkey",
     "stay_signed_in": "Stay signed in",
     "tagline": "Central Sounding Plane",
     "username": "Username"
@@ -359,6 +360,23 @@
     "service_down": "Service {{service}} is {{status}}",
     "snoozed_for_1h": "Snoozed for 1h",
     "token_expiring": "API token \"{{name}}\" expires in {{days}} days"
+  },
+  "passkeys": {
+    "actions": "Actions",
+    "add_passkey": "Add passkey",
+    "cancel": "Cancel",
+    "created": "Added",
+    "current_password": "Current password",
+    "label": "Name",
+    "label_placeholder": "e.g. YubiKey, this laptop",
+    "last_used": "Last used",
+    "passkey_added": "Passkey added",
+    "passkey_removed": "Passkey removed",
+    "passkeys": "Passkeys",
+    "passkeys_help": "Sign in without a password using a passkey stored on this device or in your password manager. Works in the browser over HTTPS.",
+    "password_required": "Your current password is required",
+    "remove": "Remove",
+    "remove_passkey": "Remove this passkey?"
   },
   "search": {
     "global_search": "Global search",

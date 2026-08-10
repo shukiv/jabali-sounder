@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, Form, Input, Button, Typography, App, Modal, Checkbox } from "antd";
-import { LockOutlined, UserOutlined } from "@ant-design/icons";
+import { LockOutlined, UserOutlined, KeyOutlined } from "@ant-design/icons";
 import apiClient from "../apiClient";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../hooks/useAuth";
@@ -9,18 +9,21 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { BrandLogo } from "../components/BrandLogo";
 import { Call } from "@wailsio/runtime";
 import { isMobileApp } from "../lib/desktop";
+import { passkeysAvailable } from "../lib/passkeys";
 
 const { Text } = Typography;
 
 export default function Login() {
   const { t } = useTranslation();
-  const { login, setup } = useAuth();
+  const { login, passkeyLogin, setup } = useAuth();
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [setupAvailable, setSetupAvailable] = useState(false);
   const [needs2FA, setNeeds2FA] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [form] = Form.useForm();
   const { mode } = useThemeMode();
 
   useEffect(() => {
@@ -73,6 +76,22 @@ export default function Login() {
     }
   };
 
+  const handlePasskeyLogin = async () => {
+    setPasskeyLoading(true);
+    try {
+      await passkeyLogin(form.getFieldValue("remember"));
+      message.success(t("login.logged_in"));
+      window.location.reload();
+    } catch (err) {
+      // A user cancelling the browser prompt throws NotAllowedError — stay quiet.
+      if (err instanceof Error && err.name !== "NotAllowedError" && err.name !== "AbortError") {
+        message.error(err.message);
+      }
+    } finally {
+      setPasskeyLoading(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -93,7 +112,7 @@ export default function Login() {
           </div>
           <Text type="secondary">{setupAvailable ? t("login.create_first_admin") : t("login.tagline")}</Text>
         </div>
-        <Form onFinish={handleSubmit} size="large" requiredMark={false}>
+        <Form form={form} onFinish={handleSubmit} size="large" requiredMark={false}>
           <Form.Item
             name="username"
             rules={[{ required: true, message: t("login.enter_username") }]}
@@ -124,6 +143,13 @@ export default function Login() {
               {setupAvailable ? t("login.create_admin") : t("login.log_in")}
             </Button>
           </Form.Item>
+          {!setupAvailable && !needs2FA && passkeysAvailable() ? (
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button icon={<KeyOutlined />} loading={passkeyLoading} onClick={handlePasskeyLogin} block>
+                {t("login.sign_in_with_passkey")}
+              </Button>
+            </Form.Item>
+          ) : null}
         </Form>
         {!setupAvailable && isMobileApp() ? (
           <>

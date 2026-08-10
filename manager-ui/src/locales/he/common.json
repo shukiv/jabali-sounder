@@ -233,6 +233,7 @@
     "reset_help": "הגדירו סיסמה חדשה לחשבון המנהל במכשיר זה. פעולה זו עובדת רק במכשיר זה.",
     "reset_title": "איפוס סיסמה",
     "reset_two_factor": "אפס גם אימות דו-שלבי",
+    "sign_in_with_passkey": "התחברות עם מפתח גישה",
     "stay_signed_in": "השאר מחובר",
     "tagline": "מרכז בקרה מרכזי",
     "username": "שם משתמש"
@@ -359,6 +360,23 @@
     "service_down": "השירות {{service}} במצב {{status}}",
     "snoozed_for_1h": "נדחה לשעה",
     "token_expiring": "תוקף אסימון ה-API \"{{name}}\" יפוג בעוד {{days}} ימים"
+  },
+  "passkeys": {
+    "actions": "פעולות",
+    "add_passkey": "הוסף מפתח גישה",
+    "cancel": "ביטול",
+    "created": "נוסף",
+    "current_password": "סיסמה נוכחית",
+    "label": "שם",
+    "label_placeholder": "למשל YubiKey, המחשב הזה",
+    "last_used": "שימוש אחרון",
+    "passkey_added": "מפתח הגישה נוסף",
+    "passkey_removed": "מפתח הגישה הוסר",
+    "passkeys": "מפתחות גישה",
+    "passkeys_help": "התחברו ללא סיסמה באמצעות מפתח גישה השמור במכשיר זה או במנהל הסיסמאות. פועל בדפדפן דרך HTTPS.",
+    "password_required": "נדרשת הסיסמה הנוכחית שלך",
+    "remove": "הסר",
+    "remove_passkey": "להסיר מפתח גישה זה?"
   },
   "search": {
     "global_search": "חיפוש גלובלי",

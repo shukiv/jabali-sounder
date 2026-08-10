@@ -233,6 +233,7 @@
     "reset_help": "Establezca una nueva contraseña para la cuenta de administrador de este dispositivo. Esto solo funciona en este dispositivo.",
     "reset_title": "Restablecer contraseña",
     "reset_two_factor": "Restablecer también la autenticación de dos factores",
+    "sign_in_with_passkey": "Iniciar sesión con clave de acceso",
     "stay_signed_in": "Mantener la sesión iniciada",
     "tagline": "Plano de control central",
     "username": "Nombre de usuario"
@@ -359,6 +360,23 @@
     "service_down": "El servicio {{service}} está {{status}}",
     "snoozed_for_1h": "Pospuesto 1 h",
     "token_expiring": "El token de API \"{{name}}\" caduca en {{days}} días"
+  },
+  "passkeys": {
+    "actions": "Acciones",
+    "add_passkey": "Añadir clave de acceso",
+    "cancel": "Cancelar",
+    "created": "Añadida",
+    "current_password": "Contraseña actual",
+    "label": "Nombre",
+    "label_placeholder": "p. ej. YubiKey, este portátil",
+    "last_used": "Último uso",
+    "passkey_added": "Clave de acceso añadida",
+    "passkey_removed": "Clave de acceso eliminada",
+    "passkeys": "Claves de acceso",
+    "passkeys_help": "Inicie sesión sin contraseña con una clave de acceso guardada en este dispositivo o en su gestor de contraseñas. Funciona en el navegador por HTTPS.",
+    "password_required": "Se requiere su contraseña actual",
+    "remove": "Eliminar",
+    "remove_passkey": "¿Eliminar esta clave de acceso?"
   },
   "search": {
     "global_search": "Búsqueda global",
