@@ -232,6 +232,7 @@
     "password_reset_done": "密码已重置 — 请使用新密码登录",
     "reset_help": "为此设备的管理员账户设置新密码。此操作仅在本设备上有效。",
     "reset_title": "重置密码",
+    "reset_two_factor": "同时重置双重认证",
     "stay_signed_in": "保持登录",
     "tagline": "中央控制平面",
     "username": "用户名"

@@ -232,6 +232,7 @@
     "password_reset_done": "Contraseña restablecida: inicie sesión con la nueva contraseña",
     "reset_help": "Establezca una nueva contraseña para la cuenta de administrador de este dispositivo. Esto solo funciona en este dispositivo.",
     "reset_title": "Restablecer contraseña",
+    "reset_two_factor": "Restablecer también la autenticación de dos factores",
     "stay_signed_in": "Mantener la sesión iniciada",
     "tagline": "Plano de control central",
     "username": "Nombre de usuario"

@@ -232,6 +232,7 @@
     "password_reset_done": "Senha redefinida — entre com a nova senha",
     "reset_help": "Defina uma nova senha para a conta de administrador deste dispositivo. Isto funciona apenas neste dispositivo.",
     "reset_title": "Redefinir senha",
+    "reset_two_factor": "Redefinir também a autenticação de dois fatores",
     "stay_signed_in": "Manter conectado",
     "tagline": "Plano de controle central",
     "username": "Nome de usuário"

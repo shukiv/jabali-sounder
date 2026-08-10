@@ -232,6 +232,7 @@
     "password_reset_done": "Password reset — log in with the new password",
     "reset_help": "Set a new password for this device's admin account. This works only on this device.",
     "reset_title": "Reset password",
+    "reset_two_factor": "Also reset two-factor authentication",
     "stay_signed_in": "Stay signed in",
     "tagline": "Central Sounding Plane",
     "username": "Username"
