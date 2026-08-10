@@ -52,6 +52,9 @@ export function useAuth() {
   const [auth, setAuth] = useState<AuthState>(loadAuth);
 
   const acceptAuthResponse = useCallback((data: { token: string; admin: { username: string; role?: string } }) => {
+    if (!data?.token || !data?.admin?.username) {
+      throw new Error("Unexpected authentication response");
+    }
     const newState = {
       token: data.token,
       username: data.admin.username,

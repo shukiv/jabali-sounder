@@ -82,6 +82,17 @@ func NewWithDeps(deps Deps) *gin.Engine {
 	// Cap request bodies before any handler reads them (SND-5).
 	r.Use(middleware.BodyLimit(deps.MaxBodyBytes))
 
+	// Baseline security response headers (defense-in-depth for the browser /
+	// reverse-proxied deployment). No CSP here — the SPA + AntD use inline
+	// styles and the desktop webview loads from a custom scheme, so a strict
+	// policy needs its own validation pass.
+	r.Use(func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Referrer-Policy", "no-referrer")
+		c.Next()
+	})
+
 	// /health — unauthenticated liveness probe.
 	api.RegisterHealthRoutes(r)
 

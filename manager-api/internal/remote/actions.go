@@ -3,7 +3,9 @@ package remote
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 )
@@ -52,13 +54,18 @@ func (c *Client) post(ctx context.Context, path string, body any) (*ActionResult
 	defer func() { _ = resp.Body.Close() }()
 
 	var result ActionResult
-	_ = decodeCapped(resp, &result)
+	derr := decodeCapped(resp, &result)
 	if resp.StatusCode >= 300 {
 		msg := result.Error
 		if msg == "" {
 			msg = fmt.Sprintf("HTTP %d", resp.StatusCode)
 		}
 		return &result, fmt.Errorf("action rejected: %s", msg)
+	}
+	// A 2xx with an unparseable body must NOT read as success — the action may
+	// not have run. An empty body (EOF) is fine: some actions return no content.
+	if derr != nil && !errors.Is(derr, io.EOF) {
+		return &result, fmt.Errorf("action response decode: %w", derr)
 	}
 	return &result, nil
 }

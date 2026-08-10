@@ -82,14 +82,16 @@ function stampRows<T extends { id?: string }>(
   snapshots: MailSnapshotEntry[],
   key: keyof Pick<MailSnapshotEntry, "mailboxes" | "groups" | "forwarders" | "domain_forwarders" | "autoresponders">,
 ) {
-  return snapshots.flatMap((snapshot) =>
-    (snapshot[key] as unknown as T[]).map((row, index) => ({
+  return snapshots.flatMap((snapshot) => {
+    const items = snapshot[key] as unknown as T[] | null | undefined;
+    if (!Array.isArray(items)) return [];
+    return items.map((row, index) => ({
       ...row,
       row_key: `${snapshot.server.id}:${row.id || index}`,
       server_id: snapshot.server.id,
       server_name: snapshot.server.name,
-    })),
-  );
+    }));
+  });
 }
 
 export default function Mail() {

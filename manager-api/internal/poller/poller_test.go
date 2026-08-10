@@ -738,3 +738,33 @@ func TestTokenExpiryReminder(t *testing.T) {
 		t.Fatalf("want 1 token_expiring notification, got %+v", rows)
 	}
 }
+
+// TestCPURecoveryResolvesAfterRestart is a regression for the audit finding that
+// a fresh poller (empty in-memory breachSince, as after a process restart) would
+// skip ResolveActive and leave a DB-open incident hanging forever.
+func TestCPURecoveryResolvesAfterRestart(t *testing.T) {
+	sr, hr, mr, nr := notifRepos(t)
+	srv := seed(t, sr, models.ServerStatusActive)
+	cpu := 95.0
+	now := time.Unix(1_700_000_000, 0)
+	ctx := context.Background()
+
+	// Original process raises + sustains a CPU incident.
+	p1 := cpuPoller(sr, hr, mr, nr, &cpu, &now)
+	p1.PollOnce(ctx)
+	now = now.Add(61 * time.Second)
+	p1.PollOnce(ctx)
+	if exists, _ := nr.ActiveExists(ctx, srv.ID, "cpu_high"); !exists {
+		t.Fatal("expected an active cpu_high incident after a sustained breach")
+	}
+
+	// Restart: a brand-new poller has an empty breachSince map. CPU is healthy
+	// now; the incident must still auto-resolve rather than linger forever.
+	cpu = 10.0
+	now = now.Add(61 * time.Second)
+	p2 := cpuPoller(sr, hr, mr, nr, &cpu, &now)
+	p2.PollOnce(ctx)
+	if exists, _ := nr.ActiveExists(ctx, srv.ID, "cpu_high"); exists {
+		t.Fatal("cpu_high incident must resolve on recovery even across a restart")
+	}
+}

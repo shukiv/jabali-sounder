@@ -45,7 +45,7 @@ export default function Dashboard() {
   const users = useUsers();
   const navigate = useNavigate();
 
-  const serverRows = servers || [];
+  const serverRows = useMemo(() => servers || [], [servers]);
   const envBreakdown = useMemo(() => {
     const map = new Map<string, { total: number; healthy: number }>();
     for (const srv of serverRows) {

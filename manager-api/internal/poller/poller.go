@@ -554,12 +554,11 @@ func (p *Poller) evaluateServiceRules(ctx context.Context, s models.Server, st *
 
 		// Healthy again: clear tracking and resolve any open incident.
 		p.breachMu.Lock()
-		_, was := p.breachSince[key]
 		delete(p.breachSince, key)
 		p.breachMu.Unlock()
-		if !was {
-			continue
-		}
+		// Resolve regardless of whether THIS process observed the breach: after a
+		// restart the in-memory map is empty but a DB incident may still be open.
+		// ActiveExists gates the work, so healthy servers with no incident stay cheap.
 		if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, kind); exists {
 			_ = p.cfg.Notifications.ResolveActive(ctx, s.ID, kind)
 			p.dispatch(ctx, alert.Event{
@@ -669,12 +668,11 @@ func (p *Poller) evaluateRules(ctx context.Context, s models.Server, snap remote
 
 		// Recovered: clear tracking and resolve any open incident.
 		p.breachMu.Lock()
-		_, was := p.breachSince[key]
 		delete(p.breachSince, key)
 		p.breachMu.Unlock()
-		if !was {
-			continue
-		}
+		// Resolve regardless of whether THIS process observed the breach: after a
+		// restart the in-memory map is empty but a DB incident may still be open.
+		// ActiveExists gates the work, so healthy servers with no incident stay cheap.
 		if exists, _ := p.cfg.Notifications.ActiveExists(ctx, s.ID, kind); exists {
 			_ = p.cfg.Notifications.ResolveActive(ctx, s.ID, kind)
 			p.dispatch(ctx, alert.Event{
