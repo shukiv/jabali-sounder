@@ -12,6 +12,8 @@ import AlertRulesSettings from "../components/AlertRulesSettings";
 import AlertChannelsSettings from "../components/AlertChannelsSettings";
 import MaintenanceSettings from "../components/MaintenanceSettings";
 import AboutSettings from "../components/AboutSettings";
+import PasskeysSettings from "../components/PasskeysSettings";
+import { passkeysAvailable } from "../lib/passkeys";
 import { roleAtLeast } from "../hooks/useAuth";
 import { desktopBridge, isMobileApp } from "../lib/desktop";
 
@@ -185,6 +187,7 @@ export default function Settings() {
         <a href="#sec-import">Import / Export</a>
         <a href="#sec-password">Password</a>
         <a href="#sec-2fa">Two-factor</a>
+        {passkeysAvailable() ? <a href="#sec-passkeys">{t("passkeys.passkeys")}</a> : null}
         <a href="#sec-sessions">Sessions</a>
         {roleAtLeast("operator") ? <a href="#sec-tokens">API tokens</a> : null}
         <a href="#sec-alerts">Alerts</a>
@@ -319,6 +322,8 @@ export default function Settings() {
       </section>
 
       <section id="sec-2fa"><TwoFactorSettings /></section>
+
+      {passkeysAvailable() ? <section id="sec-passkeys"><PasskeysSettings /></section> : null}
 
       <section id="sec-sessions"><SessionsSettings /></section>
 

@@ -233,6 +233,7 @@
     "reset_help": "Imposta una nuova password per l'account amministratore di questo dispositivo. Funziona solo su questo dispositivo.",
     "reset_title": "Reimposta password",
     "reset_two_factor": "Reimposta anche l'autenticazione a due fattori",
+    "sign_in_with_passkey": "Accedi con una passkey",
     "stay_signed_in": "Resta connesso",
     "tagline": "Piano di controllo centrale",
     "username": "Nome utente"
@@ -359,6 +360,23 @@
     "service_down": "Il servizio {{service}} è {{status}}",
     "snoozed_for_1h": "Posticipato di 1 h",
     "token_expiring": "Il token API \"{{name}}\" scade tra {{days}} giorni"
+  },
+  "passkeys": {
+    "actions": "Azioni",
+    "add_passkey": "Aggiungi passkey",
+    "cancel": "Annulla",
+    "created": "Aggiunta",
+    "current_password": "Password attuale",
+    "label": "Nome",
+    "label_placeholder": "es. YubiKey, questo portatile",
+    "last_used": "Ultimo utilizzo",
+    "passkey_added": "Passkey aggiunta",
+    "passkey_removed": "Passkey rimossa",
+    "passkeys": "Passkey",
+    "passkeys_help": "Accedi senza password con una passkey salvata su questo dispositivo o nel gestore di password. Funziona nel browser tramite HTTPS.",
+    "password_required": "È richiesta la password attuale",
+    "remove": "Rimuovi",
+    "remove_passkey": "Rimuovere questa passkey?"
   },
   "search": {
     "global_search": "Ricerca globale",

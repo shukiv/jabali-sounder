@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import apiClient from "../apiClient";
+import { loginWithPasskey } from "../lib/passkeys";
 
 export interface AuthState {
   token: string | null;
@@ -78,6 +79,14 @@ export function useAuth() {
     [acceptAuthResponse],
   );
 
+  const passkeyLogin = useCallback(
+    async (remember?: boolean) => {
+      const data = await loginWithPasskey(!!remember);
+      return acceptAuthResponse(data);
+    },
+    [acceptAuthResponse],
+  );
+
   const setup = useCallback(async (username: string, password: string) => {
     const resp = await apiClient.post("/auth/setup", { username, password });
     return acceptAuthResponse(resp.data);
@@ -95,5 +104,5 @@ export function useAuth() {
     apiClient.defaults.headers.common["Authorization"] = `Bearer ${auth.token}`;
   }
 
-  return { auth, login, setup, logout };
+  return { auth, login, passkeyLogin, setup, logout };
 }

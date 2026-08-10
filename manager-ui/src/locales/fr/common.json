@@ -233,6 +233,7 @@
     "reset_help": "Définissez un nouveau mot de passe pour le compte administrateur de cet appareil. Cela ne fonctionne que sur cet appareil.",
     "reset_title": "Réinitialiser le mot de passe",
     "reset_two_factor": "Réinitialiser aussi l'authentification à deux facteurs",
+    "sign_in_with_passkey": "Se connecter avec une clé d'accès",
     "stay_signed_in": "Rester connecté",
     "tagline": "Plan de contrôle central",
     "username": "Nom d'utilisateur"
@@ -359,6 +360,23 @@
     "service_down": "Le service {{service}} est {{status}}",
     "snoozed_for_1h": "Reporté d'1 h",
     "token_expiring": "Le jeton d'API « {{name}} » expire dans {{days}} jours"
+  },
+  "passkeys": {
+    "actions": "Actions",
+    "add_passkey": "Ajouter une clé d'accès",
+    "cancel": "Annuler",
+    "created": "Ajoutée",
+    "current_password": "Mot de passe actuel",
+    "label": "Nom",
+    "label_placeholder": "ex. YubiKey, ce portable",
+    "last_used": "Dernière utilisation",
+    "passkey_added": "Clé d'accès ajoutée",
+    "passkey_removed": "Clé d'accès supprimée",
+    "passkeys": "Clés d'accès",
+    "passkeys_help": "Connectez-vous sans mot de passe avec une clé d'accès stockée sur cet appareil ou dans votre gestionnaire de mots de passe. Fonctionne dans le navigateur via HTTPS.",
+    "password_required": "Votre mot de passe actuel est requis",
+    "remove": "Supprimer",
+    "remove_passkey": "Supprimer cette clé d'accès ?"
   },
   "search": {
     "global_search": "Recherche globale",

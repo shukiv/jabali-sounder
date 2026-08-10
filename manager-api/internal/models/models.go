@@ -275,6 +275,21 @@ type PolicyException struct {
 
 func (PolicyException) TableName() string { return "policy_exceptions" }
 
+// WebAuthnCredential stores a registered passkey for an admin (SND-109). Data
+// holds the JSON-serialized go-webauthn Credential (public key, sign count,
+// transports, flags); CredentialID is kept raw for fast lookup on login.
+type WebAuthnCredential struct {
+	ID           string       `gorm:"column:id;type:char(26);primaryKey" json:"id"`
+	AdminID      string       `gorm:"column:admin_id;type:char(26);not null;index" json:"-"`
+	CredentialID []byte       `gorm:"column:credential_id;type:varbinary(255);uniqueIndex" json:"-"`
+	Data         []byte       `gorm:"column:data;type:blob;not null" json:"-"`
+	Label        string       `gorm:"column:label;type:varchar(120)" json:"label"`
+	CreatedAt    time.Time    `gorm:"column:created_at" json:"created_at"`
+	LastUsedAt   sql.NullTime `gorm:"column:last_used_at" json:"last_used_at"`
+}
+
+func (WebAuthnCredential) TableName() string { return "webauthn_credentials" }
+
 // AuditLog is a persisted record of a privileged mutation (SND-24). It mirrors
 // the structured slog "audit" event so the trail is queryable in the UI.
 type AuditLog struct {

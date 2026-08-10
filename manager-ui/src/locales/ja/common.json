@@ -233,6 +233,7 @@
     "reset_help": "この端末の管理者アカウントに新しいパスワードを設定します。これはこの端末でのみ機能します。",
     "reset_title": "パスワードをリセット",
     "reset_two_factor": "二要素認証もリセットする",
+    "sign_in_with_passkey": "パスキーでサインイン",
     "stay_signed_in": "ログインしたままにする",
     "tagline": "中央コントロールプレーン",
     "username": "ユーザー名"
@@ -359,6 +360,23 @@
     "service_down": "サービス {{service}} は {{status}} です",
     "snoozed_for_1h": "1時間スヌーズ中",
     "token_expiring": "APIトークン「{{name}}」は {{days}} 日後に期限切れになります"
+  },
+  "passkeys": {
+    "actions": "操作",
+    "add_passkey": "パスキーを追加",
+    "cancel": "キャンセル",
+    "created": "追加日",
+    "current_password": "現在のパスワード",
+    "label": "名前",
+    "label_placeholder": "例：YubiKey、このノートPC",
+    "last_used": "最終使用",
+    "passkey_added": "パスキーを追加しました",
+    "passkey_removed": "パスキーを削除しました",
+    "passkeys": "パスキー",
+    "passkeys_help": "この端末やパスワードマネージャーに保存されたパスキーでパスワードなしでサインインします。ブラウザで HTTPS 経由で動作します。",
+    "password_required": "現在のパスワードが必要です",
+    "remove": "削除",
+    "remove_passkey": "このパスキーを削除しますか？"
   },
   "search": {
     "global_search": "全体検索",

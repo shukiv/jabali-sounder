@@ -233,6 +233,7 @@
     "reset_help": "Bu cihazın yönetici hesabı için yeni bir parola belirleyin. Bu yalnızca bu cihazda çalışır.",
     "reset_title": "Parolayı sıfırla",
     "reset_two_factor": "İki faktörlü kimlik doğrulamayı da sıfırla",
+    "sign_in_with_passkey": "Parola anahtarıyla giriş yap",
     "stay_signed_in": "Oturumu açık tut",
     "tagline": "Merkezi kontrol düzlemi",
     "username": "Kullanıcı adı"
@@ -359,6 +360,23 @@
     "service_down": "{{service}} hizmeti {{status}} durumunda",
     "snoozed_for_1h": "1 saat ertelendi",
     "token_expiring": "\"{{name}}\" API belirtecinin süresi {{days}} gün içinde doluyor"
+  },
+  "passkeys": {
+    "actions": "İşlemler",
+    "add_passkey": "Parola anahtarı ekle",
+    "cancel": "İptal",
+    "created": "Eklendi",
+    "current_password": "Mevcut parola",
+    "label": "Ad",
+    "label_placeholder": "örn. YubiKey, bu dizüstü",
+    "last_used": "Son kullanım",
+    "passkey_added": "Parola anahtarı eklendi",
+    "passkey_removed": "Parola anahtarı kaldırıldı",
+    "passkeys": "Parola anahtarları",
+    "passkeys_help": "Bu cihazda veya parola yöneticinizde saklanan bir parola anahtarıyla parolasız giriş yapın. Tarayıcıda HTTPS üzerinden çalışır.",
+    "password_required": "Mevcut parolanız gereklidir",
+    "remove": "Kaldır",
+    "remove_passkey": "Bu parola anahtarı kaldırılsın mı?"
   },
   "search": {
     "global_search": "Genel arama",

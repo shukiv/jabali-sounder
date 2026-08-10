@@ -233,6 +233,7 @@
     "reset_help": "Setați o parolă nouă pentru contul de administrator al acestui dispozitiv. Funcționează doar pe acest dispozitiv.",
     "reset_title": "Resetare parolă",
     "reset_two_factor": "Resetați și autentificarea în doi factori",
+    "sign_in_with_passkey": "Autentificare cu cheie de acces",
     "stay_signed_in": "Rămâneți conectat",
     "tagline": "Plan central de sondare",
     "username": "Nume de utilizator"
@@ -359,6 +360,23 @@
     "service_down": "Serviciul {{service}} este {{status}}",
     "snoozed_for_1h": "Amânat pentru 1h",
     "token_expiring": "Tokenul API \"{{name}}\" expiră în {{days}} zile"
+  },
+  "passkeys": {
+    "actions": "Acțiuni",
+    "add_passkey": "Adăugați cheie de acces",
+    "cancel": "Anulați",
+    "created": "Adăugată",
+    "current_password": "Parola curentă",
+    "label": "Nume",
+    "label_placeholder": "ex. YubiKey, acest laptop",
+    "last_used": "Ultima utilizare",
+    "passkey_added": "Cheie de acces adăugată",
+    "passkey_removed": "Cheie de acces eliminată",
+    "passkeys": "Chei de acces",
+    "passkeys_help": "Autentificați-vă fără parolă cu o cheie de acces stocată pe acest dispozitiv sau în managerul de parole. Funcționează în browser prin HTTPS.",
+    "password_required": "Parola curentă este necesară",
+    "remove": "Eliminați",
+    "remove_passkey": "Eliminați această cheie de acces?"
   },
   "search": {
     "global_search": "Căutare globală",

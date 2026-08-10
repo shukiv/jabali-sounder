@@ -233,6 +233,7 @@
     "reset_help": "Встановіть новий пароль для облікового запису адміністратора на цьому пристрої. Працює лише на цьому пристрої.",
     "reset_title": "Скинути пароль",
     "reset_two_factor": "Також скинути двофакторну автентифікацію",
+    "sign_in_with_passkey": "Увійти за допомогою passkey",
     "stay_signed_in": "Залишатися в системі",
     "tagline": "Центральна панель керування",
     "username": "Ім'я користувача"
@@ -359,6 +360,23 @@
     "service_down": "Служба {{service}} у стані {{status}}",
     "snoozed_for_1h": "Відкладено на 1 год",
     "token_expiring": "Термін дії API-токена «{{name}}» спливає через {{days}} днів"
+  },
+  "passkeys": {
+    "actions": "Дії",
+    "add_passkey": "Додати passkey",
+    "cancel": "Скасувати",
+    "created": "Додано",
+    "current_password": "Поточний пароль",
+    "label": "Ім'я",
+    "label_placeholder": "напр. YubiKey, цей ноутбук",
+    "last_used": "Останнє використання",
+    "passkey_added": "Passkey додано",
+    "passkey_removed": "Passkey видалено",
+    "passkeys": "Passkey",
+    "passkeys_help": "Вхід без пароля за допомогою passkey, збереженого на цьому пристрої або в менеджері паролів. Працює в браузері через HTTPS.",
+    "password_required": "Потрібен ваш поточний пароль",
+    "remove": "Видалити",
+    "remove_passkey": "Видалити цей passkey?"
   },
   "search": {
     "global_search": "Глобальний пошук",

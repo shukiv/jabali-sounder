@@ -35,6 +35,13 @@ type AuthHandlerConfig struct {
 	SecretKey      *secrets.Key
 	AllowPlaintext bool
 	SessionRepo    repository.SessionRepository
+	// Passkeys (SND-109). Optional; nil disables the WebAuthn endpoints.
+	WebAuthnCredRepo repository.WebAuthnCredentialRepository
+	// WebAuthnRPID / WebAuthnOrigin override the RP id + origin; empty derives
+	// them from the request (Host + X-Forwarded-Proto), which is correct behind
+	// the panel reverse proxy.
+	WebAuthnRPID   string
+	WebAuthnOrigin string
 	// Notifications raises a per-account brute-force alert (SND-30). Optional.
 	Notifications repository.NotificationRepository
 }
@@ -47,7 +54,7 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	h := &authHandler{cfg: cfg, acctFail: middleware.NewAccountFailureTracker(0, cfg.LoginWindow, nil)}
+	h := &authHandler{cfg: cfg, acctFail: middleware.NewAccountFailureTracker(0, cfg.LoginWindow, nil), passkeys: newPasskeySessionStore()}
 	sessionCheck := func(ctx context.Context, sid string) (bool, error) {
 		if cfg.SessionRepo == nil {
 			return true, nil
@@ -69,11 +76,23 @@ func RegisterAuthRoutes(g *gin.RouterGroup, cfg AuthHandlerConfig) {
 	auth.GET("/sessions", authMW, h.listSessions)
 	auth.DELETE("/sessions/:id", authMW, h.revokeSession)
 	auth.POST("/logout", authMW, h.logout)
+
+	// Passkey (WebAuthn) endpoints — passwordless login (SND-109). Only when a
+	// credential store is configured.
+	if cfg.WebAuthnCredRepo != nil {
+		auth.POST("/passkeys/register/begin", authMW, h.passkeyRegisterBegin)
+		auth.POST("/passkeys/register/finish", authMW, h.passkeyRegisterFinish)
+		auth.GET("/passkeys", authMW, h.listPasskeys)
+		auth.DELETE("/passkeys/:id", authMW, h.deletePasskey)
+		auth.POST("/passkeys/login/begin", loginLimiter.Middleware(), h.passkeyLoginBegin)
+		auth.POST("/passkeys/login/finish", loginLimiter.Middleware(), h.passkeyLoginFinish)
+	}
 }
 
 type authHandler struct {
 	cfg      AuthHandlerConfig
 	acctFail *middleware.AccountFailureTracker
+	passkeys *passkeySessionStore
 }
 
 type loginRequest struct {

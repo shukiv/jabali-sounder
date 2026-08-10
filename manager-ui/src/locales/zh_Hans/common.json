@@ -233,6 +233,7 @@
     "reset_help": "为此设备的管理员账户设置新密码。此操作仅在本设备上有效。",
     "reset_title": "重置密码",
     "reset_two_factor": "同时重置双重认证",
+    "sign_in_with_passkey": "使用通行密钥登录",
     "stay_signed_in": "保持登录",
     "tagline": "中央控制平面",
     "username": "用户名"
@@ -359,6 +360,23 @@
     "service_down": "服务 {{service}} 处于 {{status}} 状态",
     "snoozed_for_1h": "已暂停 1 小时",
     "token_expiring": "API 令牌“{{name}}”将在 {{days}} 天后过期"
+  },
+  "passkeys": {
+    "actions": "操作",
+    "add_passkey": "添加通行密钥",
+    "cancel": "取消",
+    "created": "添加时间",
+    "current_password": "当前密码",
+    "label": "名称",
+    "label_placeholder": "例如 YubiKey、这台笔记本",
+    "last_used": "最近使用",
+    "passkey_added": "已添加通行密钥",
+    "passkey_removed": "已移除通行密钥",
+    "passkeys": "通行密钥",
+    "passkeys_help": "使用存储在此设备或密码管理器中的通行密钥免密码登录。在浏览器中通过 HTTPS 使用。",
+    "password_required": "需要您的当前密码",
+    "remove": "移除",
+    "remove_passkey": "移除此通行密钥？"
   },
   "search": {
     "global_search": "全局搜索",

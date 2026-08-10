@@ -233,6 +233,7 @@
     "reset_help": "Задайте новый пароль для учётной записи администратора на этом устройстве. Работает только на этом устройстве.",
     "reset_title": "Сбросить пароль",
     "reset_two_factor": "Также сбросить двухфакторную аутентификацию",
+    "sign_in_with_passkey": "Войти с помощью passkey",
     "stay_signed_in": "Оставаться в системе",
     "tagline": "Центральная панель управления",
     "username": "Имя пользователя"
@@ -359,6 +360,23 @@
     "service_down": "Служба {{service}} в состоянии {{status}}",
     "snoozed_for_1h": "Отложено на 1 ч",
     "token_expiring": "Срок действия API-токена «{{name}}» истекает через {{days}} дней"
+  },
+  "passkeys": {
+    "actions": "Действия",
+    "add_passkey": "Добавить passkey",
+    "cancel": "Отмена",
+    "created": "Добавлен",
+    "current_password": "Текущий пароль",
+    "label": "Имя",
+    "label_placeholder": "напр. YubiKey, этот ноутбук",
+    "last_used": "Последнее использование",
+    "passkey_added": "Passkey добавлен",
+    "passkey_removed": "Passkey удалён",
+    "passkeys": "Passkey",
+    "passkeys_help": "Вход без пароля с помощью passkey, сохранённого на этом устройстве или в менеджере паролей. Работает в браузере по HTTPS.",
+    "password_required": "Требуется ваш текущий пароль",
+    "remove": "Удалить",
+    "remove_passkey": "Удалить этот passkey?"
   },
   "search": {
     "global_search": "Глобальный поиск",
