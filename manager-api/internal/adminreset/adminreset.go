@@ -33,12 +33,12 @@ var ErrPasswordTooShort = fmt.Errorf("password must be at least %d characters", 
 //
 // It requires the admin to already exist — callers that also create a missing
 // admin (the desktop CLI) handle that separately. It does NOT clear 2FA: a user
-// who lost both their password and their authenticator stays locked out, which
-// is tracked as a separate follow-up.
+// who lost their password can also clear 2FA via clearTOTP (same
+// device-possession trust model) when they have also lost their authenticator.
 //
 // actor labels who performed the reset in the audit log (e.g. "device" for the
 // mobile on-device reset, "cli" for the desktop command).
-func ResetAdminPassword(ctx context.Context, gormDB *gorm.DB, username, newPassword, actor string) error {
+func ResetAdminPassword(ctx context.Context, gormDB *gorm.DB, username, newPassword, actor string, clearTOTP bool) error {
 	if len(newPassword) < MinPasswordLength {
 		return ErrPasswordTooShort
 	}
@@ -57,6 +57,13 @@ func ResetAdminPassword(ctx context.Context, gormDB *gorm.DB, username, newPassw
 		return fmt.Errorf("hash password: %w", err)
 	}
 	admin.PasswordHash = hash
+	// Optionally clear 2FA — for a user who also lost their authenticator.
+	twoFACleared := false
+	if clearTOTP && (admin.TOTPEnabled || len(admin.TOTPSecretEnc) > 0) {
+		admin.TOTPSecretEnc = nil
+		admin.TOTPEnabled = false
+		twoFACleared = true
+	}
 	if err := admins.Update(ctx, admin); err != nil {
 		return fmt.Errorf("update admin: %w", err)
 	}
@@ -79,5 +86,14 @@ func ResetAdminPassword(ctx context.Context, gormDB *gorm.DB, username, newPassw
 		ActorID:   admin.ID,
 		CreatedAt: time.Now().UTC(),
 	})
+	if twoFACleared {
+		_ = audit.Create(ctx, &models.AuditLog{
+			ID:        ids.NewULID(),
+			Event:     "auth.2fa_reset_local",
+			Actor:     actor,
+			ActorID:   admin.ID,
+			CreatedAt: time.Now().UTC(),
+		})
+	}
 	return nil
 }

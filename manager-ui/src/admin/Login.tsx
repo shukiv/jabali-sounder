@@ -55,13 +55,14 @@ export default function Login() {
     }
   };
 
-  const handleReset = async (values: { username?: string; new_password: string }) => {
+  const handleReset = async (values: { username?: string; new_password: string; reset_2fa?: boolean }) => {
     setResetLoading(true);
     try {
       await Call.ByName(
         "main.Bridge.ResetLostPassword",
         (values.username || "admin").trim(),
         values.new_password,
+        values.reset_2fa || false,
       );
       message.success(t("login.password_reset_done"));
       setResetOpen(false);
@@ -164,6 +165,9 @@ export default function Login() {
                   ]}
                 >
                   <Input.Password prefix={<LockOutlined />} />
+                </Form.Item>
+                <Form.Item name="reset_2fa" valuePropName="checked" style={{ marginBottom: 12 }}>
+                  <Checkbox>{t("login.reset_two_factor")}</Checkbox>
                 </Form.Item>
                 <Form.Item style={{ marginBottom: 0 }}>
                   <Button type="primary" htmlType="submit" loading={resetLoading} block>

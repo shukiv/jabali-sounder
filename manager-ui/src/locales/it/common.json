@@ -232,6 +232,7 @@
     "password_reset_done": "Password reimpostata — accedi con la nuova password",
     "reset_help": "Imposta una nuova password per l'account amministratore di questo dispositivo. Funziona solo su questo dispositivo.",
     "reset_title": "Reimposta password",
+    "reset_two_factor": "Reimposta anche l'autenticazione a due fattori",
     "stay_signed_in": "Resta connesso",
     "tagline": "Piano di controllo centrale",
     "username": "Nome utente"

@@ -56,7 +56,7 @@ func TestResetAdminPassword(t *testing.T) {
 		t.Fatal("session should start active")
 	}
 
-	if err := ResetAdminPassword(ctx, g, "admin", "newpassword2", "device"); err != nil {
+	if err := ResetAdminPassword(ctx, g, "admin", "newpassword2", "device", false); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
 
@@ -90,7 +90,7 @@ func TestResetAdminPasswordRejectsShort(t *testing.T) {
 	ctx := context.Background()
 	seedAdmin(t, g, "admin", "oldpassword1")
 
-	if err := ResetAdminPassword(ctx, g, "admin", "short", "device"); !errors.Is(err, ErrPasswordTooShort) {
+	if err := ResetAdminPassword(ctx, g, "admin", "short", "device", false); !errors.Is(err, ErrPasswordTooShort) {
 		t.Fatalf("want ErrPasswordTooShort, got %v", err)
 	}
 	// Password unchanged.
@@ -102,7 +102,52 @@ func TestResetAdminPasswordRejectsShort(t *testing.T) {
 
 func TestResetAdminPasswordMissingAdmin(t *testing.T) {
 	g := testDB(t)
-	if err := ResetAdminPassword(context.Background(), g, "ghost", "newpassword2", "device"); err == nil {
+	if err := ResetAdminPassword(context.Background(), g, "ghost", "newpassword2", "device", false); err == nil {
 		t.Fatal("expected error for missing admin")
+	}
+}
+
+func TestResetAdminPasswordClearsTOTP(t *testing.T) {
+	g := testDB(t)
+	ctx := context.Background()
+	admins := repository.NewAdminRepository(g)
+
+	seed2fa := func(username string) *models.Admin {
+		a, err := api.NewAdmin(username, "oldpassword1", models.RoleOwner)
+		if err != nil {
+			t.Fatalf("new admin: %v", err)
+		}
+		a.TOTPEnabled = true
+		a.TOTPSecretEnc = []byte("enc-secret")
+		if err := admins.Create(ctx, a); err != nil {
+			t.Fatalf("create: %v", err)
+		}
+		return a
+	}
+
+	// clearTOTP=false leaves 2FA intact.
+	kept := seed2fa("keeper")
+	if err := ResetAdminPassword(ctx, g, "keeper", "newpassword2", "device", false); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	got, _ := admins.FindByUsername(ctx, "keeper")
+	if !got.TOTPEnabled || len(got.TOTPSecretEnc) == 0 {
+		t.Fatal("2FA must be untouched when clearTOTP=false")
+	}
+	_ = kept
+
+	// clearTOTP=true disables 2FA and wipes the secret, and audits it.
+	seed2fa("locked")
+	if err := ResetAdminPassword(ctx, g, "locked", "newpassword2", "device", true); err != nil {
+		t.Fatalf("reset+clear: %v", err)
+	}
+	got, _ = admins.FindByUsername(ctx, "locked")
+	if got.TOTPEnabled || len(got.TOTPSecretEnc) != 0 {
+		t.Fatalf("2FA must be cleared when clearTOTP=true: enabled=%v secretLen=%d", got.TOTPEnabled, len(got.TOTPSecretEnc))
+	}
+	var n int64
+	g.Model(&models.AuditLog{}).Where("event = ? AND actor_id = ?", "auth.2fa_reset_local", got.ID).Count(&n)
+	if n != 1 {
+		t.Fatalf("expected 1 auth.2fa_reset_local audit row, got %d", n)
 	}
 }

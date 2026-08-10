@@ -232,6 +232,7 @@
     "password_reset_done": "Parola sıfırlandı — yeni parolayla giriş yapın",
     "reset_help": "Bu cihazın yönetici hesabı için yeni bir parola belirleyin. Bu yalnızca bu cihazda çalışır.",
     "reset_title": "Parolayı sıfırla",
+    "reset_two_factor": "İki faktörlü kimlik doğrulamayı da sıfırla",
     "stay_signed_in": "Oturumu açık tut",
     "tagline": "Merkezi kontrol düzlemi",
     "username": "Kullanıcı adı"

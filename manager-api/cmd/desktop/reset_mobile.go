@@ -19,7 +19,7 @@ import (
 // reachable solely through the on-device Wails runtime binding — mobile has no
 // HTTP listener, so it can never be called over the network, and it is absent
 // from the desktop and server binaries entirely.
-func (b *Bridge) ResetLostPassword(username, newPassword string) error {
+func (b *Bridge) ResetLostPassword(username, newPassword string, resetTwoFactor bool) error {
 	u := strings.TrimSpace(username)
 	if u == "" {
 		u = "admin"
@@ -33,5 +33,5 @@ func (b *Bridge) ResetLostPassword(username, newPassword string) error {
 	if err != nil {
 		return fmt.Errorf("open sqlite: %w", err)
 	}
-	return adminreset.ResetAdminPassword(context.Background(), gormDB, u, newPassword, "device")
+	return adminreset.ResetAdminPassword(context.Background(), gormDB, u, newPassword, "device", resetTwoFactor)
 }
